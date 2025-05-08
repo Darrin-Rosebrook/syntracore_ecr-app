@@ -54,10 +54,18 @@ export interface FHIRValidationResult extends ExternalFHIRValidationResult {
   summary?: string; // Optional summary from AI
 }
 
+export interface ActivityLogEntry {
+  timestamp: string;
+  entry: string;
+  type: 'System' | 'UserAction' | 'Communication' | 'PHAComment';
+  user?: string; // Optional: user who performed the action
+}
+
 export interface EnrollmentData extends EnrollmentFormData {
   id: string;
   submissionDate: string;
   ccdDocumentContent?: string; // Store actual content for mock processing
   validationResult?: FHIRValidationResult;
   status: 'Pending' | 'Approved' | 'Changes Requested';
+  activityLog?: ActivityLogEntry[];
 }

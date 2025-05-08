@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Trash2, PlusCircle, ListChecks, GripVertical, Info } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast'; // Keep for local form validation errors if needed
 
 interface AdminConsoleTabProps {
   customFieldDefinitions: CustomFieldDefinition[];
@@ -32,10 +32,9 @@ const initialFieldState: Omit<CustomFieldDefinition, 'options'> & { tempOptions:
 
 export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRemoveCustomField }: AdminConsoleTabProps) {
   const [newField, setNewField] = useState(initialFieldState);
-  const { toast } = useToast();
+  const { toast } = useToast(); // Keep for form-specific feedback not handled by context
 
   useEffect(() => {
-    // Set default order for new field
     const maxOrder = customFieldDefinitions.reduce((max, field) => Math.max(max, field.order), -1);
     setNewField(prev => ({ ...prev, order: maxOrder + 1 }));
   }, [customFieldDefinitions]);
@@ -94,6 +93,7 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
       toast({ title: 'Error', description: 'Field ID can only contain letters, numbers, and underscores.', variant: 'destructive' });
       return;
     }
+    // Duplicate check is handled by onAddCustomField in context, but good to have client-side too
     if (customFieldDefinitions.some(f => f.id === newField.id.trim())) {
       toast({ title: 'Error', description: 'Field ID already exists.', variant: 'destructive' });
       return;
@@ -113,7 +113,6 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
       }
     }
 
-
     const fieldToAdd: CustomFieldDefinition = {
       id: newField.id.trim(),
       label: newField.label.trim(),
@@ -125,15 +124,14 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
       parentFieldId: newField.type === 'select' ? newField.parentFieldId : undefined,
       dependentOptionsJson: newField.type === 'select' && newField.parentFieldId ? newField.dependentOptionsJson : undefined,
     };
-    onAddCustomField(fieldToAdd);
+    onAddCustomField(fieldToAdd); // This will now call the context function
     
     const maxOrder = Math.max(...customFieldDefinitions.map(f => f.order), fieldToAdd.order);
     setNewField({...initialFieldState, order: maxOrder + 1}); // Reset form
-    toast({ title: 'Success', description: `Field "${fieldToAdd.label}" added.` });
+    // Toast for success/failure will be handled by the context function
   };
   
   const parentCandidateFields = customFieldDefinitions.filter(f => f.type === 'select' || f.type === 'radio-group');
-
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -149,19 +147,19 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="fieldId">Field ID (unique, no spaces/special chars)</Label>
-                <Input id="fieldId" name="id" value={newField.id} onChange={handleInputChange} placeholder="e.g., practice_specialty" />
+                <Label htmlFor="fieldIdAdmin">Field ID (unique, no spaces/special chars)</Label> {/* Changed id to avoid conflict */}
+                <Input id="fieldIdAdmin" name="id" value={newField.id} onChange={handleInputChange} placeholder="e.g., practice_specialty" />
               </div>
               <div>
-                <Label htmlFor="fieldLabel">Field Label</Label>
-                <Input id="fieldLabel" name="label" value={newField.label} onChange={handleInputChange} placeholder="e.g., Practice Specialty" />
+                <Label htmlFor="fieldLabelAdmin">Field Label</Label> {/* Changed id to avoid conflict */}
+                <Input id="fieldLabelAdmin" name="label" value={newField.label} onChange={handleInputChange} placeholder="e.g., Practice Specialty" />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="fieldType">Field Type</Label>
+                <Label htmlFor="fieldTypeAdmin">Field Type</Label> {/* Changed id to avoid conflict */}
                 <Select onValueChange={handleTypeChange} value={newField.type}>
-                  <SelectTrigger id="fieldType">
+                  <SelectTrigger id="fieldTypeAdmin">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -176,18 +174,18 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
                 </Select>
               </div>
               <div>
-                <Label htmlFor="fieldPlaceholder">Placeholder (optional)</Label>
-                <Input id="fieldPlaceholder" name="placeholder" value={newField.placeholder || ''} onChange={handleInputChange} />
+                <Label htmlFor="fieldPlaceholderAdmin">Placeholder (optional)</Label> {/* Changed id to avoid conflict */}
+                <Input id="fieldPlaceholderAdmin" name="placeholder" value={newField.placeholder || ''} onChange={handleInputChange} />
               </div>
             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <Label htmlFor="fieldOrder">Order</Label>
-                    <Input id="fieldOrder" name="order" type="number" value={newField.order} onChange={handleInputChange} />
+                    <Label htmlFor="fieldOrderAdmin">Order</Label> {/* Changed id to avoid conflict */}
+                    <Input id="fieldOrderAdmin" name="order" type="number" value={newField.order} onChange={handleInputChange} />
                 </div>
                 <div className="flex items-end space-x-2 pb-1">
-                    <Checkbox id="fieldRequired" checked={newField.required} onCheckedChange={handleCheckboxChange} />
-                    <Label htmlFor="fieldRequired" className="font-normal">Required Field</Label>
+                    <Checkbox id="fieldRequiredAdmin" checked={newField.required} onCheckedChange={handleCheckboxChange} /> {/* Changed id */}
+                    <Label htmlFor="fieldRequiredAdmin" className="font-normal">Required Field</Label> {/* Changed id */}
                 </div>
             </div>
 
@@ -209,9 +207,9 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
               <div className="space-y-3 p-3 border rounded-md mt-4">
                 <Label className="font-medium">Dependent Dropdown Configuration (Optional)</Label>
                 <div>
-                  <Label htmlFor="parentFieldId">Depends on Field (Parent)</Label>
+                  <Label htmlFor="parentFieldIdAdmin">Depends on Field (Parent)</Label> {/* Changed id */}
                   <Select onValueChange={(value) => setNewField(prev => ({ ...prev, parentFieldId: value }))} value={newField.parentFieldId}>
-                    <SelectTrigger id="parentFieldId">
+                    <SelectTrigger id="parentFieldIdAdmin"> {/* Changed id */}
                       <SelectValue placeholder="Select parent field" />
                     </SelectTrigger>
                     <SelectContent>
@@ -224,9 +222,9 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
                 </div>
                 {newField.parentFieldId && (
                   <div>
-                    <Label htmlFor="dependentOptionsJson">Dependent Options JSON</Label>
+                    <Label htmlFor="dependentOptionsJsonAdmin">Dependent Options JSON</Label> {/* Changed id */}
                     <Textarea 
-                      id="dependentOptionsJson" 
+                      id="dependentOptionsJsonAdmin" /* Changed id */
                       name="dependentOptionsJson" 
                       value={newField.dependentOptionsJson} 
                       onChange={handleInputChange} 

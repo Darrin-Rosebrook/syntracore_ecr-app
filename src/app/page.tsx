@@ -1,60 +1,27 @@
 
 "use client";
 
-import React from "react"; // Changed from import * as React
+import React from "react";
 import { MainHeader } from "@/components/main-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from "@/components/dashboard-tab";
 import { ProviderEnrollmentTab } from "@/components/provider-enrollment-tab";
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
 import { AdminConsoleTab } from "@/components/admin-console-tab";
-import type { EnrollmentData, CustomFieldDefinition } from "@/types";
 import { LayoutDashboard, UserPlus, ShieldCheck, Settings } from "lucide-react";
+import { useAppContext } from "@/context/AppContext";
 
 export default function HomePage() {
-  const [enrollments, setEnrollments] = React.useState<EnrollmentData[]>([]);
+  const { 
+    enrollments, 
+    customFieldDefinitions, 
+    addEnrollment, 
+    updateEnrollmentStatus, 
+    addCustomField, 
+    removeCustomField 
+  } = useAppContext();
+  
   const [activeTab, setActiveTab] = React.useState("dashboard");
-  const [customFieldDefinitions, setCustomFieldDefinitions] = React.useState<CustomFieldDefinition[]>([]);
-
-  // Function to add a new enrollment
-  const addEnrollment = (newEnrollment: EnrollmentData) => {
-    setEnrollments((prevEnrollments) => [newEnrollment, ...prevEnrollments]);
-  };
-
-  // Function to update enrollment status
-  const updateEnrollmentStatus = (id: string, status: EnrollmentData['status'], comments?: string) => {
-    setEnrollments((prevEnrollments) =>
-      prevEnrollments.map((enrollment) =>
-        enrollment.id === id
-          ? {
-              ...enrollment,
-              status,
-              validationResult: comments && enrollment.validationResult ? {
-                ...enrollment.validationResult,
-                messages: [...(enrollment.validationResult.messages || []), `PHA Comments: ${comments}`]
-              } : enrollment.validationResult
-            }
-          : enrollment
-      )
-    );
-  };
-
-  // Functions for managing custom field definitions
-  const addCustomField = (fieldDefinition: CustomFieldDefinition) => {
-    setCustomFieldDefinitions((prevFields) => {
-      // Prevent duplicate IDs
-      if (prevFields.some(f => f.id === fieldDefinition.id)) {
-        // In a real app, show a toast or error message
-        console.error("Field ID already exists");
-        return prevFields;
-      }
-      return [...prevFields, fieldDefinition];
-    });
-  };
-
-  const removeCustomField = (fieldId: string) => {
-    setCustomFieldDefinitions((prevFields) => prevFields.filter(field => field.id !== fieldId));
-  };
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">

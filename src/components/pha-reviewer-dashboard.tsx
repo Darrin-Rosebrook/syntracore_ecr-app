@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import { useState } from "react";
+import Link from 'next/link'; // Added import for Link
 import type { EnrollmentData } from "@/types";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Edit3, Eye, ChevronDown, ChevronUp, Loader2, Search, Info } from "lucide-react"; // Added Info
+import { Check, X, Edit3, Eye, ChevronDown, ChevronUp, Loader2, Search, Info } from "lucide-react";
 import { FHIRValidationDisplay } from "./fhir-validation-display";
 import { ScrollArea } from './ui/scroll-area';
 import { Input } from './ui/input';
@@ -28,7 +29,7 @@ import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from './ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-
+// Removed useAppContext hook, updateEnrollmentStatus will be passed as prop
 
 interface PHAReviewerDashboardProps {
   enrollments: EnrollmentData[];
@@ -45,7 +46,6 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
   const [currentEnrollmentForModal, setCurrentEnrollmentForModal] = useState<EnrollmentData | null>(null);
   const [changeRequestComments, setChangeRequestComments] = useState("");
 
-
   const toggleRow = (id: string) => {
     setExpandedRow(expandedRow === id ? null : id);
   };
@@ -58,8 +58,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
 
   const handleApprove = async (id: string) => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API
     updateEnrollmentStatus(id, "Approved");
     setIsLoading(false);
     toast({ title: "Enrollment Approved", description: `Enrollment ID ${id.slice(0,6)}... has been approved.`});
@@ -77,13 +76,12 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
       return;
     }
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API
     updateEnrollmentStatus(currentEnrollmentForModal.id, "Changes Requested", changeRequestComments);
     setIsLoading(false);
     setRequestChangesModalOpen(false);
     toast({ title: "Changes Requested", description: `Change request sent for enrollment ID ${currentEnrollmentForModal.id.slice(0,6)}...`});
   };
-
 
   const getStatusBadgeVariant = (status: EnrollmentData['status']) => {
     switch (status) {
@@ -105,7 +103,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
 
   const renderAdditionalData = (additionalData?: Record<string, any>) => {
     if (!additionalData || Object.keys(additionalData).length === 0) {
-      return null; // Return null if no additional data to avoid rendering empty section
+      return null;
     }
     return (
       <div className="space-y-2 mt-3 p-3 border rounded-md bg-secondary/30">
@@ -115,12 +113,11 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
           if (typeof value === 'boolean') {
             displayValue = value ? "Yes" : "No";
           } else if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/)) {
-            // Attempt to format if it looks like an ISO date string
             try {
               displayValue = format(new Date(value), "PPP");
-            } catch (e) {
-              // If formatting fails, use original string
-            }
+            } catch (e) { /* Do nothing, use original string */ }
+          } else if (Array.isArray(value)) {
+            displayValue = value.join(', ');
           }
           return (
             <p key={key} className="text-sm">
@@ -131,7 +128,6 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
       </div>
     );
   };
-
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -157,7 +153,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
               <span className="ml-2">Processing...</span>
             </div>
           )}
-          <ScrollArea className="h-[calc(100vh-22rem)] border rounded-md"> {/* Adjusted height */}
+          <ScrollArea className="h-[calc(100vh-22rem)] border rounded-md">
             <Table>
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
@@ -178,7 +174,11 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
                           {expandedRow === enrollment.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </Button>
                       </TableCell>
-                      <TableCell className="font-medium">{enrollment.practiceInfo.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link href={`/provider-profile/${enrollment.id}`} className="text-primary hover:underline">
+                          {enrollment.practiceInfo.name}
+                        </Link>
+                      </TableCell>
                       <TableCell>{enrollment.contactDetails.name}</TableCell>
                       <TableCell>{new Date(enrollment.submissionDate).toLocaleDateString()}</TableCell>
                       <TableCell>
@@ -196,6 +196,11 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => toggleRow(enrollment.id)} disabled={isLoading}>
                               <Eye className="mr-2 h-4 w-4" /> View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                               <Link href={`/provider-profile/${enrollment.id}`} className="flex items-center w-full cursor-pointer">
+                                <Edit3 className="mr-2 h-4 w-4" /> View/Edit Profile
+                              </Link>
                             </DropdownMenuItem>
                             {enrollment.status === 'Pending' && (
                               <>
