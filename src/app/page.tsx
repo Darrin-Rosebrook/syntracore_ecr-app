@@ -1,17 +1,20 @@
+
 "use client";
 
-import * as React from "react";
+import React from "react"; // Changed from import * as React
 import { MainHeader } from "@/components/main-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from "@/components/dashboard-tab";
 import { ProviderEnrollmentTab } from "@/components/provider-enrollment-tab";
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
-import type { EnrollmentData } from "@/types";
-import { LayoutDashboard, UserPlus, ShieldCheck } from "lucide-react";
+import { AdminConsoleTab } from "@/components/admin-console-tab";
+import type { EnrollmentData, CustomFieldDefinition } from "@/types";
+import { LayoutDashboard, UserPlus, ShieldCheck, Settings } from "lucide-react";
 
 export default function HomePage() {
   const [enrollments, setEnrollments] = React.useState<EnrollmentData[]>([]);
   const [activeTab, setActiveTab] = React.useState("dashboard");
+  const [customFieldDefinitions, setCustomFieldDefinitions] = React.useState<CustomFieldDefinition[]>([]);
 
   // Function to add a new enrollment
   const addEnrollment = (newEnrollment: EnrollmentData) => {
@@ -23,8 +26,8 @@ export default function HomePage() {
     setEnrollments((prevEnrollments) =>
       prevEnrollments.map((enrollment) =>
         enrollment.id === id
-          ? { 
-              ...enrollment, 
+          ? {
+              ...enrollment,
               status,
               validationResult: comments && enrollment.validationResult ? {
                 ...enrollment.validationResult,
@@ -36,6 +39,22 @@ export default function HomePage() {
     );
   };
 
+  // Functions for managing custom field definitions
+  const addCustomField = (fieldDefinition: CustomFieldDefinition) => {
+    setCustomFieldDefinitions((prevFields) => {
+      // Prevent duplicate IDs
+      if (prevFields.some(f => f.id === fieldDefinition.id)) {
+        // In a real app, show a toast or error message
+        console.error("Field ID already exists");
+        return prevFields;
+      }
+      return [...prevFields, fieldDefinition];
+    });
+  };
+
+  const removeCustomField = (fieldId: string) => {
+    setCustomFieldDefinitions((prevFields) => prevFields.filter(field => field.id !== fieldId));
+  };
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
@@ -43,7 +62,7 @@ export default function HomePage() {
       <main className="flex-1">
         <div className="container mx-auto py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 h-auto sm:h-12 mb-6 shadow-md">
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-4 h-auto sm:h-12 mb-6 shadow-md">
               <TabsTrigger value="dashboard" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
                 <LayoutDashboard className="mr-2 h-5 w-5" />
                 Project Dashboard
@@ -56,15 +75,26 @@ export default function HomePage() {
                 <ShieldCheck className="mr-2 h-5 w-5" />
                 PHA Reviewer
               </TabsTrigger>
+              <TabsTrigger value="admin-console" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
+                <Settings className="mr-2 h-5 w-5" />
+                Admin Console
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="dashboard" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
               <DashboardTab />
             </TabsContent>
             <TabsContent value="provider-enrollment" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
-              <ProviderEnrollmentTab addEnrollment={addEnrollment} />
+              <ProviderEnrollmentTab addEnrollment={addEnrollment} customFieldDefinitions={customFieldDefinitions} />
             </TabsContent>
             <TabsContent value="pha-reviewer" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
               <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} />
+            </TabsContent>
+            <TabsContent value="admin-console" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
+              <AdminConsoleTab
+                customFieldDefinitions={customFieldDefinitions}
+                onAddCustomField={addCustomField}
+                onRemoveCustomField={removeCustomField}
+              />
             </TabsContent>
           </Tabs>
         </div>
@@ -79,8 +109,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-// Simple fade-in animation for tab content
-// Add to tailwind.config.ts if not already present or handle with CSS
-// keyframes: { 'fadeIn': { '0%': { opacity: '0' }, '100%': { opacity: '1' } } },
-// animation: { 'fadeIn': 'fadeIn 0.5s ease-in-out' }

@@ -2,15 +2,16 @@
 
 import * as React from 'react';
 import { ProviderEnrollmentForm } from "@/components/provider-enrollment-form";
-import type { EnrollmentFormData, EnrollmentData, FHIRValidationResult } from "@/types";
+import type { EnrollmentFormData, EnrollmentData, FHIRValidationResult, CustomFieldDefinition } from "@/types"; // Added CustomFieldDefinition
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ProviderEnrollmentTabProps {
   addEnrollment: (enrollment: EnrollmentData) => void;
+  customFieldDefinitions: CustomFieldDefinition[]; // New prop
 }
 
-export function ProviderEnrollmentTab({ addEnrollment }: ProviderEnrollmentTabProps) {
+export function ProviderEnrollmentTab({ addEnrollment, customFieldDefinitions }: ProviderEnrollmentTabProps) { // Added customFieldDefinitions
   const { toast } = useToast();
 
   const handleEnrollmentSubmit = (formData: EnrollmentFormData, ccdDocumentContent: string | null, validationResult: FHIRValidationResult) => {
@@ -34,7 +35,10 @@ export function ProviderEnrollmentTab({ addEnrollment }: ProviderEnrollmentTabPr
   return (
     <ScrollArea className="h-[calc(100vh-10rem)]"> {/* Adjust height as needed */}
       <div className="p-4 md:p-6">
-        <ProviderEnrollmentForm onSubmitEnrollment={handleEnrollmentSubmit} />
+        <ProviderEnrollmentForm 
+          onSubmitEnrollment={handleEnrollmentSubmit} 
+          customFieldDefinitions={customFieldDefinitions} // Pass down prop
+        />
       </div>
     </ScrollArea>
   );

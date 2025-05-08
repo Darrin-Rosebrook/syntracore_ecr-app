@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Edit3, Eye, ChevronDown, ChevronUp, Loader2, Search } from "lucide-react";
+import { Check, X, Edit3, Eye, ChevronDown, ChevronUp, Loader2, Search, Info } from "lucide-react"; // Added Info
 import { FHIRValidationDisplay } from "./fhir-validation-display";
 import { ScrollArea } from './ui/scroll-area';
 import { Input } from './ui/input';
@@ -27,6 +27,7 @@ import {
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from './ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 
 interface PHAReviewerDashboardProps {
@@ -101,6 +102,36 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
       default: return '';
     }
   }
+
+  const renderAdditionalData = (additionalData?: Record<string, any>) => {
+    if (!additionalData || Object.keys(additionalData).length === 0) {
+      return null; // Return null if no additional data to avoid rendering empty section
+    }
+    return (
+      <div className="space-y-2 mt-3 p-3 border rounded-md bg-secondary/30">
+        <h5 className="font-semibold text-md flex items-center"><Info className="mr-2 h-5 w-5 text-primary"/>Additional Information:</h5>
+        {Object.entries(additionalData).map(([key, value]) => {
+          let displayValue = value;
+          if (typeof value === 'boolean') {
+            displayValue = value ? "Yes" : "No";
+          } else if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/)) {
+            // Attempt to format if it looks like an ISO date string
+            try {
+              displayValue = format(new Date(value), "PPP");
+            } catch (e) {
+              // If formatting fails, use original string
+            }
+          }
+          return (
+            <p key={key} className="text-sm">
+              <strong>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</strong> {String(displayValue)}
+            </p>
+          );
+        })}
+      </div>
+    );
+  };
+
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -191,6 +222,9 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
                             <p><strong>Contact Phone:</strong> {enrollment.contactDetails.phone}</p>
                             <p><strong>EHR Vendor:</strong> {enrollment.ehrVendor}</p>
                             {enrollment.ccdDocumentName && <p><strong>Document:</strong> {enrollment.ccdDocumentName}</p>}
+                            
+                            {renderAdditionalData(enrollment.additionalData)}
+
                             {enrollment.validationResult && (
                                 <FHIRValidationDisplay result={enrollment.validationResult} />
                             )}

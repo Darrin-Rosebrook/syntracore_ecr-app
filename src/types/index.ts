@@ -12,12 +12,22 @@ export interface ContactDetails {
   phone: string;
 }
 
+export interface CustomFieldDefinition {
+  id: string; // Unique identifier for the field, used as key in additionalData
+  label: string; // Display label for the field
+  type: 'text' | 'select' | 'textarea' | 'checkbox' | 'date'; // Type of the field
+  options?: string[]; // For 'select' type, list of option values
+  placeholder?: string; // Placeholder text for input fields
+  required?: boolean; // Whether the field is mandatory
+}
+
 export interface EnrollmentFormData {
   practiceInfo: PracticeInfo;
   contactDetails: ContactDetails;
   ehrVendor: string;
   ccdDocumentName?: string;
   consent: boolean;
+  additionalData?: Record<string, any>; // For custom fields
 }
 
 export interface FHIRValidationResult extends ExternalFHIRValidationResult {
