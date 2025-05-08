@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, ChangeEvent, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import type { ChangeEvent } from 'react'; // Ensure ChangeEvent is specifically typed if not already
 import { useParams, useRouter } from 'next/navigation';
 import { useAppContext } from '@/context/AppContext';
 import type { EnrollmentData, CustomFieldDefinition, ActivityLogEntry, CustomFieldOption } from '@/types';
@@ -15,7 +16,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
-import { ArrowLeft, Edit, Save, MessageSquare, PlusCircle, Activity, UserCircle, Building, Settings2, FileText, CalendarDays, Info, Loader2 } from 'lucide-react';
+import { ArrowLeft, Edit, Save, MessageSquare, PlusCircle, Activity, UserCircle, Building, Settings2, FileText, CalendarDays, Info, Loader2, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { EHR_VENDORS } from '@/lib/constants';
 import { FHIRValidationDisplay } from '@/components/fhir-validation-display';
@@ -34,12 +35,17 @@ const SectionCard: React.FC<{ title: string; icon: React.ElementType; children: 
   </Card>
 );
 
+// Define the type for the argument of onChange
+type EditableFieldOnChangeEvent =
+  | ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  | { target: { name: string; value: any } };
+
 interface EditableFieldProps {
   label: string;
   value: any;
   name: string;
   isEditing: boolean;
-  onChange: (ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { name: string; value: any } }) => void;
+  onChange: (event: EditableFieldOnChangeEvent) => void; // Use the alias here
   type?: string; // 'text', 'textarea', 'tel', 'email' (for standard inputs)
   options?: { label: string; value: string }[]; // for standard select
   customField?: CustomFieldDefinition;
@@ -267,7 +273,7 @@ export default function ProviderProfilePage() {
     }
   }, [id, currentEnrollment]);
 
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { name: string; value: any } }) => {
+  const handleInputChange = (e: EditableFieldOnChangeEvent) => { // Updated to use the type alias
     const { name, value } = e.target;
     const keys = name.split('.');
     
