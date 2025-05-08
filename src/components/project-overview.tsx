@@ -1,3 +1,4 @@
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PROJECT_NAME, PROJECT_DESCRIPTION } from "@/lib/constants";
 import { Info } from "lucide-react";

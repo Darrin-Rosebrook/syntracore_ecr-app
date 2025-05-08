@@ -1,6 +1,6 @@
 "use client";
 
-import type * as React from 'react';
+import * as React from 'react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UploadCloud, FileText, XCircle } from "lucide-react";

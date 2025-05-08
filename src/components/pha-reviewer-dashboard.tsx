@@ -1,6 +1,6 @@
 "use client";
 
-import type * as React from 'react';
+import * as React from 'react';
 import { useState } from "react";
 import type { EnrollmentData } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";

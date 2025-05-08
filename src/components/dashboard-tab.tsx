@@ -1,3 +1,4 @@
+import React from 'react';
 import { ProjectOverview } from "@/components/project-overview";
 import { FirebaseIntegration } from "@/components/firebase-integration";
 import { AISuggestions } from "@/components/ai-suggestions";

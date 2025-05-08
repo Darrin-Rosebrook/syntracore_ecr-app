@@ -1,6 +1,6 @@
 "use client";
 
-import type * as React from 'react';
+import * as React from 'react';
 import { ProviderEnrollmentForm } from "@/components/provider-enrollment-form";
 import type { EnrollmentFormData, EnrollmentData, FHIRValidationResult } from "@/types";
 import { useToast } from "@/hooks/use-toast";
