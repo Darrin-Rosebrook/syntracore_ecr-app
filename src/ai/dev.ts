@@ -1,1 +1,5 @@
-// Flows will be imported for their side effects in this file.
+import { config } from 'dotenv';
+config();
+
+import '@/ai/flows/summarize-validation-results.ts';
+import '@/ai/flows/suggest-new-features.ts';
