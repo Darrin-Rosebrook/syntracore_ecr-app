@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from 'react';
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -9,20 +9,20 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { EHR_VENDORS } from "@/lib/constants";
 import { FileUploader } from "@/components/file-uploader";
 import { useToast } from "@/hooks/use-toast";
-import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition } from "@/types";
+import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption } from "@/types";
 import { validateFHIRMessage } from "@/services/fhir-validator"; 
 import { summarizeValidationResults } from "@/ai/flows/summarize-validation-results";
 import { FHIRValidationDisplay } from "./fhir-validation-display";
-import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays } from "lucide-react"; // Added Info, CalendarDays
+import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-
 
 const practiceInfoSchema = z.object({
   name: z.string().min(1, "Practice name is required"),
@@ -36,12 +36,15 @@ const contactDetailsSchema = z.object({
   phone: z.string().min(10, "Valid phone number is required").regex(/^\+?[0-9\s\-()]+$/, "Invalid phone number format"),
 });
 
+// Base schema for additionalData, specific field validations will be added dynamically
+const baseAdditionalDataSchema = z.record(z.any());
+
 const enrollmentFormSchema = z.object({
   practiceInfo: practiceInfoSchema,
   contactDetails: contactDetailsSchema,
   ehrVendor: z.string().min(1, "EHR vendor selection is required"),
   consent: z.boolean().refine(val => val === true, "You must agree to the consent"),
-  additionalData: z.record(z.string(), z.any()).optional(), // For custom fields
+  additionalData: baseAdditionalDataSchema.optional(),
 });
 
 type FormSchemaType = z.infer<typeof enrollmentFormSchema>;
@@ -59,8 +62,38 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isProcessingFile, setIsProcessingFile] = React.useState(false);
 
+  // Dynamically create Zod schema for additionalData based on customFieldDefinitions
+  const dynamicEnrollmentSchema = React.useMemo(() => {
+    const additionalDataShape: Record<string, z.ZodTypeAny> = {};
+    customFieldDefinitions.forEach(field => {
+      let fieldSchema: z.ZodTypeAny;
+      switch (field.type) {
+        case 'text':
+        case 'textarea':
+        case 'select':
+        case 'radio-group':
+        case 'date':
+          fieldSchema = field.required ? z.string().min(1, `${field.label} is required.`) : z.string().optional().nullable();
+          break;
+        case 'checkbox': // Single checkbox
+          fieldSchema = field.required ? z.boolean().refine(val => val === true, `${field.label} is required.`) : z.boolean().optional();
+          break;
+        case 'checkbox-group':
+          fieldSchema = field.required ? z.array(z.string()).min(1, `At least one option for ${field.label} must be selected.`) : z.array(z.string()).optional();
+          break;
+        default:
+          fieldSchema = z.any();
+      }
+      additionalDataShape[field.id] = fieldSchema;
+    });
+    return enrollmentFormSchema.extend({
+      additionalData: z.object(additionalDataShape).optional(),
+    });
+  }, [customFieldDefinitions]);
+
+
   const form = useForm<FormSchemaType>({
-    resolver: zodResolver(enrollmentFormSchema),
+    resolver: zodResolver(dynamicEnrollmentSchema),
     defaultValues: {
       practiceInfo: { name: "", address: "", phone: "" },
       contactDetails: { name: "", email: "", phone: "" },
@@ -69,40 +102,39 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
       additionalData: {},
     },
   });
+  
+  const watchedAdditionalData = useWatch({ control: form.control, name: "additionalData" });
 
   React.useEffect(() => {
-    // Initialize additionalData with default values based on customFieldDefinitions
-    // and register fields for validation
     const defaultAdditionalData: Record<string, any> = {};
     const currentAdditionalData = form.getValues().additionalData || {};
     
     customFieldDefinitions.forEach(field => {
-      // Set default value if not already set by user or previous definitions
       if (currentAdditionalData[field.id] === undefined) {
-        if (field.type === 'checkbox') {
+        if (field.type === 'checkbox') { // single
           defaultAdditionalData[field.id] = false;
+        } else if (field.type === 'checkbox-group') {
+           defaultAdditionalData[field.id] = field.options?.filter(opt => opt.defaultChecked).map(opt => opt.value) || [];
         } else {
           defaultAdditionalData[field.id] = '';
         }
       } else {
-        defaultAdditionalData[field.id] = currentAdditionalData[field.id];
+         defaultAdditionalData[field.id] = currentAdditionalData[field.id];
       }
-      // Register field for react-hook-form to track
       form.register(`additionalData.${field.id}` as any);
     });
     
-    // Unregister fields that are no longer in customFieldDefinitions
     Object.keys(currentAdditionalData).forEach(existingFieldId => {
         if (!customFieldDefinitions.some(cfd => cfd.id === existingFieldId)) {
             form.unregister(`additionalData.${existingFieldId}` as any);
-            delete defaultAdditionalData[existingFieldId]; // Remove from data to be set
+            delete defaultAdditionalData[existingFieldId];
         }
     });
 
-    form.setValue('additionalData', defaultAdditionalData, { shouldValidate: false, shouldDirty: false });
+    form.setValue('additionalData', defaultAdditionalData, { shouldValidate: true, shouldDirty: Object.keys(defaultAdditionalData).length > 0 });
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customFieldDefinitions, form.register, form.unregister, form.setValue, form.getValues]);
+  }, [customFieldDefinitions, form.register, form.setValue, form.getValues]);
 
 
   const handleFileSelect = async (file: File | null, fileContent: string | null) => {
@@ -135,8 +167,7 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
 
   const onSubmit = async (data: FormSchemaType) => {
     setIsSubmitting(true);
-    form.clearErrors(); 
-
+    
     if (!ccdFile) {
       toast({
         title: "Missing Document",
@@ -156,30 +187,19 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
         setIsSubmitting(false);
         return;
     }
-
-    let customFieldsValid = true;
-    customFieldDefinitions.forEach(field => {
-      if (field.required) {
-        const value = data.additionalData?.[field.id];
-        if (value === undefined || value === null || String(value).trim() === '' || (field.type === 'checkbox' && value === false)) {
-          form.setError(`additionalData.${field.id}` as any, { 
-            type: 'manual',
-            message: `${field.label} is required.`,
-          });
-          customFieldsValid = false;
-        }
-      }
-    });
-
-    if (!customFieldsValid) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required custom fields.",
-        variant: "destructive",
-      });
-      setIsSubmitting(false);
-      return;
+    
+    // Manual validation re-trigger if needed, though Zod resolver should handle it.
+    const isValid = await form.trigger();
+    if (!isValid) {
+         toast({
+            title: "Validation Error",
+            description: "Please check the form for errors.",
+            variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
     }
+
 
     const enrollmentData: EnrollmentFormData = {
       ...data,
@@ -189,7 +209,6 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
     
     onSubmitEnrollment(enrollmentData, ccdFileContent, validationResult);
     
-    // Reset form, including dynamic fields
     const defaultResetValues: FormSchemaType = {
       practiceInfo: { name: "", address: "", phone: "" },
       contactDetails: { name: "", email: "", phone: "" },
@@ -199,7 +218,9 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
     };
     customFieldDefinitions.forEach(field => {
       if (defaultResetValues.additionalData) {
-         defaultResetValues.additionalData[field.id] = field.type === 'checkbox' ? false : '';
+         if (field.type === 'checkbox') defaultResetValues.additionalData[field.id] = false;
+         else if (field.type === 'checkbox-group') defaultResetValues.additionalData[field.id] = field.options?.filter(o => o.defaultChecked).map(o => o.value) || [];
+         else defaultResetValues.additionalData[field.id] = '';
       }
     });
     form.reset(defaultResetValues);
@@ -209,6 +230,10 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
     setValidationResult(undefined);
     setIsSubmitting(false);
   };
+  
+  const sortedCustomFieldDefinitions = React.useMemo(() => {
+    return [...customFieldDefinitions].sort((a, b) => a.order - b.order);
+  }, [customFieldDefinitions]);
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
@@ -284,7 +309,7 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
                 name="ehrVendor"
                 control={form.control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value} defaultValue="">
                     <SelectTrigger id="ehrVendor">
                       <SelectValue placeholder="Select EHR Vendor" />
                     </SelectTrigger>
@@ -313,98 +338,178 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
             <FHIRValidationDisplay result={validationResult} />
           </fieldset>
 
-          {/* Custom Fields */}
-          {customFieldDefinitions.length > 0 && (
-            <fieldset className="space-y-4 p-4 border rounded-md">
-              <legend className="text-lg font-medium px-1 flex items-center">
-                <Info className="mr-2 h-5 w-5 text-primary" />Additional Information
-              </legend>
-              {customFieldDefinitions.map(field => (
-                <div key={field.id}>
-                  <Label htmlFor={`additionalData.${field.id}`}>{field.label}{field.required && <span className="text-destructive">*</span>}</Label>
-                  {field.type === 'text' && (
-                    <Input 
-                      id={`additionalData.${field.id}`} 
-                      {...form.register(`additionalData.${field.id}` as any)} 
-                      placeholder={field.placeholder}
-                    />
-                  )}
-                  {field.type === 'textarea' && (
-                    <Textarea 
-                      id={`additionalData.${field.id}`} 
-                      {...form.register(`additionalData.${field.id}` as any)} 
-                      placeholder={field.placeholder}
-                    />
-                  )}
-                  {field.type === 'select' && field.options && (
-                    <Controller
-                      name={`additionalData.${field.id}` as any}
-                      control={form.control}
-                      render={({ field: controllerField }) => (
-                        <Select onValueChange={controllerField.onChange} value={controllerField.value || ''}>
+          {/* Custom Fields Section - now rendered directly in the form flow */}
+          {sortedCustomFieldDefinitions.length > 0 && (
+            sortedCustomFieldDefinitions.map(field => (
+              <fieldset key={field.id} className="space-y-2 p-4 border rounded-md">
+                <legend className="text-md font-medium px-1 flex items-center">
+                  <Info className="mr-2 h-5 w-5 text-primary opacity-70" />
+                  {field.label}{field.required && <span className="text-destructive ml-1">*</span>}
+                </legend>
+                 
+                {field.type === 'text' && (
+                  <Input 
+                    id={`additionalData.${field.id}`} 
+                    {...form.register(`additionalData.${field.id}` as any)} 
+                    placeholder={field.placeholder}
+                  />
+                )}
+                {field.type === 'textarea' && (
+                  <Textarea 
+                    id={`additionalData.${field.id}`} 
+                    {...form.register(`additionalData.${field.id}` as any)} 
+                    placeholder={field.placeholder}
+                  />
+                )}
+                {field.type === 'select' && field.options && (
+                  <Controller
+                    name={`additionalData.${field.id}` as any}
+                    control={form.control}
+                    defaultValue=""
+                    render={({ field: controllerField }) => {
+                      let currentOptions = field.options || [];
+                      if (field.parentFieldId && field.dependentOptionsJson && watchedAdditionalData) {
+                          const parentValue = watchedAdditionalData[field.parentFieldId];
+                          if (parentValue) {
+                              try {
+                                  const dependentOptionsMap = JSON.parse(field.dependentOptionsJson);
+                                  currentOptions = dependentOptionsMap[parentValue] || [];
+                                  // Reset child if parent changes and current value is not in new options
+                                  if (controllerField.value && !currentOptions.some(opt => opt.value === controllerField.value)) {
+                                      setTimeout(() => controllerField.onChange(''), 0); // Allow state to settle
+                                  }
+                              } catch (e) { console.error("Error parsing dependentOptionsJson", e); }
+                          } else {
+                            currentOptions = []; // No parent value, no options
+                             if (controllerField.value) setTimeout(() => controllerField.onChange(''), 0);
+                          }
+                      }
+
+                      return (
+                        <Select 
+                          onValueChange={controllerField.onChange} 
+                          value={controllerField.value || ''}
+                          disabled={field.parentFieldId && (!watchedAdditionalData || !watchedAdditionalData[field.parentFieldId]) && currentOptions.length === 0}
+                        >
                           <SelectTrigger id={`additionalData.${field.id}`}>
                             <SelectValue placeholder={field.placeholder || "Select an option"} />
                           </SelectTrigger>
                           <SelectContent>
-                            {field.options?.map(option => (
-                              <SelectItem key={option} value={option}>{option}</SelectItem>
+                            {currentOptions.map((option: CustomFieldOption) => (
+                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                             ))}
+                            {currentOptions.length === 0 && field.parentFieldId && watchedAdditionalData && watchedAdditionalData[field.parentFieldId] && (
+                                <SelectItem value="" disabled>No options available for selected parent</SelectItem>
+                            )}
+                             {currentOptions.length === 0 && field.parentFieldId && (!watchedAdditionalData || !watchedAdditionalData[field.parentFieldId]) && (
+                                <SelectItem value="" disabled>Select parent field first</SelectItem>
+                            )}
                           </SelectContent>
                         </Select>
+                      );
+                    }}
+                  />
+                )}
+                {field.type === 'checkbox' && ( // Single Checkbox
+                   <div className="flex items-center space-x-2 pt-1">
+                    <Controller
+                      name={`additionalData.${field.id}` as any}
+                      control={form.control}
+                      defaultValue={false}
+                      render={({ field: controllerField }) => (
+                        <Checkbox
+                          id={`additionalData.${field.id}`}
+                          checked={!!controllerField.value} 
+                          onCheckedChange={controllerField.onChange}
+                        />
                       )}
                     />
-                  )}
-                   {field.type === 'checkbox' && (
-                     <div className="flex items-center space-x-2 mt-1">
-                      <Controller
-                        name={`additionalData.${field.id}` as any}
-                        control={form.control}
-                        render={({ field: controllerField }) => (
-                          <Checkbox
-                            id={`additionalData.${field.id}`}
-                            checked={!!controllerField.value} 
-                            onCheckedChange={controllerField.onChange}
-                          />
-                        )}
-                      />
-                       <Label htmlFor={`additionalData.${field.id}`} className="font-normal">{field.placeholder || field.label}</Label>
-                     </div>
-                  )}
-                  {field.type === 'date' && (
-                     <Controller
-                        name={`additionalData.${field.id}` as any}
-                        control={form.control}
-                        render={({ field: controllerField }) => (
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant={"outline"}
-                                className={`w-full justify-start text-left font-normal ${!controllerField.value && "text-muted-foreground"}`}
-                              >
-                                <CalendarDays className="mr-2 h-4 w-4" />
-                                {controllerField.value ? format(new Date(controllerField.value), "PPP") : <span>{field.placeholder || "Pick a date"}</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={controllerField.value ? new Date(controllerField.value) : undefined}
-                                onSelect={(date) => controllerField.onChange(date ? date.toISOString() : '')}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        )}
-                      />
-                  )}
-                  {form.formState.errors.additionalData?.[field.id] && (
-                    <p className="text-sm text-destructive mt-1">{(form.formState.errors.additionalData as Record<string, {message?: string}>)[field.id]?.message}</p>
-                  )}
-                </div>
-              ))}
-            </fieldset>
+                     <Label htmlFor={`additionalData.${field.id}`} className="font-normal">{field.placeholder || field.label}</Label>
+                   </div>
+                )}
+                {field.type === 'checkbox-group' && field.options && (
+                  <Controller
+                    name={`additionalData.${field.id}` as any}
+                    control={form.control}
+                    defaultValue={field.options.filter(o => o.defaultChecked).map(o => o.value) || []}
+                    render={({ field: controllerField }) => (
+                      <div className="space-y-2 pt-1">
+                        {field.options?.map(option => (
+                          <div key={option.value} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`additionalData.${field.id}.${option.value}`}
+                              checked={Array.isArray(controllerField.value) && controllerField.value.includes(option.value)}
+                              onCheckedChange={(checked) => {
+                                const currentValues = Array.isArray(controllerField.value) ? controllerField.value : [];
+                                if (checked) {
+                                  controllerField.onChange([...currentValues, option.value]);
+                                } else {
+                                  controllerField.onChange(currentValues.filter(v => v !== option.value));
+                                }
+                              }}
+                            />
+                            <Label htmlFor={`additionalData.${field.id}.${option.value}`} className="font-normal">{option.label}</Label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  />
+                )}
+                {field.type === 'radio-group' && field.options && (
+                  <Controller
+                    name={`additionalData.${field.id}` as any}
+                    control={form.control}
+                    defaultValue=""
+                    render={({ field: controllerField }) => (
+                      <RadioGroup
+                        onValueChange={controllerField.onChange}
+                        value={controllerField.value || ''}
+                        className="space-y-1 pt-1"
+                      >
+                        {field.options?.map(option => (
+                          <div key={option.value} className="flex items-center space-x-2">
+                            <RadioGroupItem value={option.value} id={`additionalData.${field.id}.${option.value}`} />
+                            <Label htmlFor={`additionalData.${field.id}.${option.value}`} className="font-normal">{option.label}</Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    )}
+                  />
+                )}
+                {field.type === 'date' && (
+                   <Controller
+                      name={`additionalData.${field.id}` as any}
+                      control={form.control}
+                      defaultValue=""
+                      render={({ field: controllerField }) => (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant={"outline"}
+                              className={`w-full justify-start text-left font-normal ${!controllerField.value && "text-muted-foreground"}`}
+                            >
+                              <CalendarDays className="mr-2 h-4 w-4" />
+                              {controllerField.value ? format(new Date(controllerField.value), "PPP") : <span>{field.placeholder || "Pick a date"}</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={controllerField.value ? new Date(controllerField.value) : undefined}
+                              onSelect={(date) => controllerField.onChange(date ? date.toISOString() : '')}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    />
+                )}
+                {form.formState.errors.additionalData?.[field.id] && (
+                  <p className="text-sm text-destructive mt-1">{(form.formState.errors.additionalData as Record<string, {message?: string}>)[field.id]?.message}</p>
+                )}
+              </fieldset>
+            ))
           )}
-
 
           {/* Consent */}
           <fieldset className="p-4 border rounded-md">
