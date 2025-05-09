@@ -1,7 +1,8 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { ChangeEvent } from 'react'; // Ensure ChangeEvent is specifically typed if not already
+import type { ChangeEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAppContext } from '@/context/AppContext';
 import type { EnrollmentData, CustomFieldDefinition, ActivityLogEntry, CustomFieldOption } from '@/types';
@@ -15,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { ArrowLeft, Edit, Save, MessageSquare, PlusCircle, Activity, UserCircle, Building, Settings2, FileText, CalendarDays, Info, Loader2, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { EHR_VENDORS } from '@/lib/constants';
@@ -35,7 +36,6 @@ const SectionCard: React.FC<{ title: string; icon: React.ElementType; children: 
   </Card>
 );
 
-// Define the type for the argument of onChange
 type EditableFieldOnChangeEvent =
   | ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   | { target: { name: string; value: any } };
@@ -45,12 +45,12 @@ interface EditableFieldProps {
   value: any;
   name: string;
   isEditing: boolean;
-  onChange: (event: EditableFieldOnChangeEvent) => void; // Use the alias here
-  type?: string; // 'text', 'textarea', 'tel', 'email' (for standard inputs)
-  options?: { label: string; value: string }[]; // for standard select
+  onChange: (event: EditableFieldOnChangeEvent) => void;
+  type?: string; 
+  options?: { label: string; value: string }[]; 
   customField?: CustomFieldDefinition;
   allCustomFields?: CustomFieldDefinition[];
-  formData?: Record<string, any>; // Current form data, needed for dependent dropdowns
+  formData?: Record<string, any>; 
 }
 
 const EditableField: React.FC<EditableFieldProps> = ({ 
@@ -62,7 +62,10 @@ const EditableField: React.FC<EditableFieldProps> = ({
     if (val === undefined || val === null || val === '') return <span className="italic text-muted-foreground">Not provided</span>;
     
     if (cf?.type === 'date' && val) {
-      try { return format(parseISO(val), 'PPP'); } catch { return String(val); }
+      try { 
+        const date = parseISO(val);
+        return isValid(date) ? format(date, 'PPP') : String(val); 
+      } catch { return String(val); }
     }
     if (cf?.type === 'checkbox') return val ? 'Yes' : 'No';
     if (cf?.type === 'checkbox-group' && Array.isArray(val)) {
@@ -89,10 +92,9 @@ const EditableField: React.FC<EditableFieldProps> = ({
     );
   }
 
-  // Editing mode
   const fieldId = customField ? `additionalData.${customField.id}` : name;
   const fieldLabel = customField?.label || label;
-  const isRequired = customField?.required || false; // Add other required logic for standard fields if necessary
+  const isRequired = customField?.required || false; 
 
   if (customField) {
     switch (customField.type) {
@@ -195,11 +197,11 @@ const EditableField: React.FC<EditableFieldProps> = ({
               <PopoverTrigger asChild>
                 <Button variant="outline" className={`w-full justify-start text-left font-normal ${!value && "text-muted-foreground"}`}>
                   <CalendarDays className="mr-2 h-4 w-4" />
-                  {value ? format(parseISO(value), "PPP") : <span>{customField.placeholder || "Pick a date"}</span>}
+                  {value && isValid(parseISO(value)) ? format(parseISO(value), "PPP") : <span>{customField.placeholder || "Pick a date"}</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={value ? parseISO(value) : undefined} 
+                <Calendar mode="single" selected={value && isValid(parseISO(value)) ? parseISO(value) : undefined} 
                   onSelect={(date) => onChange({ target: { name: fieldId, value: date ? date.toISOString() : '' }})} initialFocus />
               </PopoverContent>
             </Popover>
@@ -209,7 +211,6 @@ const EditableField: React.FC<EditableFieldProps> = ({
     }
   }
 
-  // Standard fields (non-custom)
   if (type === 'textarea') {
     return (
       <div className="mb-3">
@@ -218,7 +219,7 @@ const EditableField: React.FC<EditableFieldProps> = ({
       </div>
     );
   }
-  if (type === 'select' && options) { // This is for standard select like EHR Vendor
+  if (type === 'select' && options) {
      return (
       <div className="mb-3">
         <Label htmlFor={fieldId}>{fieldLabel}</Label>
@@ -232,7 +233,7 @@ const EditableField: React.FC<EditableFieldProps> = ({
     );
   }
 
-  return ( // Default to standard input
+  return (
     <div className="mb-3">
       <Label htmlFor={fieldId}>{fieldLabel}</Label>
       <Input id={fieldId} name={fieldId} type={type} value={value || ''} onChange={onChange} />
@@ -244,23 +245,24 @@ export default function ProviderProfilePage() {
   const router = useRouter();
   const params = useParams();
   const { id } = params;
-  const { enrollments, customFieldDefinitions, updateEnrollmentData, addActivityLogEntry } = useAppContext();
+  const { enrollments, customFieldDefinitions, updateEnrollmentData, addActivityLogEntry, isLoading: isContextLoading } = useAppContext();
   const { toast } = useToast();
 
   const [enrollment, setEnrollment] = useState<EnrollmentData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState<Record<string, any>>({}); // Using Record<string, any> for easier nested updates
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState<Record<string, any>>({});
   const [newActivityLog, setNewActivityLog] = useState('');
   const [newCommunication, setNewCommunication] = useState('');
   
   const currentEnrollment = useMemo(() => {
+    if (typeof id !== 'string') return null;
     return enrollments.find(e => e.id === id);
   }, [id, enrollments]);
 
   useEffect(() => {
     if (currentEnrollment) {
       setEnrollment(currentEnrollment);
-      // Initialize formData with structured data
       const initialFormData: Record<string, any> = {
         practiceInfo: { ...currentEnrollment.practiceInfo },
         contactDetails: { ...currentEnrollment.contactDetails },
@@ -268,17 +270,17 @@ export default function ProviderProfilePage() {
         additionalData: { ...(currentEnrollment.additionalData || {}) },
       };
       setFormData(initialFormData);
-    } else if (id) {
-      console.warn(`Enrollment with ID ${id} not found in context.`);
+    } else if (id && !isContextLoading && enrollments.length > 0) {
+      // Enrollments loaded but this one not found
+      setEnrollment(null); 
     }
-  }, [id, currentEnrollment]);
+  }, [id, currentEnrollment, isContextLoading, enrollments.length]);
 
-  const handleInputChange = (e: EditableFieldOnChangeEvent) => { // Updated to use the type alias
+  const handleInputChange = (e: EditableFieldOnChangeEvent) => {
     const { name, value } = e.target;
     const keys = name.split('.');
     
     setFormData(prev => {
-      // Deep clone previous state to avoid direct mutation
       const newState = JSON.parse(JSON.stringify(prev));
       let currentLevel = newState;
       keys.forEach((key, index) => {
@@ -295,9 +297,10 @@ export default function ProviderProfilePage() {
     });
   };
   
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!enrollment || !id || Object.keys(formData).length === 0) return;
     
+    setIsSaving(true);
     const dataToUpdate: Partial<Omit<EnrollmentData, 'id' | 'activityLog'>> = {
         practiceInfo: formData.practiceInfo,
         contactDetails: formData.contactDetails,
@@ -305,38 +308,58 @@ export default function ProviderProfilePage() {
         additionalData: formData.additionalData,
     };
 
-    updateEnrollmentData(id as string, dataToUpdate);
+    await updateEnrollmentData(id as string, dataToUpdate);
     setIsEditing(false);
-    addActivityLogEntry(id as string, 'Provider profile details updated by PHA Admin.', 'UserAction', 'PHA Admin');
+    setIsSaving(false);
+    // Activity log for save is handled within updateEnrollmentData in context now
   };
 
-  const handleAddActivity = () => {
+  const handleAddActivity = async () => {
     if (!newActivityLog.trim() || !id) return;
-    addActivityLogEntry(id as string, newActivityLog, 'UserAction', 'PHA Admin');
+    setIsSaving(true); // Use same saving flag for simplicity or add a new one
+    await addActivityLogEntry(id as string, newActivityLog, 'UserAction', 'PHA Admin');
     setNewActivityLog('');
+    setIsSaving(false);
   };
 
-  const handleSendCommunication = () => {
+  const handleSendCommunication = async () => {
     if (!newCommunication.trim() || !id || !enrollment) return;
-    addActivityLogEntry(id as string, `Message to ${enrollment.contactDetails.name}: ${newCommunication}`, 'Communication', 'PHA Admin');
+    setIsSaving(true);
+    await addActivityLogEntry(id as string, `Message to ${enrollment.contactDetails.name}: ${newCommunication}`, 'Communication', 'PHA Admin');
     toast({ title: 'Communication Sent (Mock)', description: `Message to ${enrollment.contactDetails.name} logged.` });
     setNewCommunication('');
+    setIsSaving(false);
   };
 
-  if (!enrollment) {
-    return <div className="container mx-auto py-10 text-center flex items-center justify-center">
+  if (isContextLoading && !enrollment) {
+    return <div className="container mx-auto py-10 text-center flex items-center justify-center h-screen">
              <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-             <span>Loading provider profile... If this persists, the profile may not exist or there was an error.</span>
-             <Button asChild variant="link" className="ml-2"><Link href="/">Go Home</Link></Button>
+             <span>Loading provider profile...</span>
+           </div>;
+  }
+
+  if (!enrollment) {
+    return <div className="container mx-auto py-10 text-center h-screen flex flex-col items-center justify-center">
+             <Info className="h-12 w-12 text-destructive mb-4" />
+             <h2 className="text-2xl font-semibold mb-2">Provider Profile Not Found</h2>
+             <p className="text-muted-foreground mb-6">The profile with ID "{id}" could not be found.</p>
+             <Button asChild variant="outline">
+               <Link href="/">
+                 <ArrowLeft className="mr-2 h-4 w-4" /> Go Back to Dashboard
+               </Link>
+             </Button>
            </div>;
   }
   
   const sortedCustomFieldDefinitions = [...customFieldDefinitions].sort((a, b) => a.order - b.order);
+  const submissionDate = enrollment.submissionDate && isValid(parseISO(enrollment.submissionDate)) 
+    ? format(parseISO(enrollment.submissionDate), 'PPP p') 
+    : 'Invalid Date';
 
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 container mx-auto">
-         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => router.back()}>
+         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => router.back()} disabled={isSaving}>
             <ArrowLeft className="h-4 w-4" />
             <span className="sr-only">Back</span>
           </Button>
@@ -348,13 +371,20 @@ export default function ProviderProfilePage() {
           title="Enrollment Overview"
           icon={UserCircle}
           actions={
-            <Button onClick={() => {
-              if (isEditing) handleSave(); // Save if currently editing
-              else setIsEditing(true); // Otherwise, toggle to edit
-            }} variant={isEditing ? 'default' : 'outline'} size="sm" className={isEditing ? 'bg-green-600 hover:bg-green-700 text-white' : ''}>
-              {isEditing ? <Save className="mr-1 h-4 w-4" /> : <Edit className="mr-1 h-4 w-4" />}
-              {isEditing ? 'Save Profile' : 'Edit Profile'}
-            </Button>
+            <div className="flex space-x-2">
+              {isEditing && (
+                <Button onClick={() => { setIsEditing(false); if(currentEnrollment) setFormData({ practiceInfo: { ...currentEnrollment.practiceInfo }, contactDetails: { ...currentEnrollment.contactDetails }, ehrVendor: currentEnrollment.ehrVendor, additionalData: { ...(currentEnrollment.additionalData || {}) }}); }} variant="outline" size="sm" disabled={isSaving}>
+                     Cancel
+                </Button>
+              )}
+              <Button onClick={() => {
+                if (isEditing) handleSave();
+                else setIsEditing(true);
+              }} variant={isEditing ? 'default' : 'outline'} size="sm" className={isEditing ? 'bg-green-600 hover:bg-green-700 text-white' : ''} disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : (isEditing ? <Save className="mr-1 h-4 w-4" /> : <Edit className="mr-1 h-4 w-4" />)}
+                {isSaving ? 'Saving...' : (isEditing ? 'Save Profile' : 'Edit Profile')}
+              </Button>
+            </div>
           }
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
@@ -383,7 +413,7 @@ export default function ProviderProfilePage() {
                 />
                 <div className="mb-3">
                     <Label className="font-semibold text-foreground/80">Submission Date:</Label>
-                    <p className="text-sm mt-0.5">{format(parseISO(enrollment.submissionDate), 'PPP p')}</p>
+                    <p className="text-sm mt-0.5">{submissionDate}</p>
                 </div>
                  <div className="mb-3">
                     <Label className="font-semibold text-foreground/80">Status:</Label>
@@ -399,24 +429,18 @@ export default function ProviderProfilePage() {
                 {sortedCustomFieldDefinitions.map(fieldDef => (
                   <EditableField
                     key={fieldDef.id}
-                    label={fieldDef.label} // Passed for display in non-editing mode & for label in editing
-                    name={`additionalData.${fieldDef.id}`} // Full path for formData access
+                    label={fieldDef.label}
+                    name={`additionalData.${fieldDef.id}`}
                     value={formData.additionalData?.[fieldDef.id]}
                     isEditing={isEditing}
                     onChange={handleInputChange}
-                    customField={fieldDef} // Pass the full definition
-                    allCustomFields={customFieldDefinitions} // For dependent dropdowns
-                    formData={formData} // Pass current form data for dependent logic
+                    customField={fieldDef}
+                    allCustomFields={customFieldDefinitions}
+                    formData={formData}
                   />
                 ))}
                 </div>
             </div>
-          )}
-          
-          {isEditing && (
-            <Button onClick={() => { setIsEditing(false); if(currentEnrollment) setFormData({ practiceInfo: { ...currentEnrollment.practiceInfo }, contactDetails: { ...currentEnrollment.contactDetails }, ehrVendor: currentEnrollment.ehrVendor, additionalData: { ...(currentEnrollment.additionalData || {}) }}); }} variant="outline" size="sm" className="mt-4 ml-2">
-                 Cancel
-            </Button>
           )}
         </SectionCard>
 
@@ -430,9 +454,17 @@ export default function ProviderProfilePage() {
         <SectionCard title="Activity Log" icon={Activity}>
           <div className="max-h-60 overflow-y-auto space-y-2 mb-4 p-2 bg-muted/30 rounded-md">
             {enrollment.activityLog && enrollment.activityLog.length > 0 ? (
-              [...enrollment.activityLog].sort((a,b) => parseISO(b.timestamp).getTime() - parseISO(a.timestamp).getTime()).map((log, index) => (
+              [...enrollment.activityLog].sort((a,b) => {
+                  const dateA = a.timestamp ? parseISO(a.timestamp) : new Date(0);
+                  const dateB = b.timestamp ? parseISO(b.timestamp) : new Date(0);
+                  if (!isValid(dateA)) return 1;
+                  if (!isValid(dateB)) return -1;
+                  return dateB.getTime() - dateA.getTime();
+              }).map((log, index) => (
                 <div key={index} className="text-xs p-1.5 border-b border-dashed">
-                  <span className="font-semibold">{format(parseISO(log.timestamp), 'MMM d, yyyy h:mm a')}</span> ({log.type} by {log.user || 'System'}): {log.entry}
+                  <span className="font-semibold">
+                    {log.timestamp && isValid(parseISO(log.timestamp)) ? format(parseISO(log.timestamp), 'MMM d, yyyy h:mm a') : 'Invalid Date'}
+                  </span> ({log.type} by {log.user || 'System'}): {log.entry}
                 </div>
               ))
             ) : (
@@ -446,8 +478,12 @@ export default function ProviderProfilePage() {
               onChange={(e) => setNewActivityLog(e.target.value)}
               placeholder="Add new log entry..."
               className="flex-grow"
+              disabled={isSaving}
             />
-            <Button onClick={handleAddActivity} size="sm"><PlusCircle className="mr-1 h-4 w-4" />Add Log</Button>
+            <Button onClick={handleAddActivity} size="sm" disabled={isSaving || !newActivityLog.trim()}>
+              {isSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-1 h-4 w-4" />}
+              Add Log
+            </Button>
           </div>
         </SectionCard>
 
@@ -459,8 +495,12 @@ export default function ProviderProfilePage() {
             placeholder={`Type message for ${enrollment.contactDetails.name} (${enrollment.contactDetails.email})...`}
             rows={3}
             className="mb-2"
+            disabled={isSaving}
           />
-          <Button onClick={handleSendCommunication} size="sm">Send Message (Log)</Button>
+          <Button onClick={handleSendCommunication} size="sm" disabled={isSaving || !newCommunication.trim()}>
+            {isSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+            Send Message (Log)
+          </Button>
         </SectionCard>
       </main>
     </div>

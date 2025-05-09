@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -9,13 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, PlusCircle, ListChecks, GripVertical, Info } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast'; // Keep for local form validation errors if needed
+import { Trash2, PlusCircle, ListChecks, GripVertical, Info, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface AdminConsoleTabProps {
   customFieldDefinitions: CustomFieldDefinition[];
-  onAddCustomField: (field: CustomFieldDefinition) => void;
-  onRemoveCustomField: (fieldId: string) => void;
+  onAddCustomField: (field: CustomFieldDefinition) => Promise<void>;
+  onRemoveCustomField: (fieldId: string) => Promise<void>;
+  isLoadingContext: boolean; // From AppContext
 }
 
 const initialFieldState: Omit<CustomFieldDefinition, 'options'> & { tempOptions: CustomFieldOption[], required: boolean, dependentOptionsJson: string } = {
@@ -30,9 +32,10 @@ const initialFieldState: Omit<CustomFieldDefinition, 'options'> & { tempOptions:
   dependentOptionsJson: '',
 };
 
-export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRemoveCustomField }: AdminConsoleTabProps) {
+export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRemoveCustomField, isLoadingContext }: AdminConsoleTabProps) {
   const [newField, setNewField] = useState(initialFieldState);
-  const { toast } = useToast(); // Keep for form-specific feedback not handled by context
+  const [isSubmitting, setIsSubmitting] = useState(false); // Local submitting state for this form
+  const { toast } = useToast();
 
   useEffect(() => {
     const maxOrder = customFieldDefinitions.reduce((max, field) => Math.max(max, field.order), -1);
@@ -83,7 +86,7 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
     }));
   };
 
-  const handleAddCfdField = (e: React.FormEvent) => {
+  const handleAddCfdField = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newField.id.trim() || !newField.label.trim()) {
       toast({ title: 'Error', description: 'Field ID and Label are required.', variant: 'destructive' });
@@ -93,7 +96,6 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
       toast({ title: 'Error', description: 'Field ID can only contain letters, numbers, and underscores.', variant: 'destructive' });
       return;
     }
-    // Duplicate check is handled by onAddCustomField in context, but good to have client-side too
     if (customFieldDefinitions.some(f => f.id === newField.id.trim())) {
       toast({ title: 'Error', description: 'Field ID already exists.', variant: 'destructive' });
       return;
@@ -113,6 +115,7 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
       }
     }
 
+    setIsSubmitting(true);
     const fieldToAdd: CustomFieldDefinition = {
       id: newField.id.trim(),
       label: newField.label.trim(),
@@ -124,14 +127,23 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
       parentFieldId: newField.type === 'select' ? newField.parentFieldId : undefined,
       dependentOptionsJson: newField.type === 'select' && newField.parentFieldId ? newField.dependentOptionsJson : undefined,
     };
-    onAddCustomField(fieldToAdd); // This will now call the context function
     
-    const maxOrder = Math.max(...customFieldDefinitions.map(f => f.order), fieldToAdd.order);
-    setNewField({...initialFieldState, order: maxOrder + 1}); // Reset form
-    // Toast for success/failure will be handled by the context function
+    await onAddCustomField(fieldToAdd);
+    
+    const maxOrder = Math.max(...customFieldDefinitions.map(f => f.order), fieldToAdd.order, -1); // Ensure maxOrder is at least -1
+    setNewField({...initialFieldState, order: maxOrder + 1});
+    setIsSubmitting(false);
   };
   
   const parentCandidateFields = customFieldDefinitions.filter(f => f.type === 'select' || f.type === 'radio-group');
+
+  const handleRemoveCfdField = async (fieldId: string) => {
+    setIsSubmitting(true);
+    await onRemoveCustomField(fieldId);
+    setIsSubmitting(false);
+  }
+
+  const totalLoading = isLoadingContext || isSubmitting;
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -147,18 +159,18 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="fieldIdAdmin">Field ID (unique, no spaces/special chars)</Label> {/* Changed id to avoid conflict */}
-                <Input id="fieldIdAdmin" name="id" value={newField.id} onChange={handleInputChange} placeholder="e.g., practice_specialty" />
+                <Label htmlFor="fieldIdAdmin">Field ID (unique, no spaces/special chars)</Label>
+                <Input id="fieldIdAdmin" name="id" value={newField.id} onChange={handleInputChange} placeholder="e.g., practice_specialty" disabled={totalLoading} />
               </div>
               <div>
-                <Label htmlFor="fieldLabelAdmin">Field Label</Label> {/* Changed id to avoid conflict */}
-                <Input id="fieldLabelAdmin" name="label" value={newField.label} onChange={handleInputChange} placeholder="e.g., Practice Specialty" />
+                <Label htmlFor="fieldLabelAdmin">Field Label</Label>
+                <Input id="fieldLabelAdmin" name="label" value={newField.label} onChange={handleInputChange} placeholder="e.g., Practice Specialty" disabled={totalLoading} />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="fieldTypeAdmin">Field Type</Label> {/* Changed id to avoid conflict */}
-                <Select onValueChange={handleTypeChange} value={newField.type}>
+                <Label htmlFor="fieldTypeAdmin">Field Type</Label>
+                <Select onValueChange={handleTypeChange} value={newField.type} disabled={totalLoading}>
                   <SelectTrigger id="fieldTypeAdmin">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
@@ -174,18 +186,18 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
                 </Select>
               </div>
               <div>
-                <Label htmlFor="fieldPlaceholderAdmin">Placeholder (optional)</Label> {/* Changed id to avoid conflict */}
-                <Input id="fieldPlaceholderAdmin" name="placeholder" value={newField.placeholder || ''} onChange={handleInputChange} />
+                <Label htmlFor="fieldPlaceholderAdmin">Placeholder (optional)</Label>
+                <Input id="fieldPlaceholderAdmin" name="placeholder" value={newField.placeholder || ''} onChange={handleInputChange} disabled={totalLoading} />
               </div>
             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <Label htmlFor="fieldOrderAdmin">Order</Label> {/* Changed id to avoid conflict */}
-                    <Input id="fieldOrderAdmin" name="order" type="number" value={newField.order} onChange={handleInputChange} />
+                    <Label htmlFor="fieldOrderAdmin">Order</Label>
+                    <Input id="fieldOrderAdmin" name="order" type="number" value={newField.order} onChange={handleInputChange} disabled={totalLoading} />
                 </div>
                 <div className="flex items-end space-x-2 pb-1">
-                    <Checkbox id="fieldRequiredAdmin" checked={newField.required} onCheckedChange={handleCheckboxChange} /> {/* Changed id */}
-                    <Label htmlFor="fieldRequiredAdmin" className="font-normal">Required Field</Label> {/* Changed id */}
+                    <Checkbox id="fieldRequiredAdmin" checked={newField.required} onCheckedChange={handleCheckboxChange} disabled={totalLoading}/>
+                    <Label htmlFor="fieldRequiredAdmin" className="font-normal">Required Field</Label>
                 </div>
             </div>
 
@@ -194,12 +206,12 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
                 <Label className="font-medium">Options</Label>
                 {newField.tempOptions.map((option, index) => (
                   <div key={index} className="flex items-center gap-2">
-                    <Input placeholder="Label" value={option.label} onChange={(e) => handleOptionChange(index, 'label', e.target.value)} />
-                    <Input placeholder="Value" value={option.value} onChange={(e) => handleOptionChange(index, 'value', e.target.value)} />
-                    <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveOption(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    <Input placeholder="Label" value={option.label} onChange={(e) => handleOptionChange(index, 'label', e.target.value)} disabled={totalLoading} />
+                    <Input placeholder="Value" value={option.value} onChange={(e) => handleOptionChange(index, 'value', e.target.value)} disabled={totalLoading} />
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveOption(index)} disabled={totalLoading}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>
                 ))}
-                <Button type="button" variant="outline" size="sm" onClick={handleAddOption}><PlusCircle className="mr-2 h-4 w-4" />Add Option</Button>
+                <Button type="button" variant="outline" size="sm" onClick={handleAddOption} disabled={totalLoading}><PlusCircle className="mr-2 h-4 w-4" />Add Option</Button>
               </div>
             )}
 
@@ -207,9 +219,9 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
               <div className="space-y-3 p-3 border rounded-md mt-4">
                 <Label className="font-medium">Dependent Dropdown Configuration (Optional)</Label>
                 <div>
-                  <Label htmlFor="parentFieldIdAdmin">Depends on Field (Parent)</Label> {/* Changed id */}
-                  <Select onValueChange={(value) => setNewField(prev => ({ ...prev, parentFieldId: value }))} value={newField.parentFieldId}>
-                    <SelectTrigger id="parentFieldIdAdmin"> {/* Changed id */}
+                  <Label htmlFor="parentFieldIdAdmin">Depends on Field (Parent)</Label>
+                  <Select onValueChange={(value) => setNewField(prev => ({ ...prev, parentFieldId: value }))} value={newField.parentFieldId} disabled={totalLoading}>
+                    <SelectTrigger id="parentFieldIdAdmin">
                       <SelectValue placeholder="Select parent field" />
                     </SelectTrigger>
                     <SelectContent>
@@ -222,14 +234,15 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
                 </div>
                 {newField.parentFieldId && (
                   <div>
-                    <Label htmlFor="dependentOptionsJsonAdmin">Dependent Options JSON</Label> {/* Changed id */}
+                    <Label htmlFor="dependentOptionsJsonAdmin">Dependent Options JSON</Label>
                     <Textarea 
-                      id="dependentOptionsJsonAdmin" /* Changed id */
+                      id="dependentOptionsJsonAdmin"
                       name="dependentOptionsJson" 
                       value={newField.dependentOptionsJson} 
                       onChange={handleInputChange} 
                       rows={5}
                       placeholder={'Example: {"parentVal1": [{"label": "ChildOpt A", "value": "child_a"}], "parentVal2": [...] }'} 
+                      disabled={totalLoading}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       JSON format: Keys are parent field values, values are arrays of child options (<code>{`{label: string, value: string}`}</code>).
@@ -241,8 +254,9 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
 
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Field Definition
+            <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90" disabled={totalLoading}>
+              {totalLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+              {totalLoading ? 'Processing...' : 'Add Field Definition'}
             </Button>
           </CardFooter>
         </form>
@@ -257,8 +271,13 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
           <CardDescription>List of currently active custom fields in the enrollment form. Sorted by Order.</CardDescription>
         </CardHeader>
         <CardContent>
-          {customFieldDefinitions.length === 0 ? (
+          {customFieldDefinitions.length === 0 && !isLoadingContext ? (
             <p className="text-muted-foreground">No custom fields defined yet.</p>
+          ) : isLoadingContext && customFieldDefinitions.length === 0 ? (
+             <div className="flex justify-center items-center p-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2">Loading custom fields...</span>
+            </div>
           ) : (
             <ul className="space-y-3">
               {[...customFieldDefinitions].sort((a, b) => a.order - b.order).map(field => (
@@ -277,8 +296,8 @@ export function AdminConsoleTab({ customFieldDefinitions, onAddCustomField, onRe
                         )}
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => onRemoveCustomField(field.id)} aria-label="Remove field">
-                    <Trash2 className="h-5 w-5 text-destructive" />
+                  <Button variant="ghost" size="icon" onClick={() => handleRemoveCfdField(field.id)} aria-label="Remove field" disabled={totalLoading}>
+                    {isSubmitting && !isLoadingContext ? <Loader2 className="h-5 w-5 animate-spin" /> : <Trash2 className="h-5 w-5 text-destructive" />}
                   </Button>
                 </li>
               ))}

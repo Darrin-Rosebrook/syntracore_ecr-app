@@ -1,8 +1,9 @@
+
 "use client";
 
 import * as React from 'react';
 import { useState } from "react";
-import Link from 'next/link'; // Added import for Link
+import Link from 'next/link';
 import type { EnrollmentData } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -28,18 +29,18 @@ import {
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from './ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
-// Removed useAppContext hook, updateEnrollmentStatus will be passed as prop
+import { format, parseISO } from 'date-fns';
 
 interface PHAReviewerDashboardProps {
   enrollments: EnrollmentData[];
-  updateEnrollmentStatus: (id: string, status: EnrollmentData['status'], comments?: string) => void;
+  updateEnrollmentStatus: (id: string, status: EnrollmentData['status'], comments?: string) => Promise<void>;
+  isLoadingContext: boolean; // From AppContext
 }
 
-export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PHAReviewerDashboardProps) {
+export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLoadingContext }: PHAReviewerDashboardProps) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isProcessingAction, setIsProcessingAction] = useState(false); // Local loading for specific actions
   const { toast } = useToast();
 
   const [requestChangesModalOpen, setRequestChangesModalOpen] = useState(false);
@@ -57,10 +58,9 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
   );
 
   const handleApprove = async (id: string) => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API
-    updateEnrollmentStatus(id, "Approved");
-    setIsLoading(false);
+    setIsProcessingAction(true);
+    await updateEnrollmentStatus(id, "Approved");
+    setIsProcessingAction(false);
     toast({ title: "Enrollment Approved", description: `Enrollment ID ${id.slice(0,6)}... has been approved.`});
   };
   
@@ -75,10 +75,9 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
       toast({ title: "Missing Information", description: "Please provide comments for the change request.", variant: "destructive"});
       return;
     }
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API
-    updateEnrollmentStatus(currentEnrollmentForModal.id, "Changes Requested", changeRequestComments);
-    setIsLoading(false);
+    setIsProcessingAction(true);
+    await updateEnrollmentStatus(currentEnrollmentForModal.id, "Changes Requested", changeRequestComments);
+    setIsProcessingAction(false);
     setRequestChangesModalOpen(false);
     toast({ title: "Changes Requested", description: `Change request sent for enrollment ID ${currentEnrollmentForModal.id.slice(0,6)}...`});
   };
@@ -114,7 +113,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
             displayValue = value ? "Yes" : "No";
           } else if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/)) {
             try {
-              displayValue = format(new Date(value), "PPP");
+              displayValue = format(parseISO(value), "PPP");
             } catch (e) { /* Do nothing, use original string */ }
           } else if (Array.isArray(value)) {
             displayValue = value.join(', ');
@@ -128,6 +127,8 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
       </div>
     );
   };
+
+  const totalLoading = isLoadingContext || isProcessingAction;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -145,117 +146,126 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 w-full md:w-1/2 lg:w-1/3"
+              disabled={isLoadingContext && enrollments.length === 0}
             />
           </div>
-          {isLoading && (
-            <div className="flex justify-center items-center p-4">
+          {isLoadingContext && enrollments.length === 0 && (
+            <div className="flex justify-center items-center p-4 h-64">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <span className="ml-2">Processing...</span>
+              <span className="ml-2">Loading enrollments...</span>
             </div>
           )}
-          <ScrollArea className="h-[calc(100vh-22rem)] border rounded-md">
-            <Table>
-              <TableHeader className="sticky top-0 bg-background z-10">
-                <TableRow>
-                  <TableHead className="w-[50px]"></TableHead>
-                  <TableHead>Practice Name</TableHead>
-                  <TableHead>Contact Person</TableHead>
-                  <TableHead>Submission Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredEnrollments.length > 0 ? filteredEnrollments.map((enrollment) => (
-                  <React.Fragment key={enrollment.id}>
-                    <TableRow>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => toggleRow(enrollment.id)} aria-label={expandedRow === enrollment.id ? "Collapse row" : "Expand row"}>
-                          {expandedRow === enrollment.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </Button>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        <Link href={`/provider-profile/${enrollment.id}`} className="text-primary hover:underline">
-                          {enrollment.practiceInfo.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{enrollment.contactDetails.name}</TableCell>
-                      <TableCell>{new Date(enrollment.submissionDate).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant(enrollment.status)} className={getStatusBadgeClass(enrollment.status)}>
-                          {enrollment.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" disabled={isLoading}>
-                              Actions <ChevronDown className="ml-1 h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => toggleRow(enrollment.id)} disabled={isLoading}>
-                              <Eye className="mr-2 h-4 w-4" /> View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                               <Link href={`/provider-profile/${enrollment.id}`} className="flex items-center w-full cursor-pointer">
-                                <Edit3 className="mr-2 h-4 w-4" /> View/Edit Profile
-                              </Link>
-                            </DropdownMenuItem>
-                            {enrollment.status === 'Pending' && (
-                              <>
-                                <DropdownMenuItem onClick={() => handleApprove(enrollment.id)} disabled={isLoading}>
-                                  <Check className="mr-2 h-4 w-4" /> Approve
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openRequestChangesModal(enrollment)} disabled={isLoading}>
-                                  <Edit3 className="mr-2 h-4 w-4" /> Request Changes
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                    {expandedRow === enrollment.id && (
-                      <TableRow className="bg-muted/50 hover:bg-muted/50">
-                        <TableCell colSpan={6}>
-                          <div className="p-4 space-y-3">
-                            <h4 className="font-semibold">Enrollment Details:</h4>
-                            <p><strong>Practice Phone:</strong> {enrollment.practiceInfo.phone}</p>
-                            <p><strong>Practice Address:</strong> {enrollment.practiceInfo.address}</p>
-                            <p><strong>Contact Email:</strong> {enrollment.contactDetails.email}</p>
-                            <p><strong>Contact Phone:</strong> {enrollment.contactDetails.phone}</p>
-                            <p><strong>EHR Vendor:</strong> {enrollment.ehrVendor}</p>
-                            {enrollment.ccdDocumentName && <p><strong>Document:</strong> {enrollment.ccdDocumentName}</p>}
-                            
-                            {renderAdditionalData(enrollment.additionalData)}
-
-                            {enrollment.validationResult && (
-                                <FHIRValidationDisplay result={enrollment.validationResult} />
-                            )}
-                            {enrollment.status === "Changes Requested" && enrollment.validationResult?.messages.find(msg => msg.startsWith("PHA Comments:")) && (
-                                <Card className="mt-2">
-                                    <CardHeader><CardTitle className="text-md">PHA Reviewer Comments</CardTitle></CardHeader>
-                                    <CardContent>
-                                        <p className="text-sm">{enrollment.validationResult.messages.find(msg => msg.startsWith("PHA Comments:"))?.replace("PHA Comments: ", "")}</p>
-                                    </CardContent>
-                                </Card>
-                            )}
-                          </div>
+          {totalLoading && enrollments.length > 0 && ( // Show spinner on top of table if actions are processing
+             <div className="absolute inset-0 bg-background/50 flex justify-center items-center z-20">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+             </div>
+          )}
+          {(!isLoadingContext || enrollments.length > 0) && (
+            <ScrollArea className="h-[calc(100vh-22rem)] border rounded-md">
+              <Table>
+                <TableHeader className="sticky top-0 bg-background z-10">
+                  <TableRow>
+                    <TableHead className="w-[50px]"></TableHead>
+                    <TableHead>Practice Name</TableHead>
+                    <TableHead>Contact Person</TableHead>
+                    <TableHead>Submission Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredEnrollments.length > 0 ? filteredEnrollments.map((enrollment) => (
+                    <React.Fragment key={enrollment.id}>
+                      <TableRow className={totalLoading ? 'opacity-50 pointer-events-none' : ''}>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" onClick={() => toggleRow(enrollment.id)} aria-label={expandedRow === enrollment.id ? "Collapse row" : "Expand row"} disabled={totalLoading}>
+                            {expandedRow === enrollment.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          <Link href={`/provider-profile/${enrollment.id}`} className={`text-primary hover:underline ${totalLoading ? 'pointer-events-none' : ''}`}>
+                            {enrollment.practiceInfo.name}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{enrollment.contactDetails.name}</TableCell>
+                        <TableCell>{enrollment.submissionDate ? format(parseISO(enrollment.submissionDate), 'P') : 'N/A'}</TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadgeVariant(enrollment.status)} className={getStatusBadgeClass(enrollment.status)}>
+                            {enrollment.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" disabled={totalLoading}>
+                                {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : "Actions"}
+                                {!isProcessingAction && <ChevronDown className="ml-1 h-4 w-4" />}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => toggleRow(enrollment.id)} disabled={totalLoading}>
+                                <Eye className="mr-2 h-4 w-4" /> View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild disabled={totalLoading}>
+                                 <Link href={`/provider-profile/${enrollment.id}`} className="flex items-center w-full cursor-pointer">
+                                  <Edit3 className="mr-2 h-4 w-4" /> View/Edit Profile
+                                </Link>
+                              </DropdownMenuItem>
+                              {enrollment.status === 'Pending' && (
+                                <>
+                                  <DropdownMenuItem onClick={() => handleApprove(enrollment.id)} disabled={totalLoading}>
+                                    <Check className="mr-2 h-4 w-4" /> Approve
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openRequestChangesModal(enrollment)} disabled={totalLoading}>
+                                    <Edit3 className="mr-2 h-4 w-4" /> Request Changes
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                    )}
-                  </React.Fragment>
-                )) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center h-24">
-                      No enrollments found.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </ScrollArea>
+                      {expandedRow === enrollment.id && (
+                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                          <TableCell colSpan={6}>
+                            <div className="p-4 space-y-3">
+                              <h4 className="font-semibold">Enrollment Details:</h4>
+                              <p><strong>Practice Phone:</strong> {enrollment.practiceInfo.phone}</p>
+                              <p><strong>Practice Address:</strong> {enrollment.practiceInfo.address}</p>
+                              <p><strong>Contact Email:</strong> {enrollment.contactDetails.email}</p>
+                              <p><strong>Contact Phone:</strong> {enrollment.contactDetails.phone}</p>
+                              <p><strong>EHR Vendor:</strong> {enrollment.ehrVendor}</p>
+                              {enrollment.ccdDocumentName && <p><strong>Document:</strong> {enrollment.ccdDocumentName}</p>}
+                              
+                              {renderAdditionalData(enrollment.additionalData)}
+
+                              {enrollment.validationResult && (
+                                  <FHIRValidationDisplay result={enrollment.validationResult} />
+                              )}
+                              {enrollment.status === "Changes Requested" && enrollment.validationResult?.messages.find(msg => msg.startsWith("PHA Comments:")) && (
+                                  <Card className="mt-2">
+                                      <CardHeader><CardTitle className="text-md">PHA Reviewer Comments</CardTitle></CardHeader>
+                                      <CardContent>
+                                          <p className="text-sm">{enrollment.validationResult.messages.find(msg => msg.startsWith("PHA Comments:"))?.replace("PHA Comments: ", "")}</p>
+                                      </CardContent>
+                                  </Card>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  )) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center h-24">
+                        No enrollments found matching your search criteria.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          )}
         </CardContent>
       </Card>
 
@@ -273,14 +283,15 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus }: PH
               value={changeRequestComments}
               onChange={(e) => setChangeRequestComments(e.target.value)}
               rows={4}
+              disabled={isProcessingAction}
             />
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button type="button" variant="outline">Cancel</Button>
+              <Button type="button" variant="outline" disabled={isProcessingAction}>Cancel</Button>
             </DialogClose>
-            <Button type="button" onClick={handleRequestChanges} disabled={isLoading || !changeRequestComments.trim()}>
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            <Button type="button" onClick={handleRequestChanges} disabled={isProcessingAction || !changeRequestComments.trim()}>
+              {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Submit Request
             </Button>
           </DialogFooter>

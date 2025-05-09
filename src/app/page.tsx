@@ -8,7 +8,7 @@ import { DashboardTab } from "@/components/dashboard-tab";
 import { ProviderEnrollmentTab } from "@/components/provider-enrollment-tab";
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
 import { AdminConsoleTab } from "@/components/admin-console-tab";
-import { LayoutDashboard, UserPlus, ShieldCheck, Settings } from "lucide-react";
+import { LayoutDashboard, UserPlus, ShieldCheck, Settings, Loader2 } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 
 export default function HomePage() {
@@ -18,10 +18,20 @@ export default function HomePage() {
     addEnrollment, 
     updateEnrollmentStatus, 
     addCustomField, 
-    removeCustomField 
+    removeCustomField,
+    isLoading 
   } = useAppContext();
   
   const [activeTab, setActiveTab] = React.useState("dashboard");
+
+  if (isLoading && !enrollments.length && !customFieldDefinitions.length) { // Show loading only on initial full load
+    return (
+      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Loading SyntraHub...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
@@ -54,13 +64,14 @@ export default function HomePage() {
               <ProviderEnrollmentTab addEnrollment={addEnrollment} customFieldDefinitions={customFieldDefinitions} />
             </TabsContent>
             <TabsContent value="pha-reviewer" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
-              <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} />
+              <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} />
             </TabsContent>
             <TabsContent value="admin-console" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
               <AdminConsoleTab
                 customFieldDefinitions={customFieldDefinitions}
                 onAddCustomField={addCustomField}
                 onRemoveCustomField={removeCustomField}
+                isLoadingContext={isLoading}
               />
             </TabsContent>
           </Tabs>
