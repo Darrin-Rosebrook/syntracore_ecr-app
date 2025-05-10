@@ -17,7 +17,7 @@ import { EHR_VENDORS } from "@/lib/constants";
 import { FileUploader } from "@/components/file-uploader";
 import { useToast } from "@/hooks/use-toast";
 import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption } from "@/types";
-import { validateFHIRMessage } from "@/services/fhir-validator"; 
+import { validateFHIR } from "@/services/fhir-validator"; 
 import { summarizeValidationResults } from "@/ai/flows/summarize-validation-results";
 import { FHIRValidationDisplay } from "./fhir-validation-display";
 import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays, Hash } from "lucide-react"; // Added Hash
@@ -147,7 +147,7 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
     if (file && fileContent) {
       setIsProcessingFile(true);
       try {
-        const rawValidationResult = await validateFHIRMessage(fileContent);
+        const rawValidationResult = await validateFHIR(fileContent); // Changed from validateFHIRMessage
         const aiSummaryResult = await summarizeValidationResults({ validationResults: rawValidationResult });
         setValidationResult({
           ...rawValidationResult,
