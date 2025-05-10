@@ -2,7 +2,7 @@
 "use client";
 
 import React from "react";
-import { MainHeader } from "@/components/main-header";
+// import { MainHeader } from "@/components/main-header"; // Removed MainHeader import
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from "@/components/dashboard-tab";
 import { ProviderEnrollmentTab } from "@/components/provider-enrollment-tab";
@@ -35,7 +35,7 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
-      <MainHeader />
+      {/* <MainHeader /> */} {/* Removed MainHeader component */}
       <main className="flex-1">
         <div className="container mx-auto py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

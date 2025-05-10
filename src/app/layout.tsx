@@ -1,9 +1,11 @@
+
 import React from 'react';
 import type {Metadata} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { AppProvider } from '@/context/AppContext'; // Added import
+import { AppProvider } from '@/context/AppContext';
+import { MainHeader } from '@/components/main-header'; // Added import
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -28,7 +30,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <AppProvider> {/* Added AppProvider */}
+        <AppProvider>
+          <MainHeader /> {/* Added MainHeader here */}
           {children}
           <Toaster />
         </AppProvider>

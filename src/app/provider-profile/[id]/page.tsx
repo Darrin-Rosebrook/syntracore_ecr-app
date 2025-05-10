@@ -332,14 +332,14 @@ export default function ProviderProfilePage() {
   };
 
   if (isContextLoading && !enrollment) {
-    return <div className="container mx-auto py-10 text-center flex items-center justify-center h-screen">
+    return <div className="container mx-auto py-10 text-center flex items-center justify-center h-[calc(100vh-4rem)]"> {/* Adjusted height for global header */}
              <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
              <span>Loading provider profile...</span>
            </div>;
   }
 
   if (!enrollment) {
-    return <div className="container mx-auto py-10 text-center h-screen flex flex-col items-center justify-center">
+    return <div className="container mx-auto py-10 text-center h-[calc(100vh-4rem)] flex flex-col items-center justify-center"> {/* Adjusted height */}
              <Info className="h-12 w-12 text-destructive mb-4" />
              <h2 className="text-2xl font-semibold mb-2">Provider Profile Not Found</h2>
              <p className="text-muted-foreground mb-6">The profile with ID "{id}" could not be found.</p>
@@ -357,16 +357,18 @@ export default function ProviderProfilePage() {
     : 'Invalid Date';
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 container mx-auto">
-         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => router.back()} disabled={isSaving}>
-            <ArrowLeft className="h-4 w-4" />
-            <span className="sr-only">Back</span>
-          </Button>
-        <h1 className="text-xl font-semibold">Provider Profile: {enrollment.practiceInfo.name}</h1>
-      </header>
-
+    <div className="min-h-[calc(100vh-4rem)] bg-background"> {/* Adjusted min-height */}
+      {/* Header section removed, global header in layout.tsx will be used */}
       <main className="container mx-auto py-6 space-y-6">
+        <div className="flex items-center justify-between mb-6">
+           <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => router.back()} disabled={isSaving}>
+              <ArrowLeft className="h-5 w-5" />
+              <span className="sr-only">Back</span>
+            </Button>
+          <h1 className="text-2xl font-semibold">Provider Profile: {enrollment.practiceInfo.name}</h1>
+          <div className="w-9"></div> {/* Spacer to balance the back button */}
+        </div>
+
         <SectionCard
           title="Enrollment Overview"
           icon={UserCircle}
