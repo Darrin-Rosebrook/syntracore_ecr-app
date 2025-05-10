@@ -1,22 +1,24 @@
 import React from 'react';
 import Link from "next/link";
-import Image from "next/image"; // Added import for Image component
+import Image from "next/image";
 
 export function MainHeader() {
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background">
-      <div className="container flex h-16 items-center space-x-4 sm:justify-between sm:space-x-0">
-        <Link href="/" className="flex items-center"> {/* Removed space-x-2 as Image is a single child */}
+    <header className="sticky top-0 z-40 w-full border-b bg-red-500 text-white"> {/* Changed background, added text color for contrast */}
+      <div className="container flex h-16 items-center justify-between"> {/* Ensured justify-between */}
+        <Link href="/" className="flex items-center">
           <Image
             src="/onboard-ecr-logo.png" // Path to the logo in the public folder
             alt="Onboard eCR Logo"
-            width={190} // Adjusted width based on common logo aspect ratios
-            height={40} // Adjusted height for header
-            priority // Good for LCP
+            width={190} 
+            height={40} 
+            priority 
             data-ai-hint="logo health"
           />
+           <span className="ml-4 font-bold">HEADER TEST</span> {/* Added test text, increased margin */}
         </Link>
-        {/* Add navigation items here if needed in the future */}
+        {/* This div helps justify-between work correctly if there are no other right-aligned items yet */}
+        <div></div> 
       </div>
     </header>
   );
