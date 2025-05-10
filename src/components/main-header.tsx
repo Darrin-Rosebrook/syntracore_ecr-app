@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -22,7 +23,7 @@ export function MainHeader() {
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
           <Image
-            src="/onboard-ecr-logo.png" 
+            src="https://picsum.photos/40/40" 
             alt="Onboard eCR Logo"
             width={40} 
             height={40} 
@@ -30,7 +31,7 @@ export function MainHeader() {
             data-ai-hint="logo health"
             className="rounded-full"
           />
-           <span className="font-bold text-lg text-primary">SyntraHub</span>
+           {/* Removed SyntraHub text */}
         </Link>
         
         <div className="flex items-center gap-3">
@@ -65,3 +66,4 @@ export function MainHeader() {
     </header>
   );
 }
+
