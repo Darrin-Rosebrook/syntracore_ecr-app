@@ -1,6 +1,7 @@
 import type { FHIRValidationResult as ExternalFHIRValidationResult } from '@/services/fhir-validator';
 
 export interface PracticeInfo {
+  organizationNPI: string; // Added
   name: string;
   address: string;
   phone: string;

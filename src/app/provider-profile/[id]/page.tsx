@@ -17,7 +17,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isValid } from 'date-fns';
-import { ArrowLeft, Edit, Save, MessageSquare, PlusCircle, Activity, UserCircle, Building, Settings2, FileText, CalendarDays, Info, Loader2, User } from 'lucide-react';
+import { ArrowLeft, Edit, Save, MessageSquare, PlusCircle, Activity, UserCircle, Building, Settings2, FileText, CalendarDays, Info, Loader2, User, Hash } from 'lucide-react'; // Added Hash
 import { useToast } from '@/hooks/use-toast';
 import { EHR_VENDORS } from '@/lib/constants';
 import { FHIRValidationDisplay } from '@/components/fhir-validation-display';
@@ -51,11 +51,12 @@ interface EditableFieldProps {
   customField?: CustomFieldDefinition;
   allCustomFields?: CustomFieldDefinition[];
   formData?: Record<string, any>; 
+  icon?: React.ElementType;
 }
 
 const EditableField: React.FC<EditableFieldProps> = ({ 
   label, value, name, isEditing, onChange, type = 'text', 
-  options, customField, allCustomFields, formData 
+  options, customField, allCustomFields, formData, icon: Icon 
 }) => {
 
   const displayValue = (val: any, cf?: CustomFieldDefinition) => {
@@ -86,8 +87,11 @@ const EditableField: React.FC<EditableFieldProps> = ({
   if (!isEditing) {
     return (
       <div className="mb-3">
-        <Label className="font-semibold text-foreground/80">{customField?.label || label}:</Label>
-        <p className="text-sm mt-0.5">{displayValue(value, customField)}</p>
+        <Label className="font-semibold text-foreground/80 flex items-center">
+          {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground"/>}
+          {customField?.label || label}:
+        </Label>
+        <p className="text-sm mt-0.5 ml-6">{displayValue(value, customField)}</p>
       </div>
     );
   }
@@ -101,15 +105,21 @@ const EditableField: React.FC<EditableFieldProps> = ({
       case 'text':
         return (
           <div className="mb-3">
-            <Label htmlFor={fieldId}>{fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}</Label>
-            <Input id={fieldId} name={fieldId} value={value || ''} onChange={onChange} placeholder={customField.placeholder} />
+            <Label htmlFor={fieldId} className="flex items-center">
+                {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground"/>}
+                {fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}
+            </Label>
+            <Input id={fieldId} name={fieldId} value={value || ''} onChange={onChange} placeholder={customField.placeholder} className="ml-6 w-[calc(100%-1.5rem)]"/>
           </div>
         );
       case 'textarea':
         return (
           <div className="mb-3">
-            <Label htmlFor={fieldId}>{fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}</Label>
-            <Textarea id={fieldId} name={fieldId} value={value || ''} onChange={onChange} placeholder={customField.placeholder} />
+            <Label htmlFor={fieldId} className="flex items-center">
+                {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground"/>}
+                {fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}
+            </Label>
+            <Textarea id={fieldId} name={fieldId} value={value || ''} onChange={onChange} placeholder={customField.placeholder} className="ml-6 w-[calc(100%-1.5rem)]"/>
           </div>
         );
       case 'select':
@@ -127,11 +137,14 @@ const EditableField: React.FC<EditableFieldProps> = ({
         }
         return (
           <div className="mb-3">
-            <Label htmlFor={fieldId}>{fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}</Label>
+            <Label htmlFor={fieldId} className="flex items-center">
+                {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground"/>}
+                {fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}
+            </Label>
             <Select name={fieldId} onValueChange={(val) => onChange({ target: { name: fieldId, value: val } })} value={value || ''}
               disabled={customField.parentFieldId && formData && !formData[`additionalData.${customField.parentFieldId}`] && currentOptions.length === 0}
             >
-              <SelectTrigger id={fieldId}><SelectValue placeholder={customField.placeholder || "Select an option"} /></SelectTrigger>
+              <SelectTrigger id={fieldId} className="ml-6 w-[calc(100%-1.5rem)]"><SelectValue placeholder={customField.placeholder || "Select an option"} /></SelectTrigger>
               <SelectContent>
                 {currentOptions.map((option: CustomFieldOption) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
                  {currentOptions.length === 0 && customField.parentFieldId && formData && formData[`additionalData.${customField.parentFieldId}`] && (
@@ -146,16 +159,22 @@ const EditableField: React.FC<EditableFieldProps> = ({
         );
       case 'checkbox':
         return (
-          <div className="flex items-center space-x-2 mb-3 py-2">
+          <div className="flex items-center space-x-2 mb-3 py-2 ml-6">
             <Checkbox id={fieldId} name={fieldId} checked={!!value} onCheckedChange={(checked) => onChange({ target: { name: fieldId, value: !!checked } })} />
-            <Label htmlFor={fieldId} className="font-normal">{fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}</Label>
+            <Label htmlFor={fieldId} className="font-normal flex items-center">
+                {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground"/>}
+                {fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}
+            </Label>
           </div>
         );
       case 'checkbox-group':
         return (
           <div className="mb-3">
-            <Label>{fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}</Label>
-            <div className="space-y-1 mt-1">
+            <Label className="flex items-center">
+                {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground"/>}
+                {fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}
+            </Label>
+            <div className="space-y-1 mt-1 ml-6">
               {customField.options?.map(option => (
                 <div key={option.value} className="flex items-center space-x-2">
                   <Checkbox
@@ -178,8 +197,11 @@ const EditableField: React.FC<EditableFieldProps> = ({
       case 'radio-group':
         return (
           <div className="mb-3">
-            <Label>{fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}</Label>
-            <RadioGroup name={fieldId} value={value || ''} onValueChange={(val) => onChange({ target: { name: fieldId, value: val }})} className="space-y-1 mt-1">
+            <Label className="flex items-center">
+                {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground"/>}
+                {fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}
+            </Label>
+            <RadioGroup name={fieldId} value={value || ''} onValueChange={(val) => onChange({ target: { name: fieldId, value: val }})} className="space-y-1 mt-1 ml-6">
               {customField.options?.map(option => (
                 <div key={option.value} className="flex items-center space-x-2">
                   <RadioGroupItem value={option.value} id={`${fieldId}.${option.value}`} />
@@ -192,10 +214,13 @@ const EditableField: React.FC<EditableFieldProps> = ({
        case 'date':
         return (
           <div className="mb-3">
-            <Label htmlFor={fieldId}>{fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}</Label>
+            <Label htmlFor={fieldId} className="flex items-center">
+                {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground"/>}
+                {fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}
+            </Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className={`w-full justify-start text-left font-normal ${!value && "text-muted-foreground"}`}>
+                <Button variant="outline" className={`ml-6 w-[calc(100%-1.5rem)] justify-start text-left font-normal ${!value && "text-muted-foreground"}`}>
                   <CalendarDays className="mr-2 h-4 w-4" />
                   {value && isValid(parseISO(value)) ? format(parseISO(value), "PPP") : <span>{customField.placeholder || "Pick a date"}</span>}
                 </Button>
@@ -214,17 +239,23 @@ const EditableField: React.FC<EditableFieldProps> = ({
   if (type === 'textarea') {
     return (
       <div className="mb-3">
-        <Label htmlFor={fieldId}>{fieldLabel}</Label>
-        <Textarea id={fieldId} name={fieldId} value={value || ''} onChange={onChange} />
+        <Label htmlFor={fieldId} className="flex items-center">
+            {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground"/>}
+            {fieldLabel}
+        </Label>
+        <Textarea id={fieldId} name={fieldId} value={value || ''} onChange={onChange} className="ml-6 w-[calc(100%-1.5rem)]" />
       </div>
     );
   }
   if (type === 'select' && options) {
      return (
       <div className="mb-3">
-        <Label htmlFor={fieldId}>{fieldLabel}</Label>
+        <Label htmlFor={fieldId} className="flex items-center">
+            {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground"/>}
+            {fieldLabel}
+        </Label>
         <Select name={fieldId} onValueChange={(val) => onChange({target: {name: fieldId, value: val}})} value={value || ''}>
-          <SelectTrigger id={fieldId}><SelectValue placeholder={`Select ${fieldLabel.toLowerCase()}`} /></SelectTrigger>
+          <SelectTrigger id={fieldId} className="ml-6 w-[calc(100%-1.5rem)]"><SelectValue placeholder={`Select ${fieldLabel.toLowerCase()}`} /></SelectTrigger>
           <SelectContent>
             {options.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
           </SelectContent>
@@ -235,8 +266,11 @@ const EditableField: React.FC<EditableFieldProps> = ({
 
   return (
     <div className="mb-3">
-      <Label htmlFor={fieldId}>{fieldLabel}</Label>
-      <Input id={fieldId} name={fieldId} type={type} value={value || ''} onChange={onChange} />
+      <Label htmlFor={fieldId} className="flex items-center">
+        {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground"/>}
+        {fieldLabel}
+      </Label>
+      <Input id={fieldId} name={fieldId} type={type} value={value || ''} onChange={onChange} className="ml-6 w-[calc(100%-1.5rem)]" />
     </div>
   );
 };
@@ -392,6 +426,7 @@ export default function ProviderProfilePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
             <div>
                 <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><Building className="mr-2 h-4 w-4 text-muted-foreground"/>Practice Information</h4>
+                <EditableField label="Organization NPI" name="practiceInfo.organizationNPI" value={formData.practiceInfo?.organizationNPI} isEditing={isEditing} onChange={handleInputChange} icon={Hash} />
                 <EditableField label="Practice Name" name="practiceInfo.name" value={formData.practiceInfo?.name} isEditing={isEditing} onChange={handleInputChange} />
                 <EditableField label="Address" name="practiceInfo.address" value={formData.practiceInfo?.address} type="textarea" isEditing={isEditing} onChange={handleInputChange} />
                 <EditableField label="Phone" name="practiceInfo.phone" value={formData.practiceInfo?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
@@ -412,14 +447,21 @@ export default function ProviderProfilePage() {
                   onChange={handleInputChange} 
                   type="select"
                   options={EHR_VENDORS}
+                  icon={Settings2}
                 />
                 <div className="mb-3">
-                    <Label className="font-semibold text-foreground/80">Submission Date:</Label>
-                    <p className="text-sm mt-0.5">{submissionDate}</p>
+                    <Label className="font-semibold text-foreground/80 flex items-center">
+                        <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground"/>
+                        Submission Date:
+                    </Label>
+                    <p className="text-sm mt-0.5 ml-6">{submissionDate}</p>
                 </div>
                  <div className="mb-3">
-                    <Label className="font-semibold text-foreground/80">Status:</Label>
-                     <p className="text-sm mt-0.5">{enrollment.status}</p>
+                    <Label className="font-semibold text-foreground/80 flex items-center">
+                        <Info className="mr-2 h-4 w-4 text-muted-foreground"/>
+                        Status:
+                    </Label>
+                     <p className="text-sm mt-0.5 ml-6">{enrollment.status}</p>
                 </div>
             </div>
           </div>
@@ -439,6 +481,7 @@ export default function ProviderProfilePage() {
                     customField={fieldDef}
                     allCustomFields={customFieldDefinitions}
                     formData={formData}
+                    icon={Info}
                   />
                 ))}
                 </div>
@@ -508,3 +551,4 @@ export default function ProviderProfilePage() {
     </div>
   );
 }
+

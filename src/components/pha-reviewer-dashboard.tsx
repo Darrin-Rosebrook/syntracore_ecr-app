@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Edit3, Eye, ChevronDown, ChevronUp, Loader2, Search, Info } from "lucide-react";
+import { Check, X, Edit3, Eye, ChevronDown, ChevronUp, Loader2, Search, Info, Hash } from "lucide-react"; // Added Hash
 import { FHIRValidationDisplay } from "./fhir-validation-display";
 import { ScrollArea } from './ui/scroll-area';
 import { Input } from './ui/input';
@@ -54,7 +54,8 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
   const filteredEnrollments = enrollments.filter(enrollment =>
     enrollment.practiceInfo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     enrollment.contactDetails.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    enrollment.status.toLowerCase().includes(searchTerm.toLowerCase())
+    enrollment.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (enrollment.practiceInfo.organizationNPI && enrollment.practiceInfo.organizationNPI.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleApprove = async (id: string) => {
@@ -142,7 +143,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
             <Search className="absolute ml-3 h-5 w-5 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search enrollments (name, contact, status)..."
+              placeholder="Search enrollments (name, NPI, contact, status)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 w-full md:w-1/2 lg:w-1/3"
@@ -167,6 +168,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
                   <TableRow>
                     <TableHead className="w-[50px]"></TableHead>
                     <TableHead>Practice Name</TableHead>
+                    <TableHead>Organization NPI</TableHead>
                     <TableHead>Contact Person</TableHead>
                     <TableHead>Submission Date</TableHead>
                     <TableHead>Status</TableHead>
@@ -187,6 +189,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
                             {enrollment.practiceInfo.name}
                           </Link>
                         </TableCell>
+                        <TableCell>{enrollment.practiceInfo.organizationNPI || 'N/A'}</TableCell>
                         <TableCell>{enrollment.contactDetails.name}</TableCell>
                         <TableCell>{enrollment.submissionDate ? format(parseISO(enrollment.submissionDate), 'P') : 'N/A'}</TableCell>
                         <TableCell>
@@ -227,9 +230,10 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
                       </TableRow>
                       {expandedRow === enrollment.id && (
                         <TableRow className="bg-muted/50 hover:bg-muted/50">
-                          <TableCell colSpan={6}>
+                          <TableCell colSpan={7}> {/* Updated colSpan */}
                             <div className="p-4 space-y-3">
                               <h4 className="font-semibold">Enrollment Details:</h4>
+                              <p><strong>Organization NPI:</strong> {enrollment.practiceInfo.organizationNPI || 'N/A'}</p>
                               <p><strong>Practice Phone:</strong> {enrollment.practiceInfo.phone}</p>
                               <p><strong>Practice Address:</strong> {enrollment.practiceInfo.address}</p>
                               <p><strong>Contact Email:</strong> {enrollment.contactDetails.email}</p>
@@ -257,7 +261,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
                     </React.Fragment>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center h-24">
+                      <TableCell colSpan={7} className="text-center h-24"> {/* Updated colSpan */}
                         No enrollments found matching your search criteria.
                       </TableCell>
                     </TableRow>
@@ -300,3 +304,4 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
     </div>
   );
 }
+

@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -19,12 +20,13 @@ import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, C
 import { validateFHIRMessage } from "@/services/fhir-validator"; 
 import { summarizeValidationResults } from "@/ai/flows/summarize-validation-results";
 import { FHIRValidationDisplay } from "./fhir-validation-display";
-import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays } from "lucide-react";
+import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays, Hash } from "lucide-react"; // Added Hash
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 
 const practiceInfoSchema = z.object({
+  organizationNPI: z.string().length(10, "Organization NPI must be 10 digits").regex(/^[0-9]{10}$/, "Organization NPI must be a 10-digit number"),
   name: z.string().min(1, "Practice name is required"),
   address: z.string().min(1, "Address is required"),
   phone: z.string().min(10, "Valid phone number is required").regex(/^\+?[0-9\s\-()]+$/, "Invalid phone number format"),
@@ -95,7 +97,7 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
   const form = useForm<FormSchemaType>({
     resolver: zodResolver(dynamicEnrollmentSchema),
     defaultValues: {
-      practiceInfo: { name: "", address: "", phone: "" },
+      practiceInfo: { organizationNPI: "", name: "", address: "", phone: "" },
       contactDetails: { name: "", email: "", phone: "" },
       ehrVendor: "",
       consent: false,
@@ -210,7 +212,7 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
     onSubmitEnrollment(enrollmentData, ccdFileContent, validationResult);
     
     const defaultResetValues: FormSchemaType = {
-      practiceInfo: { name: "", address: "", phone: "" },
+      practiceInfo: { organizationNPI: "", name: "", address: "", phone: "" },
       contactDetails: { name: "", email: "", phone: "" },
       ehrVendor: "",
       consent: false,
@@ -251,6 +253,13 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
           {/* Practice Info */}
           <fieldset className="space-y-4 p-4 border rounded-md">
             <legend className="text-lg font-medium px-1 flex items-center"><Building className="mr-2 h-5 w-5 text-primary" />Practice Information</legend>
+            <div>
+              <Label htmlFor="organizationNPI" className="flex items-center"><Hash className="mr-2 h-4 w-4 text-muted-foreground" />Organization NPI</Label>
+              <Input id="organizationNPI" {...form.register("practiceInfo.organizationNPI")} placeholder="Enter 10-digit NPI"/>
+              {form.formState.errors.practiceInfo?.organizationNPI && (
+                <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.organizationNPI.message}</p>
+              )}
+            </div>
             <div>
               <Label htmlFor="practiceName">Practice Name</Label>
               <Input id="practiceName" {...form.register("practiceInfo.name")} />
@@ -549,3 +558,4 @@ export function ProviderEnrollmentForm({ onSubmitEnrollment, customFieldDefiniti
     </Card>
   );
 }
+
