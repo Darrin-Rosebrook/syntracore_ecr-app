@@ -2,13 +2,13 @@
 "use client";
 
 import React from "react";
-// import { MainHeader } from "@/components/main-header"; // Removed MainHeader import
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from "@/components/dashboard-tab";
 import { ProviderEnrollmentTab } from "@/components/provider-enrollment-tab";
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
 import { AdminConsoleTab } from "@/components/admin-console-tab";
-import { LayoutDashboard, UserPlus, ShieldCheck, Settings, Loader2 } from "lucide-react";
+import { WorkflowDemoTab } from "@/components/workflow-demo-tab"; // Import new tab
+import { LayoutDashboard, UserPlus, ShieldCheck, Settings, Loader2, Waypoints } from "lucide-react"; // Added Waypoints
 import { useAppContext } from "@/context/AppContext";
 
 export default function HomePage() {
@@ -24,7 +24,7 @@ export default function HomePage() {
   
   const [activeTab, setActiveTab] = React.useState("dashboard");
 
-  if (isLoading && !enrollments.length && !customFieldDefinitions.length) { // Show loading only on initial full load
+  if (isLoading && !enrollments.length && !customFieldDefinitions.length) { 
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -35,11 +35,10 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
-      {/* <MainHeader /> */} {/* Removed MainHeader component */}
       <main className="flex-1">
         <div className="container mx-auto py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-4 h-auto sm:h-12 mb-6 shadow-md">
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-5 h-auto sm:h-12 mb-6 shadow-md"> {/* Updated grid-cols */}
               <TabsTrigger value="dashboard" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
                 <LayoutDashboard className="mr-2 h-5 w-5" />
                 Project Dashboard
@@ -55,6 +54,10 @@ export default function HomePage() {
               <TabsTrigger value="admin-console" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
                 <Settings className="mr-2 h-5 w-5" />
                 Admin Console
+              </TabsTrigger>
+              <TabsTrigger value="workflow-demo" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200"> {/* New Tab Trigger */}
+                <Waypoints className="mr-2 h-5 w-5" />
+                Workflow Demo
               </TabsTrigger>
             </TabsList>
             <TabsContent value="dashboard" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
@@ -73,6 +76,9 @@ export default function HomePage() {
                 onRemoveCustomField={removeCustomField}
                 isLoadingContext={isLoading}
               />
+            </TabsContent>
+            <TabsContent value="workflow-demo" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn"> {/* New Tab Content */}
+              <WorkflowDemoTab />
             </TabsContent>
           </Tabs>
         </div>
