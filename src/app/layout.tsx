@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'SyntraHub',
+  title: 'Onboard eCR', // Changed from SyntraHub as it's not part of the logo anymore
   description: 'SyntraHub - Project Management and Enrollment Portal',
 };
 
