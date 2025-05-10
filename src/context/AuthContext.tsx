@@ -39,6 +39,7 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showGlobalLoader, setShowGlobalLoader] = useState(true); // Start with loader potentially visible
   const { toast } = useToast();
 
   useEffect(() => {
@@ -48,6 +49,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     });
     return unsubscribe; // Cleanup subscription on unmount
   }, []);
+
+  useEffect(() => {
+    // This effect runs only on the client after initial hydration
+    if (loading) {
+      if (typeof window !== 'undefined' && 
+          (window.location.pathname === '/login' || window.location.pathname === '/signup')) {
+        setShowGlobalLoader(false); // Don't show global loader on login/signup pages
+      } else {
+        setShowGlobalLoader(true); // Show global loader on other pages if auth is loading
+      }
+    } else {
+      setShowGlobalLoader(false); // Hide loader once auth state is resolved
+    }
+  }, [loading]);
+
 
   const signUp = async (email: string, password: string): Promise<User | null> => {
     setLoading(true);
@@ -117,8 +133,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     logOut,
     resetPassword,
   };
-
-  if (loading && typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/signup') { // Avoid full screen loader on login/signup
+  
+  // Conditionally render loader based on client-side state `showGlobalLoader`
+  if (showGlobalLoader) { 
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
