@@ -9,7 +9,7 @@ export async function addEnrollmentToFirestore(
   ccdDocumentContent: string | null,
   validationResult: FHIRValidationResult
 ): Promise<{ success: boolean; id?: string; error?: string }> {
-  let dataToLogForDebug: any = null;
+  let dataToSubmit: any = null;
   try {
     const submissionDate = new Date();
     const initialLogEntry: ActivityLogEntry = {
@@ -18,8 +18,7 @@ export async function addEnrollmentToFirestore(
       type: 'System',
     };
 
-    // Explicitly construct the object to be sent to Firestore
-    const dataForFirestore: any = {
+    dataToSubmit = {
       practiceInfo: formData.practiceInfo,
       contactDetails: formData.contactDetails,
       ehrVendor: formData.ehrVendor,
@@ -28,50 +27,69 @@ export async function addEnrollmentToFirestore(
       validationResult: validationResult, 
       status: "Pending" as const,
       activityLog: [{ ...initialLogEntry, timestamp: Timestamp.fromDate(new Date(initialLogEntry.timestamp)) }],
+      additionalData: formData.additionalData || {},
     };
 
-    // Handle optional fields explicitly
     if (formData.ccdDocumentName !== undefined) {
-      dataForFirestore.ccdDocumentName = formData.ccdDocumentName;
+      dataToSubmit.ccdDocumentName = formData.ccdDocumentName;
     }
-    // Ensure additionalData is an object, even if formData.additionalData is undefined
-    dataForFirestore.additionalData = formData.additionalData || {}; 
     
     if (ccdDocumentContent !== null) {
-      dataForFirestore.ccdDocumentContent = ccdDocumentContent;
+      dataToSubmit.ccdDocumentContent = ccdDocumentContent;
     }
 
-    dataToLogForDebug = dataForFirestore; 
+    // console.log("Data being sent to Firestore (Server Action):", JSON.stringify(dataToSubmit, null, 2));
 
-    // console.log("Data being sent to Firestore (Server Action):", JSON.stringify(dataForFirestore, null, 2));
-
-    const docRef = await addDoc(collection(db, "enrollments"), dataToLogForDebug);
+    const docRef = await addDoc(collection(db, "enrollments"), dataToSubmit);
     console.log("Firestore document written with ID (Server Action): ", docRef.id);
     return { success: true, id: docRef.id };
 
   } catch (error) {
-    console.error("Raw error object in addEnrollmentToFirestore:", error); // Log the raw error
-    console.error("Firestore write failed in addEnrollmentToFirestore (Server Action). Error details:", error instanceof Error ? error.message : String(error));
-    if (error instanceof Error && error.stack) {
-        console.error("Stack trace:", error.stack);
-    }
-    // For more detailed debugging, you can log the data that was attempted to be written:
-    // console.error("Data that was attempted to be written (Server Action):", JSON.stringify(dataToLogForDebug, null, 2));
+    console.error("--- START: Firestore write failed in addEnrollmentToFirestore (Server Action) ---");
+    console.error("Timestamp:", new Date().toISOString());
+    console.error("Form Data (partial, for context):", { practiceName: formData?.practiceInfo?.name, contactName: formData?.contactDetails?.name });
     
-    let errorMessage = "An unknown error occurred while writing to Firestore.";
+    let errorMessage = "Failed to submit enrollment due to an unexpected server error.";
+
     if (error instanceof Error) {
-      errorMessage = `Error (${error.name}): ${error.message}`;
-      const firebaseError = error as any; 
+      console.error("Error Type: Standard Error");
+      console.error("Error Name:", error.name);
+      console.error("Error Message:", error.message);
+      if (error.stack) {
+        console.error("Stack Trace:", error.stack);
+      }
+      errorMessage = `Failed to submit enrollment: ${error.message}`;
+      
+      // Attempt to get Firebase error code if present
+      const firebaseError = error as any; // Cast to any to check for code
       if (firebaseError.code) {
+        console.error("Firebase Error Code:", firebaseError.code);
         errorMessage += ` (Code: ${firebaseError.code})`;
       }
     } else if (typeof error === 'string') {
-      errorMessage = error;
-    } else if (error && typeof error === 'object' && 'message' in error) {
-      const errorObj = error as { name?: string; message: string; code?: string };
-      errorMessage = `Error (${errorObj.name || errorObj.code || 'UnknownError'}): ${errorObj.message}`;
+      console.error("Error Type: String");
+      console.error("Error String:", error);
+      errorMessage = `Failed to submit enrollment: ${error}`;
+    } else if (error && typeof error === 'object') {
+      console.error("Error Type: Object");
+      console.error("Error Object (raw):", JSON.stringify(error, null, 2)); // Log the raw object structure
+      // Try to access common error properties
+      const errorObj = error as { name?: string; message?: string; code?: string };
+      if(errorObj.message) {
+        errorMessage = `Failed to submit enrollment: ${errorObj.message}`;
+        if(errorObj.code) errorMessage += ` (Code: ${errorObj.code})`;
+        else if(errorObj.name) errorMessage += ` (Name: ${errorObj.name})`;
+      } else {
+         errorMessage = `Failed to submit enrollment: An non-standard error object was received. Check server logs.`;
+      }
+    } else {
+      console.error("Error Type: Unknown");
+      console.error("Raw error value:", error);
     }
-
+    
+    console.error("Data that was attempted to be written (if available):", JSON.stringify(dataToSubmit, null, 2));
+    console.error("--- END: Firestore write failed in addEnrollmentToFirestore (Server Action) ---");
+    
     return { success: false, error: errorMessage };
   }
 }
