@@ -68,7 +68,7 @@ interface ProviderEnrollmentFormProps {
     data: EnrollmentFormData,
     ccdDocumentContent: string | null,
     validationResult: FHIRValidationResult
-  ) => Promise<boolean>; // Modified to expect a Promise<boolean>
+  ) => Promise<boolean>; 
   customFieldDefinitions: CustomFieldDefinition[];
 }
 
@@ -265,9 +265,11 @@ export function ProviderEnrollmentForm({
 
 
   const onSubmit = async (data: FormSchemaType) => {
-    setIsSubmitting(true); // Set local loading state for UI feedback
+    console.log("Form onSubmit triggered"); 
+    setIsSubmitting(true); 
 
     if (!ccdFile) {
+      console.log("onSubmit: Missing CCD file"); 
       toast({
         title: "Missing Document",
         description: "Please upload a CCD/FHIR document.",
@@ -278,6 +280,7 @@ export function ProviderEnrollmentForm({
     }
 
     if (!validationResult) {
+      console.log("onSubmit: Missing validation result"); 
       toast({
         title: "File Not Processed",
         description: "Please wait for the file to be processed or re-upload if an error occurred.",
@@ -287,8 +290,7 @@ export function ProviderEnrollmentForm({
       return;
     }
     
-    // Note: Zod schema validation is handled by react-hook-form before this onSubmit is called.
-    // No need for an explicit `form.trigger()` here.
+    console.log("onSubmit: Proceeding with submission. Data:", data); 
 
     try {
       const enrollmentData: EnrollmentFormData = {
@@ -296,10 +298,12 @@ export function ProviderEnrollmentForm({
         ccdDocumentName: ccdFile.name,
         additionalData: data.additionalData || {},
       };
-
+      console.log("onSubmit: Calling onSubmitEnrollment (addEnrollment)"); 
       const submissionSuccessful = await onSubmitEnrollment(enrollmentData, ccdFileContent, validationResult);
+      console.log("onSubmit: onSubmitEnrollment returned:", submissionSuccessful); 
 
       if (submissionSuccessful) {
+        console.log("onSubmit: Submission successful, resetting form.");
         form.reset({
           practiceInfo: { organizationNPI: "", name: "", address: "", phone: "" },
           contactDetails: { name: "", email: "", phone: "" },
@@ -312,22 +316,19 @@ export function ProviderEnrollmentForm({
         setFetchedNpiData(null);
         setValidationResult(undefined);
         setNpiLookupError(null);
-        // Success toast is handled by AppContext.addEnrollment
       } else {
-        // Error toast is handled by AppContext.addEnrollment if submission to DB fails
-        // No additional toast needed here unless for a different type of error.
+        console.log("onSubmit: Submission was not successful (as per addEnrollment return).");
       }
     } catch (error) {
-      // This catch block is for unexpected errors during the submission process itself
-      // or if onSubmitEnrollment throws an error not caught internally.
-      console.error("Critical error during enrollment form submission process:", error);
+      console.error("Critical error during enrollment form submission process:", error); 
       toast({
         title: "Submission Failed",
         description: "An critical unexpected error occurred. Please try again or contact support.",
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false); // Ensure button loading state is always reset
+      console.log("onSubmit: Finally block, setting isSubmitting to false."); 
+      setIsSubmitting(false); 
     }
   };
 

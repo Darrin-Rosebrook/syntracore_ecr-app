@@ -23,11 +23,11 @@ import {
 interface AppContextState {
   enrollments: EnrollmentData[];
   customFieldDefinitions: CustomFieldDefinition[];
-  isLoading: boolean; // For loading state from Firestore
+  isLoading: boolean; 
 }
 
 interface AppContextActions {
-  addEnrollment: (formData: EnrollmentFormData, ccdDocumentContent: string | null, validationResult: FHIRValidationResult) => Promise<boolean>; // Modified return type
+  addEnrollment: (formData: EnrollmentFormData, ccdDocumentContent: string | null, validationResult: FHIRValidationResult) => Promise<boolean>; 
   updateEnrollmentStatus: (id: string, status: EnrollmentData['status'], comments?: string) => Promise<void>;
   updateEnrollmentData: (enrollmentId: string, updatedFields: Partial<Omit<EnrollmentData, 'id' | 'activityLog'>>) => Promise<void>;
   addActivityLogEntry: (enrollmentId: string, entryText: string, type: ActivityLogEntry['type'], user?: string) => Promise<void>;
@@ -62,7 +62,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return {
           id: docSnap.id,
           ...data,
-          // Convert Firestore Timestamps to ISO strings if necessary (especially for submissionDate)
           submissionDate: (data.submissionDate as Timestamp)?.toDate ? (data.submissionDate as Timestamp).toDate().toISOString() : data.submissionDate,
           activityLog: data.activityLog?.map((log: any) => ({
             ...log,
@@ -87,19 +86,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const addActivityLogEntry = useCallback(async (enrollmentId: string, entryText: string, type: ActivityLogEntry['type'], user?: string) => {
     const newLogEntry: ActivityLogEntry = {
-      timestamp: new Date().toISOString(), // Will be converted to Firestore Timestamp on save
+      timestamp: new Date().toISOString(), 
       entry: entryText,
       type,
       user: user || 'System',
     };
     const enrollmentDocRef = doc(db, 'enrollments', enrollmentId);
     try {
-      // Firestore Timestamps should be used for date fields
       const logEntryForFirestore = { ...newLogEntry, timestamp: Timestamp.fromDate(new Date(newLogEntry.timestamp)) };
       await updateDoc(enrollmentDocRef, {
         activityLog: arrayUnion(logEntryForFirestore)
       });
-      // Update local state for immediate UI feedback
       setEnrollments(prevEnrollments =>
         prevEnrollments.map(e =>
           e.id === enrollmentId
@@ -114,7 +111,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, [toast]);
 
   const addEnrollment = async (formData: EnrollmentFormData, ccdDocumentContent: string | null, validationResult: FHIRValidationResult): Promise<boolean> => {
-    setIsLoading(true); // Global loading state
+    console.log("AppContext: addEnrollment called with formData:", formData); 
+
     const submissionDate = new Date();
     const initialLogEntry: ActivityLogEntry = {
       timestamp: submissionDate.toISOString(),
@@ -124,15 +122,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const newEnrollmentForFirestore = {
       ...formData,
-      submissionDate: Timestamp.fromDate(submissionDate), // Use Firestore Timestamp
-      ccdDocumentContent: ccdDocumentContent || null, // Firestore prefers null over undefined for missing fields
+      submissionDate: Timestamp.fromDate(submissionDate),
+      ccdDocumentContent: ccdDocumentContent || null,
       validationResult: validationResult,
       status: "Pending" as EnrollmentData['status'],
       activityLog: [{ ...initialLogEntry, timestamp: Timestamp.fromDate(new Date(initialLogEntry.timestamp)) }],
     };
 
     try {
+      console.log("AppContext: Attempting to add document to Firestore:", newEnrollmentForFirestore); 
       const docRef = await addDoc(collection(db, 'enrollments'), newEnrollmentForFirestore);
+      console.log("AppContext: Document added to Firestore with ID:", docRef.id); 
+
       const newEnrollmentForState: EnrollmentData = {
         ...formData,
         id: docRef.id,
@@ -148,21 +149,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         description: `Practice "${formData.practiceInfo.name}" enrollment has been successfully submitted.`,
         className: "bg-green-500 text-white",
       });
-      return true; // Indicate success
+      console.log("AppContext: addEnrollment returning true (success)"); 
+      return true; 
     } catch (error) {
-      console.error("Error adding enrollment to Firestore: ", error);
+      console.error("Error adding enrollment to Firestore: ", error); 
       toast({ title: 'Database Error', description: 'Could not submit enrollment data to the database. Please check console for details.', variant: 'destructive' });
-      return false; // Indicate failure
+      console.log("AppContext: addEnrollment returning false (failure)"); 
+      return false; 
     } finally {
-      setIsLoading(false); // Global loading state reset
+      console.log("AppContext: addEnrollment finally block."); 
     }
   };
 
   const updateEnrollmentStatus = async (id: string, status: EnrollmentData['status'], comments?: string) => {
-    setIsLoading(true);
+    // setIsLoading(true); // Removed to let local component handle its loading state
     const enrollmentDocRef = doc(db, 'enrollments', id);
     try {
-      const updateData: Partial<EnrollmentData> & { activityLog?: any } = { status };
+      const updateData: Partial<EnrollmentData> & { activityLog?: any } = { status }; // Explicitly type activityLog as any for arrayUnion
       const activityLogsToAdd: ActivityLogEntry[] = [];
 
       const statusChangeEntry: ActivityLogEntry = {
@@ -194,13 +197,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         } else if (status === "Changes Requested" && updateData.validationResult) {
             updateData.validationResult.isValid = false;
         }
-
       }
       
       const firestoreLogEntries = activityLogsToAdd.map(log => ({...log, timestamp: Timestamp.fromDate(new Date(log.timestamp))}));
-      updateData.activityLog = arrayUnion(...firestoreLogEntries);
+      
+      // Ensure updateData.activityLog is correctly typed for arrayUnion
+      const updatePayload: { status: EnrollmentData['status'], activityLog?: any, validationResult?: FHIRValidationResult } = { status };
+      if (firestoreLogEntries.length > 0) {
+          updatePayload.activityLog = arrayUnion(...firestoreLogEntries);
+      }
+      if (updateData.validationResult) {
+          updatePayload.validationResult = updateData.validationResult;
+      }
 
-      await updateDoc(enrollmentDocRef, updateData);
+      await updateDoc(enrollmentDocRef, updatePayload);
+
 
       setEnrollments(prevEnrollments =>
         prevEnrollments.map(e =>
@@ -210,7 +221,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 status, 
                 validationResult: updateData.validationResult ? {
                     ...updateData.validationResult,
-                     summary: e.validationResult?.summary 
+                     summary: e.validationResult?.summary // Preserve existing summary
                 } : e.validationResult,
                 activityLog: [...(e.activityLog || []), ...activityLogsToAdd] 
               }
@@ -222,12 +233,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       console.error("Error updating enrollment status in Firestore: ", error);
       toast({ title: 'Error', description: 'Could not update enrollment status.', variant: 'destructive' });
     } finally {
-      setIsLoading(false);
+      // setIsLoading(false); // Removed
     }
   };
 
   const updateEnrollmentData = async (enrollmentId: string, updatedFields: Partial<Omit<EnrollmentData, 'id' | 'activityLog'>>) => {
-    setIsLoading(true);
+    // setIsLoading(true); // Removed
     const enrollmentDocRef = doc(db, 'enrollments', enrollmentId);
     try {
       await updateDoc(enrollmentDocRef, updatedFields);
@@ -245,15 +256,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       console.error("Error updating enrollment data in Firestore: ", error);
       toast({ title: 'Error', description: 'Could not update provider details.', variant: 'destructive' });
     } finally {
-      setIsLoading(false);
+      // setIsLoading(false); // Removed
     }
   };
 
   const addCustomField = async (fieldDefinition: CustomFieldDefinition) => {
-    setIsLoading(true);
+    // setIsLoading(true); // Removed
     if (customFieldDefinitions.some(f => f.id === fieldDefinition.id)) {
       toast({ title: 'Error', description: 'Field ID already exists.', variant: 'destructive' });
-      setIsLoading(false);
+      // setIsLoading(false); // Removed
       return;
     }
     const fieldDocRef = doc(db, 'customFieldDefinitions', fieldDefinition.id);
@@ -265,12 +276,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       console.error("Error adding custom field to Firestore: ", error);
       toast({ title: 'Error', description: 'Could not add custom field.', variant: 'destructive' });
     } finally {
-      setIsLoading(false);
+      // setIsLoading(false); // Removed
     }
   };
 
   const removeCustomField = async (fieldId: string) => {
-    setIsLoading(true);
+    // setIsLoading(true); // Removed
     const fieldDocRef = doc(db, 'customFieldDefinitions', fieldId);
     try {
       await deleteDoc(fieldDocRef);
@@ -283,7 +294,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       console.error("Error removing custom field from Firestore: ", error);
       toast({ title: 'Error', description: 'Could not remove custom field.', variant: 'destructive' });
     } finally {
-      setIsLoading(false);
+      // setIsLoading(false); // Removed
     }
   };
 
@@ -292,7 +303,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       value={{
         enrollments,
         customFieldDefinitions,
-        isLoading,
+        isLoading, // This is for initial data loading
         addEnrollment,
         updateEnrollmentStatus,
         updateEnrollmentData,
