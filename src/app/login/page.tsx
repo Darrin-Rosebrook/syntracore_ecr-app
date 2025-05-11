@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -15,9 +15,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const { logIn, loading, currentUser, resetPassword } = useAuth();
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false); // Local submitting state
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (currentUser) {
       router.push('/'); // Redirect if already logged in
     }
@@ -35,13 +35,13 @@ export default function LoginPage() {
 
   const handlePasswordReset = async () => {
     if (!email) {
-        alert("Please enter your email address to reset password."); // Consider using toast
-        return;
+      alert("Please enter your email address to reset password.");
+      return;
     }
     setIsSubmitting(true);
     await resetPassword(email);
     setIsSubmitting(false);
-  }
+  };
 
   return (
     <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-background p-4">
@@ -50,31 +50,31 @@ export default function LoginPage() {
           <div className="flex justify-center mb-2">
             <LogInIcon className="h-8 w-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Login to SyntraHub</CardTitle>
-          <CardDescription>Enter your credentials to access your account.</CardDescription>
+          <CardTitle className="text-2xl">Login</CardTitle>
+          <CardDescription>Enter your email and password to login.</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="m@example.com" 
+              <Input
+                id="email"
+                type="email"
+                placeholder="m@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required 
+                required
                 disabled={loading || isSubmitting}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input 
-                id="password" 
-                type="password" 
+              <Input
+                id="password"
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required 
+                required
                 disabled={loading || isSubmitting}
               />
             </div>

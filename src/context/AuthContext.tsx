@@ -1,14 +1,20 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { auth } from '@/lib/firebase';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
+import { auth } from '@/firebase-config'; // ✅ Updated path
 import type { User, AuthError } from 'firebase/auth';
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut, 
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
   onAuthStateChanged,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -39,7 +45,7 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showGlobalLoader, setShowGlobalLoader] = useState(true); // Start with loader potentially visible
+  const [showGlobalLoader, setShowGlobalLoader] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,23 +53,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setCurrentUser(user);
       setLoading(false);
     });
-    return unsubscribe; // Cleanup subscription on unmount
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
-    // This effect runs only on the client after initial hydration
     if (loading) {
-      if (typeof window !== 'undefined' && 
-          (window.location.pathname === '/login' || window.location.pathname === '/signup')) {
-        setShowGlobalLoader(false); // Don't show global loader on login/signup pages
+      if (
+        typeof window !== 'undefined' &&
+        (window.location.pathname === '/login' ||
+          window.location.pathname === '/signup')
+      ) {
+        setShowGlobalLoader(false);
       } else {
-        setShowGlobalLoader(true); // Show global loader on other pages if auth is loading
+        setShowGlobalLoader(true);
       }
     } else {
-      setShowGlobalLoader(false); // Hide loader once auth state is resolved
+      setShowGlobalLoader(false);
     }
   }, [loading]);
-
 
   const signUp = async (email: string, password: string): Promise<User | null> => {
     setLoading(true);
@@ -74,7 +81,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } catch (error) {
       const authError = error as AuthError;
       console.error('Sign up error:', authError);
-      toast({ title: 'Sign Up Failed', description: authError.message, variant: 'destructive' });
+      toast({
+        title: 'Sign Up Failed',
+        description: authError.message,
+        variant: 'destructive',
+      });
       return null;
     } finally {
       setLoading(false);
@@ -90,7 +101,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } catch (error) {
       const authError = error as AuthError;
       console.error('Login error:', authError);
-      toast({ title: 'Login Failed', description: authError.message, variant: 'destructive' });
+      toast({
+        title: 'Login Failed',
+        description: authError.message,
+        variant: 'destructive',
+      });
       return null;
     } finally {
       setLoading(false);
@@ -101,11 +116,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setLoading(true);
     try {
       await signOut(auth);
-      toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
+      toast({
+        title: 'Logged Out',
+        description: 'You have been successfully logged out.',
+      });
     } catch (error) {
       const authError = error as AuthError;
       console.error('Logout error:', authError);
-      toast({ title: 'Logout Failed', description: authError.message, variant: 'destructive' });
+      toast({
+        title: 'Logout Failed',
+        description: authError.message,
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -115,15 +137,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setLoading(true);
     try {
       await sendPasswordResetEmail(auth, email);
-      toast({ title: 'Password Reset Email Sent', description: 'Check your inbox for instructions.' });
+      toast({
+        title: 'Password Reset Email Sent',
+        description: 'Check your inbox for instructions.',
+      });
     } catch (error) {
       const authError = error as AuthError;
       console.error('Password reset error:', authError);
-      toast({ title: 'Password Reset Failed', description: authError.message, variant: 'destructive' });
+      toast({
+        title: 'Password Reset Failed',
+        description: authError.message,
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   const value = {
     currentUser,
@@ -133,9 +162,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     logOut,
     resetPassword,
   };
-  
-  // Conditionally render loader based on client-side state `showGlobalLoader`
-  if (showGlobalLoader) { 
+
+  if (showGlobalLoader) {
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />

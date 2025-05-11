@@ -27,6 +27,7 @@ export default function SignupPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    console.log("Submitting signup form..."); // <-- Add this
     if (password !== confirmPassword) {
       alert("Passwords do not match!"); // Basic validation, consider using toast
       return;
