@@ -1,4 +1,3 @@
-
 // ✅ FULL FILE CONTENT BEGINNING
 
 "use client";
@@ -78,7 +77,7 @@ export function ProviderEnrollmentForm({
   customFieldDefinitions,
 }: ProviderEnrollmentFormProps) {
   const { toast } = useToast();
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter(); 
   const [ccdFile, setCcdFile] = React.useState<File | null>(null);
   const [ccdFileContent, setCcdFileContent] = React.useState<string | null>(null);
   const [validationResult, setValidationResult] = React.useState<FHIRValidationResult | undefined>(undefined);
@@ -301,7 +300,7 @@ export function ProviderEnrollmentForm({
       if (submissionResult.success) {
         toast({
           title: "Enrollment Submitted",
-          description: `Practice "${formData.practiceInfo.name}" enrollment has been successfully submitted. ID: ${submissionResult.id}`,
+          description: `Practice "${enrollmentData.practiceInfo.name}" enrollment has been successfully submitted. ID: ${submissionResult.id}`,
           className: "bg-green-500 text-white",
         });
         form.reset({
@@ -316,7 +315,7 @@ export function ProviderEnrollmentForm({
         setFetchedNpiData(null);
         setValidationResult(undefined);
         setNpiLookupError(null);
-        router.refresh(); // Refresh data on successful submission
+        router.refresh(); 
       } else {
         toast({
           title: "Submission Failed",
