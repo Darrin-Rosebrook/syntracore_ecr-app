@@ -295,7 +295,17 @@ export function ProviderEnrollmentForm({
         additionalData: data.additionalData || {},
       };
       
-      const submissionResult = await onSubmitEnrollment(enrollmentData, ccdFileContent, validationResult);
+      const response = await fetch("/api/enroll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formData: enrollmentData,
+          ccdDocumentContent: ccdFileContent,
+          validationResult
+        }),
+      });
+      const submissionResult = await response.json();
+      
 
       if (submissionResult.success) {
         toast({

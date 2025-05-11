@@ -5,7 +5,7 @@ import * as React from 'react';
 import { ProviderEnrollmentForm } from "@/components/provider-enrollment-form";
 import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition } from "@/types";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { addEnrollmentToFirestore } from '@/actions/add-enrollment'; // Import the server action
+import { addEnrollmentToFirestore } from '@/lib/firestore-add-enrollment';
 
 interface ProviderEnrollmentTabProps {
   // addEnrollment prop is no longer needed from AppContext for this component
