@@ -7,6 +7,7 @@ import * as React from 'react';
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useRouter } from 'next/navigation'; // Import useRouter
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -68,7 +69,7 @@ interface ProviderEnrollmentFormProps {
     data: EnrollmentFormData,
     ccdDocumentContent: string | null,
     validationResult: FHIRValidationResult
-  ) => Promise<boolean>; 
+  ) => Promise<{ success: boolean; id?: string; error?: string }>; 
   customFieldDefinitions: CustomFieldDefinition[];
 }
 
@@ -77,6 +78,7 @@ export function ProviderEnrollmentForm({
   customFieldDefinitions,
 }: ProviderEnrollmentFormProps) {
   const { toast } = useToast();
+  const router = useRouter(); // Initialize useRouter
   const [ccdFile, setCcdFile] = React.useState<File | null>(null);
   const [ccdFileContent, setCcdFileContent] = React.useState<string | null>(null);
   const [validationResult, setValidationResult] = React.useState<FHIRValidationResult | undefined>(undefined);
@@ -265,11 +267,9 @@ export function ProviderEnrollmentForm({
 
 
   const onSubmit = async (data: FormSchemaType) => {
-    console.log("Form onSubmit triggered"); 
     setIsSubmitting(true); 
 
     if (!ccdFile) {
-      console.log("onSubmit: Missing CCD file"); 
       toast({
         title: "Missing Document",
         description: "Please upload a CCD/FHIR document.",
@@ -280,7 +280,6 @@ export function ProviderEnrollmentForm({
     }
 
     if (!validationResult) {
-      console.log("onSubmit: Missing validation result"); 
       toast({
         title: "File Not Processed",
         description: "Please wait for the file to be processed or re-upload if an error occurred.",
@@ -290,20 +289,21 @@ export function ProviderEnrollmentForm({
       return;
     }
     
-    console.log("onSubmit: Proceeding with submission. Data:", data); 
-
     try {
       const enrollmentData: EnrollmentFormData = {
         ...data,
         ccdDocumentName: ccdFile.name,
         additionalData: data.additionalData || {},
       };
-      console.log("onSubmit: Calling onSubmitEnrollment (addEnrollment)"); 
-      const submissionSuccessful = await onSubmitEnrollment(enrollmentData, ccdFileContent, validationResult);
-      console.log("onSubmit: onSubmitEnrollment returned:", submissionSuccessful); 
+      
+      const submissionResult = await onSubmitEnrollment(enrollmentData, ccdFileContent, validationResult);
 
-      if (submissionSuccessful) {
-        console.log("onSubmit: Submission successful, resetting form.");
+      if (submissionResult.success) {
+        toast({
+          title: "Enrollment Submitted",
+          description: `Practice "${formData.practiceInfo.name}" enrollment has been successfully submitted. ID: ${submissionResult.id}`,
+          className: "bg-green-500 text-white",
+        });
         form.reset({
           practiceInfo: { organizationNPI: "", name: "", address: "", phone: "" },
           contactDetails: { name: "", email: "", phone: "" },
@@ -316,8 +316,13 @@ export function ProviderEnrollmentForm({
         setFetchedNpiData(null);
         setValidationResult(undefined);
         setNpiLookupError(null);
+        router.refresh(); // Refresh data on successful submission
       } else {
-        console.log("onSubmit: Submission was not successful (as per addEnrollment return).");
+        toast({
+          title: "Submission Failed",
+          description: submissionResult.error || "Could not submit enrollment. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Critical error during enrollment form submission process:", error); 
@@ -327,7 +332,6 @@ export function ProviderEnrollmentForm({
         variant: "destructive",
       });
     } finally {
-      console.log("onSubmit: Finally block, setting isSubmitting to false."); 
       setIsSubmitting(false); 
     }
   };
