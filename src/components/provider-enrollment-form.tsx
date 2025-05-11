@@ -1,3 +1,4 @@
+
 // ✅ FULL FILE CONTENT BEGINNING
 
 "use client";
@@ -67,7 +68,7 @@ interface ProviderEnrollmentFormProps {
     data: EnrollmentFormData,
     ccdDocumentContent: string | null,
     validationResult: FHIRValidationResult
-  ) => void;
+  ) => Promise<boolean>; // Modified to expect a Promise<boolean>
   customFieldDefinitions: CustomFieldDefinition[];
 }
 
@@ -178,7 +179,7 @@ export function ProviderEnrollmentForm({
     if (file && fileContent) {
       setIsProcessingFile(true);
       try {
-        const rawValidationResult = await validateFHIR(fileContent); // Using the imported validateFHIR
+        const rawValidationResult = await validateFHIR(fileContent); 
         const aiSummaryResult = await summarizeValidationResults({ validationResults: rawValidationResult });
         setValidationResult({
           ...rawValidationResult,
@@ -259,16 +260,12 @@ export function ProviderEnrollmentForm({
   const handleClearNpiData = () => {
     setFetchedNpiData(null);
     setNpiLookupError(null);
-    // Optionally clear related form fields if desired, or let user edit/clear them manually
-    // form.setValue('practiceInfo.name', '', { shouldValidate: true });
-    // form.setValue('practiceInfo.address', '', { shouldValidate: true });
-    // form.setValue('practiceInfo.phone', '', { shouldValidate: true });
     toast({ title: 'NPI Data Cleared', description: 'Lookup information has been cleared.' });
   };
 
 
   const onSubmit = async (data: FormSchemaType) => {
-    setIsSubmitting(true);
+    setIsSubmitting(true); // Set local loading state for UI feedback
 
     if (!ccdFile) {
       toast({
@@ -283,49 +280,55 @@ export function ProviderEnrollmentForm({
     if (!validationResult) {
       toast({
         title: "File Not Processed",
-        description: "Please wait for the file to be processed or try re-uploading.",
-        variant: "destructive",
-      });
-      setIsSubmitting(false);
-      return;
-    }
-
-    const isValid = await form.trigger();
-    if (!isValid) {
-      toast({
-        title: "Validation Error",
-        description: "Please check the form for errors.",
+        description: "Please wait for the file to be processed or re-upload if an error occurred.",
         variant: "destructive",
       });
       setIsSubmitting(false);
       return;
     }
     
-    // NPI is validated by schema, if lookup was used, it's pre-filled.
-    // If not, manual entry is validated.
+    // Note: Zod schema validation is handled by react-hook-form before this onSubmit is called.
+    // No need for an explicit `form.trigger()` here.
 
-    const enrollmentData: EnrollmentFormData = {
-      ...data,
-      ccdDocumentName: ccdFile.name,
-      additionalData: data.additionalData || {},
-    };
+    try {
+      const enrollmentData: EnrollmentFormData = {
+        ...data,
+        ccdDocumentName: ccdFile.name,
+        additionalData: data.additionalData || {},
+      };
 
-    onSubmitEnrollment(enrollmentData, ccdFileContent, validationResult);
+      const submissionSuccessful = await onSubmitEnrollment(enrollmentData, ccdFileContent, validationResult);
 
-    form.reset({
-      practiceInfo: { organizationNPI: "", name: "", address: "", phone: "" },
-      contactDetails: { name: "", email: "", phone: "" },
-      ehrVendor: "",
-      consent: false,
-      additionalData: {},
-    });
-
-    setCcdFile(null);
-    setCcdFileContent(null);
-    setFetchedNpiData(null);
-    setValidationResult(undefined);
-    setNpiLookupError(null);
-    setIsSubmitting(false);
+      if (submissionSuccessful) {
+        form.reset({
+          practiceInfo: { organizationNPI: "", name: "", address: "", phone: "" },
+          contactDetails: { name: "", email: "", phone: "" },
+          ehrVendor: "",
+          consent: false,
+          additionalData: {},
+        });
+        setCcdFile(null);
+        setCcdFileContent(null);
+        setFetchedNpiData(null);
+        setValidationResult(undefined);
+        setNpiLookupError(null);
+        // Success toast is handled by AppContext.addEnrollment
+      } else {
+        // Error toast is handled by AppContext.addEnrollment if submission to DB fails
+        // No additional toast needed here unless for a different type of error.
+      }
+    } catch (error) {
+      // This catch block is for unexpected errors during the submission process itself
+      // or if onSubmitEnrollment throws an error not caught internally.
+      console.error("Critical error during enrollment form submission process:", error);
+      toast({
+        title: "Submission Failed",
+        description: "An critical unexpected error occurred. Please try again or contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false); // Ensure button loading state is always reset
+    }
   };
 
   const sortedCustomFieldDefinitions = [...customFieldDefinitions].sort((a,b) => a.order - b.order);
@@ -523,7 +526,7 @@ export function ProviderEnrollmentForm({
                                         currentOptions = dependentOptionsMap[parentValue] || [];
                                     } catch (e) { console.error("Error parsing dependentOptionsJson", e); }
                                 } else {
-                                  currentOptions = []; // No parent value, no options
+                                  currentOptions = []; 
                                 }
                             }
                             return (
@@ -699,3 +702,4 @@ export function ProviderEnrollmentForm({
     </Card>
   );
 }
+

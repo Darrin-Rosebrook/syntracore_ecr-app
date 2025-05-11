@@ -27,7 +27,7 @@ interface AppContextState {
 }
 
 interface AppContextActions {
-  addEnrollment: (formData: EnrollmentFormData, ccdDocumentContent: string | null, validationResult: FHIRValidationResult) => Promise<void>;
+  addEnrollment: (formData: EnrollmentFormData, ccdDocumentContent: string | null, validationResult: FHIRValidationResult) => Promise<boolean>; // Modified return type
   updateEnrollmentStatus: (id: string, status: EnrollmentData['status'], comments?: string) => Promise<void>;
   updateEnrollmentData: (enrollmentId: string, updatedFields: Partial<Omit<EnrollmentData, 'id' | 'activityLog'>>) => Promise<void>;
   addActivityLogEntry: (enrollmentId: string, entryText: string, type: ActivityLogEntry['type'], user?: string) => Promise<void>;
@@ -113,8 +113,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [toast]);
 
-  const addEnrollment = async (formData: EnrollmentFormData, ccdDocumentContent: string | null, validationResult: FHIRValidationResult) => {
-    setIsLoading(true);
+  const addEnrollment = async (formData: EnrollmentFormData, ccdDocumentContent: string | null, validationResult: FHIRValidationResult): Promise<boolean> => {
+    setIsLoading(true); // Global loading state
     const submissionDate = new Date();
     const initialLogEntry: ActivityLogEntry = {
       timestamp: submissionDate.toISOString(),
@@ -148,11 +148,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         description: `Practice "${formData.practiceInfo.name}" enrollment has been successfully submitted.`,
         className: "bg-green-500 text-white",
       });
+      return true; // Indicate success
     } catch (error) {
       console.error("Error adding enrollment to Firestore: ", error);
-      toast({ title: 'Error', description: 'Could not submit enrollment.', variant: 'destructive' });
+      toast({ title: 'Database Error', description: 'Could not submit enrollment data to the database. Please check console for details.', variant: 'destructive' });
+      return false; // Indicate failure
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Global loading state reset
     }
   };
 
@@ -180,16 +182,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         };
         activityLogsToAdd.push(phaCommentEntry);
         
-        // Safely add comments to validationResult messages
         const currentEnrollmentDoc = await getDoc(enrollmentDocRef);
         const currentEnrollmentData = currentEnrollmentDoc.data() as EnrollmentData | undefined;
         const existingMessages = currentEnrollmentData?.validationResult?.messages || [];
         updateData.validationResult = {
-            ...(currentEnrollmentData?.validationResult || { isValid: status !== "Changes Requested" }), // assume valid if not 'Changes Requested'
+            ...(currentEnrollmentData?.validationResult || { isValid: status !== "Changes Requested", messages: [] }), 
             messages: [...existingMessages, `PHA Comments: ${comments}`]
         };
          if (status !== "Changes Requested" && updateData.validationResult) {
-            updateData.validationResult.isValid = true; // Reset to valid if approved, for example
+            updateData.validationResult.isValid = true; 
         } else if (status === "Changes Requested" && updateData.validationResult) {
             updateData.validationResult.isValid = false;
         }
@@ -209,7 +210,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 status, 
                 validationResult: updateData.validationResult ? {
                     ...updateData.validationResult,
-                     summary: e.validationResult?.summary // Preserve existing summary
+                     summary: e.validationResult?.summary 
                 } : e.validationResult,
                 activityLog: [...(e.activityLog || []), ...activityLogsToAdd] 
               }
@@ -230,14 +231,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const enrollmentDocRef = doc(db, 'enrollments', enrollmentId);
     try {
       await updateDoc(enrollmentDocRef, updatedFields);
-      // Add activity log for this update
       await addActivityLogEntry(enrollmentId, 'Provider details updated by PHA Admin.', 'UserAction', 'PHA Admin');
       
-      // Local state update (including the new log entry from addActivityLogEntry)
       setEnrollments(prevEnrollments =>
         prevEnrollments.map(e =>
           e.id === enrollmentId
-            ? { ...e, ...updatedFields } // The activity log is handled by addActivityLogEntry's local update
+            ? { ...e, ...updatedFields } 
             : e
         )
       );
@@ -252,7 +251,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const addCustomField = async (fieldDefinition: CustomFieldDefinition) => {
     setIsLoading(true);
-    // Check for duplicate ID client-side (Firestore rules should also enforce uniqueness if id is doc id)
     if (customFieldDefinitions.some(f => f.id === fieldDefinition.id)) {
       toast({ title: 'Error', description: 'Field ID already exists.', variant: 'destructive' });
       setIsLoading(false);
@@ -260,7 +258,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     const fieldDocRef = doc(db, 'customFieldDefinitions', fieldDefinition.id);
     try {
-      await setDoc(fieldDocRef, fieldDefinition); // Using setDoc with explicit ID
+      await setDoc(fieldDocRef, fieldDefinition); 
       setCustomFieldDefinitions(prevFields => [...prevFields, fieldDefinition].sort((a, b) => a.order - b.order));
       toast({ title: 'Success', description: `Custom field "${fieldDefinition.label}" added.` });
     } catch (error) {
@@ -315,3 +313,4 @@ export const useAppContext = () => {
   }
   return context;
 };
+
