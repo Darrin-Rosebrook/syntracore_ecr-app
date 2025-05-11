@@ -25,7 +25,7 @@ export async function addEnrollmentToFirestore(
       ehrVendor: formData.ehrVendor,
       consent: formData.consent,
       submissionDate: Timestamp.fromDate(submissionDate),
-      validationResult: validationResult, // Ensure validationResult is a plain, serializable object
+      validationResult: validationResult, 
       status: "Pending" as const,
       activityLog: [{ ...initialLogEntry, timestamp: Timestamp.fromDate(new Date(initialLogEntry.timestamp)) }],
     };
@@ -40,34 +40,34 @@ export async function addEnrollmentToFirestore(
     if (ccdDocumentContent !== null) {
       dataForFirestore.ccdDocumentContent = ccdDocumentContent;
     }
-    // If ccdDocumentContent is null, the ccdDocumentContent field will not be added to dataForFirestore,
-    // which means Firestore will omit it. This is generally fine.
 
-    dataToLogForDebug = dataForFirestore; // For debugging in catch block
+    dataToLogForDebug = dataForFirestore; 
 
     // console.log("Data being sent to Firestore (Server Action):", JSON.stringify(dataForFirestore, null, 2));
 
-    const docRef = await addDoc(collection(db, "enrollments"), dataForFirestore);
+    const docRef = await addDoc(collection(db, "enrollments"), dataToLogForDebug);
     console.log("Firestore document written with ID (Server Action): ", docRef.id);
     return { success: true, id: docRef.id };
 
   } catch (error) {
-    console.error("Firestore write failed in addEnrollmentToFirestore (Server Action). Error:", error);
+    console.error("Raw error object in addEnrollmentToFirestore:", error); // Log the raw error
+    console.error("Firestore write failed in addEnrollmentToFirestore (Server Action). Error details:", error instanceof Error ? error.message : String(error));
+    if (error instanceof Error && error.stack) {
+        console.error("Stack trace:", error.stack);
+    }
     // For more detailed debugging, you can log the data that was attempted to be written:
     // console.error("Data that was attempted to be written (Server Action):", JSON.stringify(dataToLogForDebug, null, 2));
     
     let errorMessage = "An unknown error occurred while writing to Firestore.";
     if (error instanceof Error) {
       errorMessage = `Error (${error.name}): ${error.message}`;
-      // Attempt to get more specific Firebase error codes if available
-      const firebaseError = error as any; // Type assertion to check for 'code'
+      const firebaseError = error as any; 
       if (firebaseError.code) {
         errorMessage += ` (Code: ${firebaseError.code})`;
       }
     } else if (typeof error === 'string') {
       errorMessage = error;
     } else if (error && typeof error === 'object' && 'message' in error) {
-      // Handle cases where the error might be an object with a message property
       const errorObj = error as { name?: string; message: string; code?: string };
       errorMessage = `Error (${errorObj.name || errorObj.code || 'UnknownError'}): ${errorObj.message}`;
     }
