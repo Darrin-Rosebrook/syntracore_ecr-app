@@ -1,4 +1,3 @@
-// ✅ FULL FILE CONTENT BEGINNING
 
 "use client";
 
@@ -6,7 +5,7 @@ import * as React from 'react';
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,7 +18,7 @@ import { EHR_VENDORS } from "@/lib/constants";
 import { FileUploader } from "@/components/file-uploader";
 import { useToast } from "@/hooks/use-toast";
 import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData } from "@/types";
-import { validateFHIR } from "@/services/fhir-validator";
+import { validateFHIR } from "@/services/fhir-validator"; 
 import { fetchNpiDataAction } from '@/actions/workflow-actions';
 import { summarizeValidationResults } from "@/ai/flows/summarize-validation-results";
 import { FHIRValidationDisplay } from "./fhir-validation-display";
@@ -68,14 +67,14 @@ interface ProviderEnrollmentFormProps {
     data: EnrollmentFormData,
     ccdDocumentContent: string | null,
     validationResult: FHIRValidationResult
-  ) => Promise<{ success: boolean; id?: string; error?: string }>; 
+  ) => Promise<{ success: boolean; id?: string; error?: string }>;
   customFieldDefinitions: CustomFieldDefinition[];
 }
 
-export function ProviderEnrollmentForm({
+export function ProviderEnrollmentForm({ // Ensure this line is correct
   onSubmitEnrollment,
-  customFieldDefinitions,
-}: ProviderEnrollmentFormProps) {
+  customFieldDefinitions
+}: ProviderEnrollmentFormProps) { // The error was reported around this part of the signature
   const { toast } = useToast();
   const router = useRouter(); 
   const [ccdFile, setCcdFile] = React.useState<File | null>(null);
@@ -267,7 +266,7 @@ export function ProviderEnrollmentForm({
 
   const onSubmit = async (data: FormSchemaType) => {
     setIsSubmitting(true); 
-
+  
     if (!ccdFile) {
       toast({
         title: "Missing Document",
@@ -277,7 +276,7 @@ export function ProviderEnrollmentForm({
       setIsSubmitting(false);
       return;
     }
-
+  
     if (!validationResult) {
       toast({
         title: "File Not Processed",
@@ -287,7 +286,7 @@ export function ProviderEnrollmentForm({
       setIsSubmitting(false);
       return;
     }
-    
+  
     try {
       const enrollmentData: EnrollmentFormData = {
         ...data,
@@ -295,24 +294,20 @@ export function ProviderEnrollmentForm({
         additionalData: data.additionalData || {},
       };
       
-      const response = await fetch("/api/enroll", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          formData: enrollmentData,
-          ccdDocumentContent: ccdFileContent,
-          validationResult
-        }),
-      });
-      const submissionResult = await response.json();
-      
-
+      // Call the passed onSubmitEnrollment prop (which is addEnrollmentToFirestore server action)
+      const submissionResult = await onSubmitEnrollment(
+        enrollmentData,
+        ccdFileContent,
+        validationResult
+      );
+  
       if (submissionResult.success) {
         toast({
           title: "Enrollment Submitted",
           description: `Practice "${enrollmentData.practiceInfo.name}" enrollment has been successfully submitted. ID: ${submissionResult.id}`,
           className: "bg-green-500 text-white",
         });
+  
         form.reset({
           practiceInfo: { organizationNPI: "", name: "", address: "", phone: "" },
           contactDetails: { name: "", email: "", phone: "" },
@@ -325,7 +320,7 @@ export function ProviderEnrollmentForm({
         setFetchedNpiData(null);
         setValidationResult(undefined);
         setNpiLookupError(null);
-        router.refresh(); 
+        router.refresh(); // To refresh data on other parts of the page (like PHA reviewer dashboard)
       } else {
         toast({
           title: "Submission Failed",
@@ -334,16 +329,21 @@ export function ProviderEnrollmentForm({
         });
       }
     } catch (error) {
-      console.error("Critical error during enrollment form submission process:", error); 
+      console.error("❌ Critical error during enrollment form submission:", error);
+      let errorMessage = "A critical unexpected error occurred. Please try again or contact support.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       toast({
         title: "Submission Failed",
-        description: "An critical unexpected error occurred. Please try again or contact support.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false); 
+      setIsSubmitting(false);
     }
   };
+  
 
   const sortedCustomFieldDefinitions = [...customFieldDefinitions].sort((a,b) => a.order - b.order);
 
@@ -716,4 +716,3 @@ export function ProviderEnrollmentForm({
     </Card>
   );
 }
-
