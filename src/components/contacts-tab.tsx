@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { EnrollmentData, ContactEntry, ContactDetails } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,9 +8,9 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAppContext } from '@/context/AppContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { PlusCircle, Edit3, Trash2, UserCheck, UserPlus, Loader2 } from 'lucide-react';
-import { Checkbox } from './ui/checkbox';
+import { Checkbox } from '@/components/ui/checkbox'; // Standardized import path
 
 interface ContactsTabProps {
   enrollment: EnrollmentData;
@@ -47,14 +47,13 @@ export function ContactsTab({ enrollment }: ContactsTabProps) {
 
   const handleOpenEditDialog = (contact: ContactEntry | ContactDetails, isPrimary = false) => {
     if (isPrimary) {
-        // For primary contact, we don't have an 'id' or 'role' in ContactDetails, so we adapt
         setEditingContact({ 
-            id: 'primary', // Special ID for primary, won't be saved as 'primary' if updated
+            id: 'primary', 
             name: contact.name, 
             email: contact.email, 
             phone: contact.phone, 
-            role: 'Primary Contact', // Fixed role
-            isAlternative: false // Primary cannot be alternative
+            role: 'Primary Contact', 
+            isAlternative: false 
         });
     } else {
         setEditingContact(contact as ContactEntry);
@@ -74,18 +73,11 @@ export function ContactsTab({ enrollment }: ContactsTabProps) {
     }
     setIsSubmittingContact(true);
     try {
-      if ('id' in editingContact && editingContact.id !== 'primary') { // Editing existing additional contact
+      if ('id' in editingContact && editingContact.id && editingContact.id !== 'primary') { 
         await updateContactInEnrollment(enrollment.id, editingContact as ContactEntry);
-      } else if ('id' in editingContact && editingContact.id === 'primary') { // Editing the primary contact
-        // This scenario needs special handling: update the main contactDetails on EnrollmentData
-        // This is better handled by updateEnrollmentData in HcoProfileTab for now.
-        // Or, make primary contact editable here, which means we need an updatePrimaryContact action.
-        // For simplicity, let's assume primary edit happens on HcoProfileTab.
-        // If we want to edit it here:
-        // await updatePrimaryContactDetails(enrollment.id, {name: editingContact.name, email: editingContact.email, phone: editingContact.phone});
+      } else if ('id' in editingContact && editingContact.id === 'primary') { 
          toast({ title: 'Info', description: 'Primary contact details are managed on the HCO Profile tab.' });
-
-      } else { // Adding new contact
+      } else { 
         await addContactToEnrollment(enrollment.id, editingContact as Omit<ContactEntry, 'id'>);
       }
       setIsContactDialogOpen(false);
@@ -97,7 +89,7 @@ export function ContactsTab({ enrollment }: ContactsTabProps) {
   };
   
   const handleDeleteContact = async (contactId: string) => {
-    setIsSubmittingContact(true); // Use same flag for busy state
+    setIsSubmittingContact(true); 
     await deleteContactFromEnrollment(enrollment.id, contactId);
     setIsSubmittingContact(false);
   };
@@ -129,7 +121,6 @@ export function ContactsTab({ enrollment }: ContactsTabProps) {
         <p><strong>Name:</strong> {primaryContact.name}</p>
         <p><strong>Email:</strong> {primaryContact.email}</p>
         <p><strong>Phone:</strong> {primaryContact.phone}</p>
-        {/* Primary contact editing is on HCO Profile tab */}
       </div>
 
       {/* Additional Contacts Table */}
@@ -148,7 +139,7 @@ export function ContactsTab({ enrollment }: ContactsTabProps) {
               <TableHead>Role</TableHead>
               <TableHead>Alternative</TableHead>
               <TableHead className="text-right">Actions</TableHead>
-            TableRow>
+            </TableRow>
           </TableHeader>
           <TableBody>
             {additionalContacts.map((contact) => (
@@ -158,46 +149,93 @@ export function ContactsTab({ enrollment }: ContactsTabProps) {
                 <TableCell>{contact.phone}</TableCell>
                 <TableCell>{contact.role || 'N/A'}</TableCell>
                 <TableCell>
-                    
-                TableCell>
+                    <Checkbox
+                        checked={!!contact.isAlternative}
+                        onCheckedChange={() => handleSetAlternative(contact)}
+                        disabled={isSubmittingContact || isAppContextLoading}
+                        aria-label={`Set ${contact.name} ${contact.isAlternative ? 'away from' : 'to'} alternative contact`}
+                    />
+                </TableCell>
                 <TableCell className="text-right space-x-1">
                   <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(contact)} title="Edit Contact" disabled={isSubmittingContact || isAppContextLoading}>
-                    
-                  Button>
+                    <Edit3 className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => handleSetPrimary(contact.id)} title="Set as Primary" disabled={isSubmittingContact || isAppContextLoading}>
-                    
-                  Button>
+                    <UserCheck className="h-4 w-4" />
+                  </Button>
                    <Dialog>
                         <DialogTrigger asChild>
                            <Button variant="ghost" size="icon" title="Delete Contact" disabled={isSubmittingContact || isAppContextLoading}>
-                             {isSubmittingContact ?  null}
-                           Button>
-                        DialogTrigger>
+                             {isSubmittingContact ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
+                           </Button>
+                        </DialogTrigger>
                         <DialogContent>
-                            Confirm Deletion
-                            
+                            <DialogHeader><DialogTitle>Confirm Deletion</DialogTitle></DialogHeader>
+                            <DialogDescription>
                             Are you sure you want to delete contact "{contact.name}"?
-                            
-                                Cancel
-                                 Delete
-                                    {isSubmittingContact ?  null}
-                                
-                            
-                        DialogContent>
-                    Dialog>
-                TableCell>
-              TableRow>
+                            </DialogDescription>
+                            <DialogFooter>
+                                <DialogClose asChild><Button variant="outline" disabled={isSubmittingContact}>Cancel</Button></DialogClose>
+                                <Button variant="destructive" onClick={() => handleDeleteContact(contact.id)} disabled={isSubmittingContact}>
+                                    {isSubmittingContact ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Delete
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                </TableCell>
+              </TableRow>
             ))}
-          TableBody>
-        Table>
+          </TableBody>
+        </Table>
       )}
 
       {/* Add/Edit Contact Dialog */}
-       Save Contact
-            
-            
-        
-        
-      
+      <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{('id' in editingContact && editingContact.id && editingContact.id !== 'primary') ? 'Edit Contact' : 'Add New Contact'}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {/* Name Input */}
+            <div>
+                <Label htmlFor="contactNameDialog">Name</Label>
+                <Input id="contactNameDialog" name="name" value={editingContact.name} onChange={handleContactFormChange} disabled={isSubmittingContact || isAppContextLoading} />
+            </div>
+            {/* Email Input */}
+            <div>
+                <Label htmlFor="contactEmailDialog">Email</Label>
+                <Input id="contactEmailDialog" name="email" type="email" value={editingContact.email} onChange={handleContactFormChange} disabled={isSubmittingContact || isAppContextLoading} />
+            </div>
+            {/* Phone Input */}
+            <div>
+                <Label htmlFor="contactPhoneDialog">Phone</Label>
+                <Input id="contactPhoneDialog" name="phone" type="tel" value={editingContact.phone} onChange={handleContactFormChange} disabled={isSubmittingContact || isAppContextLoading} />
+            </div>
+            {/* Role Input */}
+            <div>
+                <Label htmlFor="contactRoleDialog">Role</Label>
+                <Input id="contactRoleDialog" name="role" value={editingContact.role || ''} onChange={handleContactFormChange} disabled={isSubmittingContact || isAppContextLoading} />
+            </div>
+            {/* isAlternative Checkbox */}
+             <div className="flex items-center space-x-2">
+                <Checkbox
+                    id="isAlternativeDialog"
+                    checked={!!editingContact.isAlternative}
+                    onCheckedChange={(checked) => setEditingContact(prev => ({...prev, isAlternative: !!checked})) }
+                    disabled={isSubmittingContact || isAppContextLoading || ('id' in editingContact && editingContact.id === 'primary')}
+                />
+                <Label htmlFor="isAlternativeDialog">Mark as Alternative/Secondary Contact</Label>
+              </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="ghost" disabled={isSubmittingContact}>Cancel</Button></DialogClose>
+            <Button onClick={handleSaveContact} disabled={isSubmittingContact}>
+              {isSubmittingContact ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save Contact
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
