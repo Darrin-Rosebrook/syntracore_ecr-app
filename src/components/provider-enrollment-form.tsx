@@ -18,7 +18,7 @@ import { EHR_VENDORS } from "@/lib/constants";
 import { FileUploader } from "@/components/file-uploader";
 import { useToast } from "@/hooks/use-toast";
 import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData } from "@/types";
-import { validateFHIR } from "@/services/fhir-validator"; 
+import { validateFHIR } from "@/services/fhir-validator";
 import { fetchNpiDataAction } from '@/actions/workflow-actions';
 import { summarizeValidationResults } from "@/ai/flows/summarize-validation-results";
 import { FHIRValidationDisplay } from "./fhir-validation-display";
@@ -71,12 +71,12 @@ interface ProviderEnrollmentFormProps {
   customFieldDefinitions: CustomFieldDefinition[];
 }
 
-export function ProviderEnrollmentForm({ // Ensure this line is correct
+export function ProviderEnrollmentForm({
   onSubmitEnrollment,
   customFieldDefinitions
-}: ProviderEnrollmentFormProps) { // The error was reported around this part of the signature
+}: ProviderEnrollmentFormProps) {
   const { toast } = useToast();
-  const router = useRouter(); 
+  const router = useRouter();
   const [ccdFile, setCcdFile] = React.useState<File | null>(null);
   const [ccdFileContent, setCcdFileContent] = React.useState<string | null>(null);
   const [validationResult, setValidationResult] = React.useState<FHIRValidationResult | undefined>(undefined);
@@ -179,7 +179,7 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
     if (file && fileContent) {
       setIsProcessingFile(true);
       try {
-        const rawValidationResult = await validateFHIR(fileContent); 
+        const rawValidationResult = await validateFHIR(JSON.parse(fileContent)); // Assuming fileContent is JSON for FHIR
         const aiSummaryResult = await summarizeValidationResults({ validationResults: rawValidationResult });
         setValidationResult({
           ...rawValidationResult,
@@ -189,12 +189,12 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
         console.error("Error during file validation:", error);
         toast({
           title: "File Processing Error",
-          description: "Could not validate the uploaded file. Please try again.",
+          description: "Could not validate the uploaded file. Ensure it's valid JSON/XML and try again.",
           variant: "destructive",
         });
         setValidationResult({
           isValid: false,
-          messages: ["Error processing file for validation."],
+          messages: ["Error processing file for validation. Ensure it's valid JSON/XML."],
           summary: "File processing failed.",
         });
       } finally {
@@ -265,8 +265,12 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
 
 
   const onSubmit = async (data: FormSchemaType) => {
-    setIsSubmitting(true); 
-  
+    console.log("onSubmit function called"); // Log: Start of onSubmit
+    setIsSubmitting(true);
+    console.log("Form is submitting with data:", JSON.stringify(data, null, 2));
+    console.log("CCD file selected:", ccdFile ? ccdFile.name : "No file");
+    console.log("Validation result:", JSON.stringify(validationResult, null, 2));
+
     if (!ccdFile) {
       toast({
         title: "Missing Document",
@@ -274,9 +278,10 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
         variant: "destructive",
       });
       setIsSubmitting(false);
+      console.log("onSubmit aborted: Missing CCD file."); // Log: Abort
       return;
     }
-  
+
     if (!validationResult) {
       toast({
         title: "File Not Processed",
@@ -284,9 +289,10 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
         variant: "destructive",
       });
       setIsSubmitting(false);
+      console.log("onSubmit aborted: Missing validation result."); // Log: Abort
       return;
     }
-  
+
     try {
       const enrollmentData: EnrollmentFormData = {
         ...data,
@@ -294,20 +300,21 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
         additionalData: data.additionalData || {},
       };
       
-      // Call the passed onSubmitEnrollment prop (which is addEnrollmentToFirestore server action)
+      console.log("Prepared enrollmentData, about to call onSubmitEnrollment:", JSON.stringify(enrollmentData, null, 2));
       const submissionResult = await onSubmitEnrollment(
         enrollmentData,
-        ccdFileContent,
+        ccdFileContent, // This can be large
         validationResult
       );
-  
+      console.log("Submission result received from server action:", JSON.stringify(submissionResult, null, 2));
+
       if (submissionResult.success) {
         toast({
           title: "Enrollment Submitted",
           description: `Practice "${enrollmentData.practiceInfo.name}" enrollment has been successfully submitted. ID: ${submissionResult.id}`,
           className: "bg-green-500 text-white",
         });
-  
+
         form.reset({
           practiceInfo: { organizationNPI: "", name: "", address: "", phone: "" },
           contactDetails: { name: "", email: "", phone: "" },
@@ -320,30 +327,33 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
         setFetchedNpiData(null);
         setValidationResult(undefined);
         setNpiLookupError(null);
-        router.refresh(); // To refresh data on other parts of the page (like PHA reviewer dashboard)
+        console.log("Form reset and router.refresh() called.");
+        router.refresh();
       } else {
         toast({
           title: "Submission Failed",
           description: submissionResult.error || "Could not submit enrollment. Please try again.",
           variant: "destructive",
         });
+        console.error("Submission failed as per submissionResult:", submissionResult.error);
       }
     } catch (error) {
-      console.error("❌ Critical error during enrollment form submission:", error);
+      console.error("❌ Critical error during enrollment form submission in ProviderEnrollmentForm:", error);
       let errorMessage = "A critical unexpected error occurred. Please try again or contact support.";
       if (error instanceof Error) {
         errorMessage = error.message;
       }
       toast({
-        title: "Submission Failed",
+        title: "Submission Error",
         description: errorMessage,
         variant: "destructive",
       });
     } finally {
+      console.log("onSubmit finally block: setIsSubmitting(false)");
       setIsSubmitting(false);
     }
   };
-  
+
 
   const sortedCustomFieldDefinitions = [...customFieldDefinitions].sort((a,b) => a.order - b.order);
 
@@ -383,16 +393,16 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
                       placeholder="Enter NPI"
                       maxLength={10}
                       className={fieldState.error ? "border-destructive" : ""}
-                      disabled={npiLookupLoading}
+                      disabled={npiLookupLoading || isSubmitting}
                     />
                   )}
                 />
-                <Button type="button" onClick={handleNpiLookup} disabled={npiLookupLoading || !watchedOrganizationNPI || watchedOrganizationNPI.length !== 10} size="sm">
+                <Button type="button" onClick={handleNpiLookup} disabled={npiLookupLoading || isSubmitting || !watchedOrganizationNPI || watchedOrganizationNPI.length !== 10} size="sm">
                   {npiLookupLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchIcon className="h-4 w-4" />}
                   <span className="ml-1 hidden sm:inline">Lookup</span>
                 </Button>
                 {fetchedNpiData && (
-                   <Button type="button" variant="ghost" onClick={handleClearNpiData} disabled={npiLookupLoading} size="sm">Clear</Button>
+                   <Button type="button" variant="ghost" onClick={handleClearNpiData} disabled={npiLookupLoading || isSubmitting} size="sm">Clear</Button>
                 )}
               </div>
               {form.formState.errors.practiceInfo?.organizationNPI && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.organizationNPI.message}</p>}
@@ -425,17 +435,17 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
 
             <div>
               <Label htmlFor="practiceName">Practice Name</Label>
-              <Input id="practiceName" {...form.register("practiceInfo.name")} placeholder="Official practice name" className={form.formState.errors.practiceInfo?.name ? "border-destructive" : ""} />
+              <Input id="practiceName" {...form.register("practiceInfo.name")} placeholder="Official practice name" className={form.formState.errors.practiceInfo?.name ? "border-destructive" : ""} disabled={isSubmitting} />
               {form.formState.errors.practiceInfo?.name && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.name.message}</p>}
             </div>
             <div>
               <Label htmlFor="practiceAddress">Full Address</Label>
-              <Textarea id="practiceAddress" {...form.register("practiceInfo.address")} placeholder="Street, City, State, ZIP" className={form.formState.errors.practiceInfo?.address ? "border-destructive" : ""} />
+              <Textarea id="practiceAddress" {...form.register("practiceInfo.address")} placeholder="Street, City, State, ZIP" className={form.formState.errors.practiceInfo?.address ? "border-destructive" : ""} disabled={isSubmitting}/>
               {form.formState.errors.practiceInfo?.address && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.address.message}</p>}
             </div>
             <div>
               <Label htmlFor="practicePhone">Practice Phone</Label>
-              <Input id="practicePhone" type="tel" {...form.register("practiceInfo.phone")} placeholder="(XXX) XXX-XXXX" className={form.formState.errors.practiceInfo?.phone ? "border-destructive" : ""} />
+              <Input id="practicePhone" type="tel" {...form.register("practiceInfo.phone")} placeholder="(XXX) XXX-XXXX" className={form.formState.errors.practiceInfo?.phone ? "border-destructive" : ""} disabled={isSubmitting}/>
               {form.formState.errors.practiceInfo?.phone && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.phone.message}</p>}
             </div>
           </fieldset>
@@ -448,17 +458,17 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
             </legend>
             <div>
               <Label htmlFor="contactName">Contact Full Name</Label>
-              <Input id="contactName" {...form.register("contactDetails.name")} className={form.formState.errors.contactDetails?.name ? "border-destructive" : ""} />
+              <Input id="contactName" {...form.register("contactDetails.name")} className={form.formState.errors.contactDetails?.name ? "border-destructive" : ""} disabled={isSubmitting} />
               {form.formState.errors.contactDetails?.name && <p className="text-sm text-destructive mt-1">{form.formState.errors.contactDetails.name.message}</p>}
             </div>
             <div>
               <Label htmlFor="contactEmail">Email</Label>
-              <Input id="contactEmail" type="email" {...form.register("contactDetails.email")} className={form.formState.errors.contactDetails?.email ? "border-destructive" : ""} />
+              <Input id="contactEmail" type="email" {...form.register("contactDetails.email")} className={form.formState.errors.contactDetails?.email ? "border-destructive" : ""} disabled={isSubmitting}/>
               {form.formState.errors.contactDetails?.email && <p className="text-sm text-destructive mt-1">{form.formState.errors.contactDetails.email.message}</p>}
             </div>
             <div>
               <Label htmlFor="contactPhone">Phone</Label>
-              <Input id="contactPhone" type="tel" {...form.register("contactDetails.phone")} className={form.formState.errors.contactDetails?.phone ? "border-destructive" : ""} />
+              <Input id="contactPhone" type="tel" {...form.register("contactDetails.phone")} className={form.formState.errors.contactDetails?.phone ? "border-destructive" : ""} disabled={isSubmitting}/>
               {form.formState.errors.contactDetails?.phone && <p className="text-sm text-destructive mt-1">{form.formState.errors.contactDetails.phone.message}</p>}
             </div>
           </fieldset>
@@ -474,7 +484,7 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
               control={form.control}
               render={({ field, fieldState }) => (
                 <>
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting}>
                     <SelectTrigger className={fieldState.error ? "border-destructive" : ""}>
                       <SelectValue placeholder="Select EHR Vendor" />
                     </SelectTrigger>
@@ -514,7 +524,7 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
                         name={fieldName}
                         control={form.control}
                         defaultValue={form.getValues(fieldName) || ''}
-                        render={({ field }) => <Input id={fieldName} {...field} placeholder={fieldDef.placeholder} className={error ? "border-destructive" : ""} />}
+                        render={({ field }) => <Input id={fieldName} {...field} placeholder={fieldDef.placeholder} className={error ? "border-destructive" : ""} disabled={isSubmitting}/>}
                       />
                     )}
                     {fieldDef.type === 'textarea' && (
@@ -522,7 +532,7 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
                         name={fieldName}
                         control={form.control}
                         defaultValue={form.getValues(fieldName) || ''}
-                        render={({ field }) => <Textarea id={fieldName} {...field} placeholder={fieldDef.placeholder} className={error ? "border-destructive" : ""} />}
+                        render={({ field }) => <Textarea id={fieldName} {...field} placeholder={fieldDef.placeholder} className={error ? "border-destructive" : ""} disabled={isSubmitting} />}
                       />
                     )}
                     {fieldDef.type === 'select' && (
@@ -540,11 +550,11 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
                                         currentOptions = dependentOptionsMap[parentValue] || [];
                                     } catch (e) { console.error("Error parsing dependentOptionsJson", e); }
                                 } else {
-                                  currentOptions = []; 
+                                  currentOptions = [];
                                 }
                             }
                             return (
-                                <Select onValueChange={field.onChange} value={field.value} disabled={fieldDef.parentFieldId && watchedAdditionalData && !watchedAdditionalData[fieldDef.parentFieldId] && currentOptions.length === 0}>
+                                <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || (fieldDef.parentFieldId && watchedAdditionalData && !watchedAdditionalData[fieldDef.parentFieldId] && currentOptions.length === 0)}>
                                     <SelectTrigger id={fieldName} className={error ? "border-destructive" : ""}>
                                         <SelectValue placeholder={fieldDef.placeholder || "Select an option"} />
                                     </SelectTrigger>
@@ -569,7 +579,7 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
                         defaultValue={form.getValues(fieldName) || false}
                         render={({ field }) => (
                           <div className="flex items-center space-x-2 mt-1">
-                            <Checkbox id={fieldName} checked={!!field.value} onCheckedChange={field.onChange} />
+                            <Checkbox id={fieldName} checked={!!field.value} onCheckedChange={field.onChange} disabled={isSubmitting}/>
                             <Label htmlFor={fieldName} className="font-normal">{fieldDef.placeholder || fieldDef.label}</Label>
                           </div>
                         )}
@@ -586,13 +596,14 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
                                 <div key={option.value} className="flex items-center space-x-2">
                                     <Checkbox
                                     id={`${fieldName}-${option.value}`}
-                                    checked={field.value?.includes(option.value)}
+                                    checked={Array.isArray(field.value) && field.value.includes(option.value)}
                                     onCheckedChange={(checked) => {
                                         const newValue = checked
-                                        ? [...(field.value || []), option.value]
-                                        : (field.value || []).filter((v: string) => v !== option.value);
+                                        ? [...(Array.isArray(field.value) ? field.value : []), option.value]
+                                        : (Array.isArray(field.value) ? field.value : []).filter((v: string) => v !== option.value);
                                         field.onChange(newValue);
                                     }}
+                                    disabled={isSubmitting}
                                     />
                                     <Label htmlFor={`${fieldName}-${option.value}`} className="font-normal">{option.label}</Label>
                                 </div>
@@ -607,7 +618,7 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
                             control={form.control}
                             defaultValue={form.getValues(fieldName) || ''}
                             render={({ field }) => (
-                            <RadioGroup onValueChange={field.onChange} value={field.value} className="mt-1 space-y-1">
+                            <RadioGroup onValueChange={field.onChange} value={field.value} className="mt-1 space-y-1" disabled={isSubmitting}>
                                 {fieldDef.options!.map(option => (
                                 <div key={option.value} className="flex items-center space-x-2">
                                     <RadioGroupItem value={option.value} id={`${fieldName}-${option.value}`} />
@@ -629,6 +640,7 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
                                         <Button
                                             variant={"outline"}
                                             className={`w-full justify-start text-left font-normal mt-1 ${!field.value && "text-muted-foreground"} ${error ? "border-destructive" : ""}`}
+                                            disabled={isSubmitting}
                                         >
                                             <CalendarDays className="mr-2 h-4 w-4" />
                                             {field.value && isValid(parseISO(field.value)) ? format(parseISO(field.value), "PPP") : <span>{fieldDef.placeholder || "Pick a date"}</span>}
@@ -640,6 +652,7 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
                                             selected={field.value && isValid(parseISO(field.value)) ? parseISO(field.value) : undefined}
                                             onSelect={(date) => field.onChange(date ? date.toISOString() : '')}
                                             initialFocus
+                                            disabled={isSubmitting}
                                         />
                                     </PopoverContent>
                                 </Popover>
@@ -681,7 +694,7 @@ export function ProviderEnrollmentForm({ // Ensure this line is correct
                 control={form.control}
                 render={({ field, fieldState }) => (
                     <>
-                    <Checkbox id="consent" checked={field.value} onCheckedChange={field.onChange} className={fieldState.error ? "border-destructive" : ""} />
+                    <Checkbox id="consent" checked={field.value} onCheckedChange={field.onChange} className={fieldState.error ? "border-destructive" : ""} disabled={isSubmitting}/>
                     <div className="grid gap-1.5 leading-none">
                         <Label htmlFor="consent" className={`text-sm font-medium ${fieldState.error ? "text-destructive" : ""}`}>
                         I agree to the terms and conditions for data submission and processing.
