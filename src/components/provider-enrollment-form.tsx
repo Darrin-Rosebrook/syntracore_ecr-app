@@ -26,6 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isValid } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useAppContext } from '@/context/AppContext'; // Added AppContext import
 
 const practiceInfoSchema = z.object({
   organizationNPI: z
@@ -76,6 +77,7 @@ export function ProviderEnrollmentForm({
 }: ProviderEnrollmentFormProps) {
   const { toast } = useToast();
   const router = useRouter(); 
+  const { fetchInitialData } = useAppContext(); // Get fetchInitialData from context
   const [ccdFile, setCcdFile] = React.useState<File | null>(null);
   const [ccdFileContent, setCcdFileContent] = React.useState<string | null>(null);
   const [validationResult, setValidationResult] = React.useState<FHIRValidationResult | undefined>(undefined);
@@ -180,39 +182,39 @@ export function ProviderEnrollmentForm({
       let parsedContent: any;
 
       try {
+        // Attempt to parse as JSON first
         parsedContent = JSON.parse(fileContent);
-      } catch (error) {
-        console.error("Error parsing uploaded file content as JSON:", error);
-        const isXmlFile = file.name.toLowerCase().endsWith('.xml') || file.type === 'application/xml' || file.type === 'text/xml';
-        let description = "The uploaded file does not contain valid JSON. Please check the file and try again.";
-        if (isXmlFile) {
-          description = "The uploaded XML file could not be parsed as JSON. If FHIR validation supports XML, it will be processed accordingly. For now, this step expects JSON.";
-        }
-
+      } catch (jsonError) {
+        // If JSON parsing fails, try to handle as XML or other text for validation
+        // For now, we'll assume the validator might handle raw strings or specific structures
+        // Or, you might implement XML parsing here if your `validateFHIR` supports it
+        console.warn("File is not valid JSON. Proceeding with raw content for validation.", jsonError);
+        // If your validateFHIR function expects a string (e.g., for XML or other formats it can parse itself):
+        // parsedContent = fileContent; 
+        // If it strictly expects a JS object, and non-JSON is an error:
         toast({
-          title: "File Parsing Error",
-          description: description,
+          title: "File Content Error",
+          description: "The uploaded file could not be parsed as JSON. Validation might be affected.",
           variant: "destructive",
         });
+        // Set a basic error state for validationResult if parsing is critical before validation
         setValidationResult({
             isValid: false,
-            messages: [
-                isXmlFile 
-                    ? "Uploaded file appears to be XML; direct JSON parsing failed."
-                    : "File content is not valid JSON.", 
-                (error as Error).message
-            ],
-            summary: isXmlFile 
-                ? "Uploaded XML file could not be processed by the JSON parser for this step." 
-                : "Uploaded file could not be processed as it's not valid JSON."
+            messages: ["File content is not valid JSON. Cannot perform structured validation."],
+            summary: "Uploaded file is not valid JSON."
         });
-        setIsProcessingFile(false);
-        return; // Stop processing if JSON parsing fails
+        // Comment out or adjust the line below if validateFHIR should not receive non-JSON parsed content.
+        // For this iteration, let's try passing the raw string if JSON.parse fails.
+        // This is a placeholder for more robust multi-format handling.
+        parsedContent = fileContent; 
+        // If validateFHIR can ONLY take a JS object, then you should return here:
+        // setIsProcessingFile(false);
+        // return;
       }
 
-      // If JSON.parse succeeded
       try {
-        const rawValidationResult = await validateFHIR(parsedContent);
+        // Pass the parsedContent (either JSON object or raw string) to validateFHIR
+        const rawValidationResult = await validateFHIR(parsedContent); 
         const aiSummaryResult = await summarizeValidationResults({ validationResults: rawValidationResult });
         setValidationResult({
           ...rawValidationResult,
@@ -318,7 +320,7 @@ export function ProviderEnrollmentForm({
       return;
     }
 
-    if (!validationResult) { //This covers the case where file parsing failed and validationResult was set to an error state
+    if (!validationResult) { 
       toast({
         title: "File Not Processed or Invalid",
         description: "Please ensure the file is correctly processed and valid or re-upload if an error occurred.",
@@ -351,6 +353,8 @@ export function ProviderEnrollmentForm({
           className: "bg-green-500 text-white",
         });
 
+        await fetchInitialData(); // Re-fetch data to update the PHA Reviewer Dashboard
+
         form.reset({
           practiceInfo: { organizationNPI: "", name: "", address: "", phone: "" },
           contactDetails: { name: "", email: "", phone: "" },
@@ -366,8 +370,8 @@ export function ProviderEnrollmentForm({
         if (document.getElementById('file-upload')) { 
             (document.getElementById('file-upload') as HTMLInputElement).value = "";
         }
-        console.log("Form reset and router.refresh() called.");
-        router.refresh(); 
+        console.log("Form reset and fetchInitialData() called.");
+        // router.refresh(); // May not be needed if fetchInitialData updates context sufficiently
       } else {
         toast({
           title: "Submission Failed",
