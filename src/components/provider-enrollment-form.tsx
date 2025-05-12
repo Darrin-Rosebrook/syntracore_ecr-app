@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from 'react';
@@ -76,7 +75,7 @@ export function ProviderEnrollmentForm({
   customFieldDefinitions
 }: ProviderEnrollmentFormProps) {
   const { toast } = useToast();
-  const router = useRouter();
+  const router = useRouter(); 
   const [ccdFile, setCcdFile] = React.useState<File | null>(null);
   const [ccdFileContent, setCcdFileContent] = React.useState<string | null>(null);
   const [validationResult, setValidationResult] = React.useState<FHIRValidationResult | undefined>(undefined);
@@ -184,18 +183,31 @@ export function ProviderEnrollmentForm({
         parsedContent = JSON.parse(fileContent);
       } catch (error) {
         console.error("Error parsing uploaded file content as JSON:", error);
+        const isXmlFile = file.name.toLowerCase().endsWith('.xml') || file.type === 'application/xml' || file.type === 'text/xml';
+        let description = "The uploaded file does not contain valid JSON. Please check the file and try again.";
+        if (isXmlFile) {
+          description = "The uploaded XML file could not be parsed as JSON. If FHIR validation supports XML, it will be processed accordingly. For now, this step expects JSON.";
+        }
+
         toast({
-          title: "Invalid File Content",
-          description: "The uploaded file does not contain valid JSON. Please check the file and try again.",
+          title: "File Parsing Error",
+          description: description,
           variant: "destructive",
         });
         setValidationResult({
             isValid: false,
-            messages: ["File content is not valid JSON.", (error as Error).message],
-            summary: "Uploaded file could not be processed as it's not valid JSON."
+            messages: [
+                isXmlFile 
+                    ? "Uploaded file appears to be XML; direct JSON parsing failed."
+                    : "File content is not valid JSON.", 
+                (error as Error).message
+            ],
+            summary: isXmlFile 
+                ? "Uploaded XML file could not be processed by the JSON parser for this step." 
+                : "Uploaded file could not be processed as it's not valid JSON."
         });
         setIsProcessingFile(false);
-        return; // Stop processing if parsing fails
+        return; // Stop processing if JSON parsing fails
       }
 
       // If JSON.parse succeeded
@@ -213,7 +225,7 @@ export function ProviderEnrollmentForm({
           description: "An error occurred while validating the file or generating a summary.",
           variant: "destructive",
         });
-        setValidationResult({ // Ensure validationResult reflects this failure
+        setValidationResult({ 
             isValid: false,
             messages: ["Error during validation or AI summarization.", (validationError as Error).message],
             summary: "File processing failed during validation or summarization."
@@ -222,10 +234,6 @@ export function ProviderEnrollmentForm({
         setIsProcessingFile(false);
       }
     } else {
-      // No file or no content, ensure states are reset
-      // setCcdFile(null) and setCcdFileContent(null) are already handled by the caller (FileUploader)
-      // or should be if this function is called with nulls.
-      // The main thing is to clear validationResult.
       setValidationResult(undefined);
       setIsProcessingFile(false);
     }
@@ -288,10 +296,6 @@ export function ProviderEnrollmentForm({
   const handleClearNpiData = () => {
     setFetchedNpiData(null);
     setNpiLookupError(null);
-    // Optionally clear related form fields if desired, or let user overwrite
-    // form.setValue('practiceInfo.name', '', { shouldValidate: false });
-    // form.setValue('practiceInfo.address', '', { shouldValidate: false });
-    // form.setValue('practiceInfo.phone', '', { shouldValidate: false });
     toast({ title: 'NPI Data Cleared', description: 'Lookup information has been cleared.' });
   };
 
@@ -314,14 +318,14 @@ export function ProviderEnrollmentForm({
       return;
     }
 
-    if (!validationResult) {
+    if (!validationResult) { //This covers the case where file parsing failed and validationResult was set to an error state
       toast({
-        title: "File Not Processed",
-        description: "Please wait for the file to be processed or re-upload if an error occurred.",
+        title: "File Not Processed or Invalid",
+        description: "Please ensure the file is correctly processed and valid or re-upload if an error occurred.",
         variant: "destructive",
       });
       setIsSubmitting(false);
-      console.log("onSubmit aborted: Missing validation result."); 
+      console.log("onSubmit aborted: Missing or invalid validation result."); 
       return;
     }
 
@@ -340,10 +344,10 @@ export function ProviderEnrollmentForm({
       );
       console.log("Submission result received from server action:", JSON.stringify(submissionResult, null, 2));
 
-      if (submissionResult.success) {
+      if (submissionResult.success && submissionResult.id) {
         toast({
           title: "Enrollment Submitted",
-          description: `Practice "${enrollmentData.practiceInfo.name}" enrollment has been successfully submitted. ID: ${submissionResult.id}`,
+          description: `Practice "${enrollmentData.practiceInfo.name}" enrollment has been successfully submitted. ID: ${submissionResult.id.slice(0,8)}...`,
           className: "bg-green-500 text-white",
         });
 
@@ -359,11 +363,11 @@ export function ProviderEnrollmentForm({
         setFetchedNpiData(null);
         setValidationResult(undefined);
         setNpiLookupError(null);
-        if (document.getElementById('file-upload')) { // Resets the actual file input field in FileUploader
+        if (document.getElementById('file-upload')) { 
             (document.getElementById('file-upload') as HTMLInputElement).value = "";
         }
         console.log("Form reset and router.refresh() called.");
-        router.refresh(); // Consider if this is needed or if data refetches via context
+        router.refresh(); 
       } else {
         toast({
           title: "Submission Failed",
@@ -708,7 +712,7 @@ export function ProviderEnrollmentForm({
               <FileText className="mr-2 h-5 w-5 text-primary" />
               CCD/FHIR Document
             </legend>
-            <FileUploader onFileSelect={handleFileSelect} acceptedFileTypes=".xml,.json" label="Upload Document" />
+            <FileUploader onFileSelect={handleFileSelect} acceptedFileTypes=".xml,.json" label="Upload Document (JSON or XML)" />
             {isProcessingFile && (
               <div className="text-muted-foreground text-sm flex items-center mt-2">
                 <Loader2 className="h-4 w-4 animate-spin mr-2" /> Processing file...
@@ -764,4 +768,3 @@ export function ProviderEnrollmentForm({
     </Card>
   );
 }
-
