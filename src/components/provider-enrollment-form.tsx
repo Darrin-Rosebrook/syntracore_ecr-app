@@ -174,32 +174,60 @@ export function ProviderEnrollmentForm({
   const handleFileSelect = async (file: File | null, fileContent: string | null) => {
     setCcdFile(file);
     setCcdFileContent(fileContent);
-    setValidationResult(undefined);
+    setValidationResult(undefined); // Clear previous result
 
     if (file && fileContent) {
       setIsProcessingFile(true);
+      let parsedContent: any;
+
       try {
-        const rawValidationResult = await validateFHIR(JSON.parse(fileContent)); // Assuming fileContent is JSON for FHIR
+        parsedContent = JSON.parse(fileContent);
+      } catch (error) {
+        console.error("Error parsing uploaded file content as JSON:", error);
+        toast({
+          title: "Invalid File Content",
+          description: "The uploaded file does not contain valid JSON. Please check the file and try again.",
+          variant: "destructive",
+        });
+        setValidationResult({
+            isValid: false,
+            messages: ["File content is not valid JSON.", (error as Error).message],
+            summary: "Uploaded file could not be processed as it's not valid JSON."
+        });
+        setIsProcessingFile(false);
+        return; // Stop processing if parsing fails
+      }
+
+      // If JSON.parse succeeded
+      try {
+        const rawValidationResult = await validateFHIR(parsedContent);
         const aiSummaryResult = await summarizeValidationResults({ validationResults: rawValidationResult });
         setValidationResult({
           ...rawValidationResult,
           summary: aiSummaryResult.summary,
         });
-      } catch (error) {
-        console.error("Error during file validation:", error);
+      } catch (validationError) {
+        console.error("Error during FHIR validation or AI summarization:", validationError);
         toast({
-          title: "File Processing Error",
-          description: "Could not validate the uploaded file. Ensure it's valid JSON/XML and try again.",
+          title: "Processing Error",
+          description: "An error occurred while validating the file or generating a summary.",
           variant: "destructive",
         });
-        setValidationResult({
-          isValid: false,
-          messages: ["Error processing file for validation. Ensure it's valid JSON/XML."],
-          summary: "File processing failed.",
+        setValidationResult({ // Ensure validationResult reflects this failure
+            isValid: false,
+            messages: ["Error during validation or AI summarization.", (validationError as Error).message],
+            summary: "File processing failed during validation or summarization."
         });
       } finally {
         setIsProcessingFile(false);
       }
+    } else {
+      // No file or no content, ensure states are reset
+      // setCcdFile(null) and setCcdFileContent(null) are already handled by the caller (FileUploader)
+      // or should be if this function is called with nulls.
+      // The main thing is to clear validationResult.
+      setValidationResult(undefined);
+      setIsProcessingFile(false);
     }
   };
 
@@ -260,12 +288,16 @@ export function ProviderEnrollmentForm({
   const handleClearNpiData = () => {
     setFetchedNpiData(null);
     setNpiLookupError(null);
+    // Optionally clear related form fields if desired, or let user overwrite
+    // form.setValue('practiceInfo.name', '', { shouldValidate: false });
+    // form.setValue('practiceInfo.address', '', { shouldValidate: false });
+    // form.setValue('practiceInfo.phone', '', { shouldValidate: false });
     toast({ title: 'NPI Data Cleared', description: 'Lookup information has been cleared.' });
   };
 
 
   const onSubmit = async (data: FormSchemaType) => {
-    console.log("onSubmit function called"); // Log: Start of onSubmit
+    console.log("onSubmit function called"); 
     setIsSubmitting(true);
     console.log("Form is submitting with data:", JSON.stringify(data, null, 2));
     console.log("CCD file selected:", ccdFile ? ccdFile.name : "No file");
@@ -278,7 +310,7 @@ export function ProviderEnrollmentForm({
         variant: "destructive",
       });
       setIsSubmitting(false);
-      console.log("onSubmit aborted: Missing CCD file."); // Log: Abort
+      console.log("onSubmit aborted: Missing CCD file."); 
       return;
     }
 
@@ -289,7 +321,7 @@ export function ProviderEnrollmentForm({
         variant: "destructive",
       });
       setIsSubmitting(false);
-      console.log("onSubmit aborted: Missing validation result."); // Log: Abort
+      console.log("onSubmit aborted: Missing validation result."); 
       return;
     }
 
@@ -303,7 +335,7 @@ export function ProviderEnrollmentForm({
       console.log("Prepared enrollmentData, about to call onSubmitEnrollment:", JSON.stringify(enrollmentData, null, 2));
       const submissionResult = await onSubmitEnrollment(
         enrollmentData,
-        ccdFileContent, // This can be large
+        ccdFileContent, 
         validationResult
       );
       console.log("Submission result received from server action:", JSON.stringify(submissionResult, null, 2));
@@ -327,8 +359,11 @@ export function ProviderEnrollmentForm({
         setFetchedNpiData(null);
         setValidationResult(undefined);
         setNpiLookupError(null);
+        if (document.getElementById('file-upload')) { // Resets the actual file input field in FileUploader
+            (document.getElementById('file-upload') as HTMLInputElement).value = "";
+        }
         console.log("Form reset and router.refresh() called.");
-        router.refresh();
+        router.refresh(); // Consider if this is needed or if data refetches via context
       } else {
         toast({
           title: "Submission Failed",
@@ -729,3 +764,4 @@ export function ProviderEnrollmentForm({
     </Card>
   );
 }
+
