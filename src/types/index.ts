@@ -1,13 +1,13 @@
 import type { FHIRValidationResult as ExternalFHIRValidationResult } from '@/services/fhir-validator';
 
 export interface PracticeInfo {
-  organizationNPI: string; // Added
+  organizationNPI: string;
   name: string;
   address: string;
   phone: string;
 }
 
-export interface ContactDetails {
+export interface ContactDetails { // This will represent the primary contact
   name: string;
   email: string;
   phone: string;
@@ -16,57 +16,75 @@ export interface ContactDetails {
 export interface CustomFieldOption {
   label: string;
   value: string;
-  defaultChecked?: boolean; // For checkbox-group initial state
+  defaultChecked?: boolean;
 }
 
 export interface CustomFieldDefinition {
-  id: string; // Unique identifier for the field, used as key in additionalData
-  label: string; // Display label for the field
+  id: string;
+  label: string;
   type:
     | 'text'
     | 'textarea'
-    | 'select' // Standard select
-    | 'checkbox' // Single boolean checkbox
+    | 'select'
+    | 'checkbox'
     | 'date'
-    | 'checkbox-group' // Multiple checkboxes, store as array of values
-    | 'radio-group'; // Multiple radio options, one selectable
-  options?: CustomFieldOption[]; // For 'select', 'checkbox-group', 'radio-group'
-  placeholder?: string; // Placeholder text for input fields
-  required?: boolean; // Whether the field is mandatory
-  order: number; // For ordering fields on the enrollment form
-
-  // For 'select' type if it's dependent
-  parentFieldId?: string; // ID of the field this one depends on (must be a 'select' or 'radio-group' type)
-  // Admin will input this as JSON string. Parsed into object for use.
-  // e.g., {"parentValue1": [{"label": "Child1", "value": "c1"}], "parentValue2": [{"label": "Child2", "value": "c2"}]}
-  dependentOptionsJson?: string; 
+    | 'checkbox-group'
+    | 'radio-group';
+  options?: CustomFieldOption[];
+  placeholder?: string;
+  required?: boolean;
+  order: number;
+  parentFieldId?: string;
+  dependentOptionsJson?: string;
 }
 
 export interface EnrollmentFormData {
   practiceInfo: PracticeInfo;
-  contactDetails: ContactDetails;
+  contactDetails: ContactDetails; // Primary contact
   ehrVendor: string;
   ccdDocumentName?: string;
   consent: boolean;
-  additionalData?: Record<string, any>; // For custom fields
+  additionalData?: Record<string, any>;
 }
 
 export interface FHIRValidationResult extends ExternalFHIRValidationResult {
-  summary?: string; // Optional summary from AI
+  summary?: string;
 }
 
 export interface ActivityLogEntry {
   timestamp: string;
   entry: string;
-  type: 'System' | 'UserAction' | 'Communication' | 'PHAComment';
-  user?: string; // Optional: user who performed the action
+  type: 'System' | 'UserAction' | 'Communication' | 'PHAComment' | 'DocumentChange' | 'ContactChange';
+  user?: string;
+}
+
+export interface DocumentEntry {
+  id: string; // Unique ID for the document
+  name: string;
+  type: string; // MIME type
+  size: number; // in bytes
+  uploadDate: string; // ISO string
+  uploadedBy: string; // User ID or 'Provider'/'System'
+  url?: string; // URL if stored in Firebase Storage
+  // content?: string; // Not recommended for large files, use Storage instead
+}
+
+export interface ContactEntry {
+  id: string; // Unique ID for the contact
+  name: string;
+  email: string;
+  phone: string;
+  role?: string; // e.g., 'Billing Contact', 'Technical Contact'
+  isAlternative?: boolean; // To mark as an alternative contact
 }
 
 export interface EnrollmentData extends EnrollmentFormData {
   id: string;
   submissionDate: string;
-  ccdDocumentContent?: string; // Store actual content for mock processing
+  ccdDocumentContent?: string; 
   validationResult?: FHIRValidationResult;
   status: 'Pending' | 'Approved' | 'Changes Requested' | 'Denied';
   activityLog?: ActivityLogEntry[];
+  documents?: DocumentEntry[]; // Array for uploaded documents
+  additionalContacts?: ContactEntry[]; // Array for additional contacts
 }
