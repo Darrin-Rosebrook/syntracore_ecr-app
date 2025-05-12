@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Edit3, Eye, ChevronDown, ChevronUp, Loader2, Search, Info, Hash } from "lucide-react"; // Added Hash
+import { Check, X, Edit3, Eye, ChevronDown, ChevronUp, Loader2, Search, Info, Hash, Ban, Trash2 } from "lucide-react";
 import { FHIRValidationDisplay } from "./fhir-validation-display";
 import { ScrollArea } from './ui/scroll-area';
 import { Input } from './ui/input';
@@ -25,11 +25,33 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from './ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from './ui/dialog';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogClose 
+} from './ui/dialog';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
+import { useAppContext } from '@/context/AppContext';
+
 
 interface PHAReviewerDashboardProps {
   enrollments: EnrollmentData[];
@@ -38,14 +60,16 @@ interface PHAReviewerDashboardProps {
 }
 
 export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLoadingContext }: PHAReviewerDashboardProps) {
+  const { removeEnrollment } = useAppContext();
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isProcessingAction, setIsProcessingAction] = useState(false); // Local loading for specific actions
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
   const { toast } = useToast();
 
   const [requestChangesModalOpen, setRequestChangesModalOpen] = useState(false);
+  const [denyModalOpen, setDenyModalOpen] = useState(false);
   const [currentEnrollmentForModal, setCurrentEnrollmentForModal] = useState<EnrollmentData | null>(null);
-  const [changeRequestComments, setChangeRequestComments] = useState("");
+  const [actionComments, setActionComments] = useState(""); // Used for both 'Request Changes' and 'Deny'
 
   const toggleRow = (id: string) => {
     setExpandedRow(expandedRow === id ? null : id);
@@ -67,20 +91,42 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
   
   const openRequestChangesModal = (enrollment: EnrollmentData) => {
     setCurrentEnrollmentForModal(enrollment);
-    setChangeRequestComments("");
+    setActionComments("");
     setRequestChangesModalOpen(true);
   };
 
   const handleRequestChanges = async () => {
-    if (!currentEnrollmentForModal || !changeRequestComments.trim()) {
+    if (!currentEnrollmentForModal || !actionComments.trim()) {
       toast({ title: "Missing Information", description: "Please provide comments for the change request.", variant: "destructive"});
       return;
     }
     setIsProcessingAction(true);
-    await updateEnrollmentStatus(currentEnrollmentForModal.id, "Changes Requested", changeRequestComments);
+    await updateEnrollmentStatus(currentEnrollmentForModal.id, "Changes Requested", actionComments);
     setIsProcessingAction(false);
     setRequestChangesModalOpen(false);
     toast({ title: "Changes Requested", description: `Change request sent for enrollment ID ${currentEnrollmentForModal.id.slice(0,6)}...`});
+  };
+
+  const openDenyModal = (enrollment: EnrollmentData) => {
+    setCurrentEnrollmentForModal(enrollment);
+    setActionComments(""); // Reset comments for deny modal
+    setDenyModalOpen(true);
+  };
+
+  const handleDeny = async () => {
+    if (!currentEnrollmentForModal) return;
+    setIsProcessingAction(true);
+    await updateEnrollmentStatus(currentEnrollmentForModal.id, "Denied", actionComments || "No reason provided."); // Pass comments as reason
+    setIsProcessingAction(false);
+    setDenyModalOpen(false);
+    toast({ title: "Enrollment Denied", description: `Enrollment ID ${currentEnrollmentForModal.id.slice(0,6)}... has been denied.`});
+  };
+
+  const handleRemove = async (id: string) => {
+    setIsProcessingAction(true);
+    await removeEnrollment(id);
+    setIsProcessingAction(false);
+    // Toast is handled in AppContext's removeEnrollment
   };
 
   const getStatusBadgeVariant = (status: EnrollmentData['status']) => {
@@ -88,6 +134,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
       case 'Approved': return 'default';
       case 'Pending': return 'secondary';
       case 'Changes Requested': return 'destructive';
+      case 'Denied': return 'destructive';
       default: return 'outline';
     }
   };
@@ -97,6 +144,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
       case 'Approved': return 'bg-green-500 hover:bg-green-600 text-white';
       case 'Pending': return 'bg-yellow-500 hover:bg-yellow-600 text-black';
       case 'Changes Requested': return 'bg-orange-500 hover:bg-orange-600 text-white';
+      case 'Denied': return 'bg-red-700 hover:bg-red-800 text-white';
       default: return '';
     }
   }
@@ -156,7 +204,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
               <span className="ml-2">Loading enrollments...</span>
             </div>
           )}
-          {totalLoading && enrollments.length > 0 && ( // Show spinner on top of table if actions are processing
+          {totalLoading && enrollments.length > 0 && ( 
              <div className="absolute inset-0 bg-background/50 flex justify-center items-center z-20">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
              </div>
@@ -167,7 +215,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
                 <TableHeader className="sticky top-0 bg-background z-10">
                   <TableRow>
                     <TableHead className="w-[50px]"></TableHead>
-                    <TableHead>Practice Name</TableHead>
+                    <TableHead>Health Care Organization</TableHead>
                     <TableHead>Organization NPI</TableHead>
                     <TableHead>Contact Person</TableHead>
                     <TableHead>Submission Date</TableHead>
@@ -214,23 +262,53 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
                                   <Edit3 className="mr-2 h-4 w-4" /> View/Edit Profile
                                 </Link>
                               </DropdownMenuItem>
-                              {enrollment.status === 'Pending' && (
-                                <>
-                                  <DropdownMenuItem onClick={() => handleApprove(enrollment.id)} disabled={totalLoading}>
-                                    <Check className="mr-2 h-4 w-4" /> Approve
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => openRequestChangesModal(enrollment)} disabled={totalLoading}>
-                                    <Edit3 className="mr-2 h-4 w-4" /> Request Changes
-                                  </DropdownMenuItem>
-                                </>
+                              <DropdownMenuSeparator />
+                              {(enrollment.status === 'Pending' || enrollment.status === 'Changes Requested' || enrollment.status === 'Denied') && (
+                                <DropdownMenuItem onClick={() => handleApprove(enrollment.id)} disabled={totalLoading}>
+                                  <Check className="mr-2 h-4 w-4 text-green-600" /> Approve
+                                </DropdownMenuItem>
                               )}
+                              {(enrollment.status === 'Pending' || enrollment.status === 'Approved') && (
+                                <DropdownMenuItem onClick={() => openRequestChangesModal(enrollment)} disabled={totalLoading}>
+                                  <Edit3 className="mr-2 h-4 w-4 text-orange-500" /> Request Changes
+                                </DropdownMenuItem>
+                              )}
+                              {(enrollment.status === 'Pending' || enrollment.status === 'Changes Requested') && (
+                                <DropdownMenuItem onClick={() => openDenyModal(enrollment)} disabled={totalLoading}>
+                                  <Ban className="mr-2 h-4 w-4 text-red-600" /> Deny
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={totalLoading} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                    <Trash2 className="mr-2 h-4 w-4" /> Remove
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action cannot be undone. This will permanently delete the enrollment
+                                      for "{enrollment.practiceInfo.name}" and remove its data from servers.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel disabled={isProcessingAction}>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleRemove(enrollment.id)} disabled={isProcessingAction} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                      {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                                      Remove
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
                       {expandedRow === enrollment.id && (
                         <TableRow className="bg-muted/50 hover:bg-muted/50">
-                          <TableCell colSpan={7}> {/* Updated colSpan */}
+                          <TableCell colSpan={7}>
                             <div className="p-4 space-y-3">
                               <h4 className="font-semibold">Enrollment Details:</h4>
                               <p><strong>Organization NPI:</strong> {enrollment.practiceInfo.organizationNPI || 'N/A'}</p>
@@ -254,6 +332,14 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
                                       </CardContent>
                                   </Card>
                               )}
+                               {enrollment.status === "Denied" && enrollment.activityLog?.find(log => log.entry.startsWith("Denial Reason:")) && (
+                                <Card className="mt-2 border-destructive">
+                                    <CardHeader><CardTitle className="text-md text-destructive">Denial Reason</CardTitle></CardHeader>
+                                    <CardContent>
+                                        <p className="text-sm">{enrollment.activityLog.find(log => log.entry.startsWith("Denial Reason:"))?.entry.replace("Denial Reason: ", "")}</p>
+                                    </CardContent>
+                                </Card>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -261,7 +347,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
                     </React.Fragment>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center h-24"> {/* Updated colSpan */}
+                      <TableCell colSpan={7} className="text-center h-24">
                         No enrollments found matching your search criteria.
                       </TableCell>
                     </TableRow>
@@ -273,6 +359,7 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
         </CardContent>
       </Card>
 
+      {/* Dialog for Requesting Changes */}
       <Dialog open={requestChangesModalOpen} onOpenChange={setRequestChangesModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -284,8 +371,8 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
           <div className="grid gap-4 py-4">
             <Textarea
               placeholder="Enter comments here..."
-              value={changeRequestComments}
-              onChange={(e) => setChangeRequestComments(e.target.value)}
+              value={actionComments}
+              onChange={(e) => setActionComments(e.target.value)}
               rows={4}
               disabled={isProcessingAction}
             />
@@ -294,9 +381,39 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
             <DialogClose asChild>
               <Button type="button" variant="outline" disabled={isProcessingAction}>Cancel</Button>
             </DialogClose>
-            <Button type="button" onClick={handleRequestChanges} disabled={isProcessingAction || !changeRequestComments.trim()}>
+            <Button type="button" onClick={handleRequestChanges} disabled={isProcessingAction || !actionComments.trim()}>
               {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Submit Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for Denying Enrollment */}
+      <Dialog open={denyModalOpen} onOpenChange={setDenyModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Deny Enrollment</DialogTitle>
+            <DialogDescription>
+              Provide a reason for denying enrollment ID {currentEnrollmentForModal?.id.slice(0,6)}... (Optional)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Textarea
+              placeholder="Enter reason for denial (optional)..."
+              value={actionComments}
+              onChange={(e) => setActionComments(e.target.value)}
+              rows={4}
+              disabled={isProcessingAction}
+            />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" disabled={isProcessingAction}>Cancel</Button>
+            </DialogClose>
+            <Button type="button" onClick={handleDeny} disabled={isProcessingAction} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+              {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Confirm Denial
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -304,4 +421,3 @@ export function PHAReviewerDashboard({ enrollments, updateEnrollmentStatus, isLo
     </div>
   );
 }
-

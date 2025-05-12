@@ -33,6 +33,7 @@ interface AppContextActions {
   addActivityLogEntry: (enrollmentId: string, entryText: string, type: ActivityLogEntry['type'], user?: string) => Promise<void>;
   addCustomField: (fieldDefinition: CustomFieldDefinition) => Promise<void>;
   removeCustomField: (fieldId: string) => Promise<void>;
+  removeEnrollment: (enrollmentId: string) => Promise<void>; // Added removeEnrollment
   fetchInitialData: () => Promise<void>; // Expose fetchInitialData
 }
 
@@ -111,55 +112,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [toast]);
 
-  // This method's direct Firestore write is being replaced by the addEnrollmentToFirestore server action for form submissions.
-  // It's kept for now, but its usage for form submission from ProviderEnrollmentTab is removed.
   const addEnrollment = async (formData: EnrollmentFormData, ccdDocumentContent: string | null, validationResult: FHIRValidationResult): Promise<boolean> => {
-    console.warn("AppContext.addEnrollment called. For form submissions, prefer using the addEnrollmentToFirestore server action.");
-    
-    // The Firestore write logic below is now primarily handled by the server action.
-    // This function might be repurposed or removed if not used for other programmatic additions.
-    /*
-    const submissionDate = new Date();
-    const initialLogEntry: ActivityLogEntry = {
-      timestamp: submissionDate.toISOString(),
-      entry: 'Enrollment application submitted (via AppContext).', // Modified log entry
-      type: 'System',
-    };
-
-    const newEnrollmentForFirestore = {
-      ...formData,
-      submissionDate: Timestamp.fromDate(submissionDate),
-      ccdDocumentContent: ccdDocumentContent || null,
-      validationResult: validationResult,
-      status: "Pending" as EnrollmentData['status'],
-      activityLog: [{ ...initialLogEntry, timestamp: Timestamp.fromDate(new Date(initialLogEntry.timestamp)) }],
-    };
-
-    try {
-      const docRef = await addDoc(collection(db, 'enrollments'), newEnrollmentForFirestore);
-      const newEnrollmentForState: EnrollmentData = {
-        ...formData,
-        id: docRef.id,
-        submissionDate: submissionDate.toISOString(),
-        ccdDocumentContent: ccdDocumentContent || undefined,
-        validationResult: validationResult,
-        status: "Pending",
-        activityLog: [initialLogEntry],
-      };
-      setEnrollments(prevEnrollments => [newEnrollmentForState, ...prevEnrollments].sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()));
-      toast({
-        title: "Enrollment Submitted (Context)",
-        description: `Practice "${formData.practiceInfo.name}" enrollment has been submitted.`,
-        className: "bg-green-500 text-white",
-      });
-      return true;
-    } catch (error) {
-      console.error("Error adding enrollment to Firestore (AppContext): ", error);
-      toast({ title: 'Database Error (Context)', description: 'Could not submit enrollment data. Please check console.', variant: 'destructive' });
-      return false;
-    }
-    */
-    // For now, return a promise that resolves to false as the primary submission path is via server action.
+    console.warn("AppContext.addEnrollment called. This function is deprecated for direct form submission. Use server action 'addEnrollmentToFirestore' instead.");
     toast({ title: 'Notice', description: 'Enrollment submission is now handled by a server action. This context function is not writing to DB.', variant: 'default' });
     return Promise.resolve(false);
   };
@@ -178,7 +132,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       };
       activityLogsToAdd.push(statusChangeEntry);
 
-      if (comments) {
+      if (comments && status === 'Changes Requested') { // Only add PHA comment if status is 'Changes Requested'
         const phaCommentEntry: ActivityLogEntry = {
           timestamp: new Date().toISOString(),
           entry: `PHA Reviewer Comment: ${comments}`,
@@ -192,13 +146,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const existingMessages = currentEnrollmentData?.validationResult?.messages || [];
         updateData.validationResult = {
             ...(currentEnrollmentData?.validationResult || { isValid: status !== "Changes Requested", messages: [] }), 
-            messages: [...existingMessages, `PHA Comments: ${comments}`]
+            messages: [...existingMessages.filter(msg => !msg.startsWith("PHA Comments:")), `PHA Comments: ${comments}`] // Replace old PHA comments
         };
          if (status !== "Changes Requested" && updateData.validationResult) {
             updateData.validationResult.isValid = true; 
         } else if (status === "Changes Requested" && updateData.validationResult) {
             updateData.validationResult.isValid = false;
         }
+      } else if (status === 'Denied' && comments) { // Log denial reason if provided
+         const denialReasonEntry: ActivityLogEntry = {
+          timestamp: new Date().toISOString(),
+          entry: `Denial Reason: ${comments}`,
+          type: 'System', // Or 'UserAction' depending on how you want to categorize
+          user: 'PHA Reviewer',
+        };
+        activityLogsToAdd.push(denialReasonEntry);
       }
       
       const firestoreLogEntries = activityLogsToAdd.map(log => ({...log, timestamp: Timestamp.fromDate(new Date(log.timestamp))}));
@@ -287,6 +249,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const removeEnrollment = async (enrollmentId: string) => {
+    const enrollmentDocRef = doc(db, 'enrollments', enrollmentId);
+    try {
+      await deleteDoc(enrollmentDocRef);
+      setEnrollments(prevEnrollments => prevEnrollments.filter(e => e.id !== enrollmentId));
+      toast({ title: 'Enrollment Removed', description: `Enrollment ID ${enrollmentId.slice(0,6)}... has been removed.` });
+    } catch (error) {
+      console.error("Error removing enrollment from Firestore: ", error);
+      toast({ title: 'Error', description: 'Could not remove enrollment.', variant: 'destructive' });
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -299,7 +273,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         addActivityLogEntry,
         addCustomField,
         removeCustomField,
-        fetchInitialData, // Expose fetchInitialData
+        removeEnrollment, // Added removeEnrollment
+        fetchInitialData, 
       }}
     >
       {children}

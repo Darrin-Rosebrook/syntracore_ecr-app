@@ -67,6 +67,6 @@ export interface EnrollmentData extends EnrollmentFormData {
   submissionDate: string;
   ccdDocumentContent?: string; // Store actual content for mock processing
   validationResult?: FHIRValidationResult;
-  status: 'Pending' | 'Approved' | 'Changes Requested';
+  status: 'Pending' | 'Approved' | 'Changes Requested' | 'Denied';
   activityLog?: ActivityLogEntry[];
 }
