@@ -1,14 +1,27 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { EnrollmentData } from '@/types';
 import { EHR_VENDORS } from '@/lib/constants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ListTree, ChevronRight } from 'lucide-react'; 
+import { ListTree, ChevronRight, Trash2 } from 'lucide-react'; 
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
 
 interface EhrVendorsTabProps {
   enrollments: EnrollmentData[];
@@ -17,11 +30,14 @@ interface EhrVendorsTabProps {
 interface VendorStat {
   label: string;
   value: string;
-  type: string; // Added vendor type
+  type: string;
   count: number;
 }
 
 export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
+  const [displayedVendors, setDisplayedVendors] = useState(EHR_VENDORS);
+  const { toast } = useToast();
+
   const vendorStats = useMemo(() => {
     const counts: Record<string, number> = {};
     enrollments.forEach(enrollment => {
@@ -30,28 +46,29 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
       }
     });
 
-    const stats: VendorStat[] = EHR_VENDORS.map(vendorConst => ({
+    const stats: VendorStat[] = displayedVendors.map(vendorConst => ({ // Use displayedVendors
       label: vendorConst.label,
       value: vendorConst.value,
-      type: vendorConst.type, // Get type from constants
+      type: vendorConst.type,
       count: counts[vendorConst.value] || 0,
     }));
 
-    // This part adds vendors found in data but not in constants (less likely now with comprehensive list)
+    // This part handles vendors found in enrollment data but not in the (potentially filtered) displayedVendors constant list
+    // For instance, if a vendor was present in enrollments but somehow not in the initial EHR_VENDORS or a filtered list.
+    // This is less likely if displayedVendors starts as EHR_VENDORS and is only filtered down.
     Object.keys(counts).forEach(dataVendorValue => {
       if (!stats.some(s => s.value === dataVendorValue)) {
-        const constantEntry = EHR_VENDORS.find(v => v.value === dataVendorValue);
+        const originalVendorConstant = EHR_VENDORS.find(v => v.value === dataVendorValue);
         stats.push({
-          label: constantEntry ? constantEntry.label : dataVendorValue, 
+          label: originalVendorConstant ? originalVendorConstant.label : dataVendorValue, 
           value: dataVendorValue,
-          type: constantEntry ? constantEntry.type : "Unknown", // Default if not in constants
+          type: originalVendorConstant ? originalVendorConstant.type : "Unknown",
           count: counts[dataVendorValue],
         });
       }
     });
     
     return stats
-        // .filter(stat => stat.count > 0) // Optionally filter out vendors with 0 providers if desired
         .sort((a, b) => {
             if (b.count === a.count) {
                 return a.label.localeCompare(b.label);
@@ -59,7 +76,18 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
             return b.count - a.count;
         });
 
-  }, [enrollments]);
+  }, [enrollments, displayedVendors]);
+
+  const handleRemoveVendor = (vendorValueToRemove: string) => {
+    const vendorToRemove = displayedVendors.find(v => v.value === vendorValueToRemove);
+    setDisplayedVendors(prevVendors =>
+      prevVendors.filter(vendor => vendor.value !== vendorValueToRemove)
+    );
+    toast({ 
+      title: "Vendor Removed", 
+      description: `Vendor "${vendorToRemove?.label || vendorValueToRemove}" has been removed from the list for the current session.` 
+    });
+  };
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -79,10 +107,10 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
               <Table>
                 <TableHeader className="sticky top-0 bg-background z-10">
                   <TableRow>
-                    <TableHead className="w-[50%]">EHR/LIMS Vendor</TableHead>
+                    <TableHead className="w-[45%]">EHR/LIMS Vendor</TableHead>
                     <TableHead className="w-[20%]">Vendor Type</TableHead>
-                    <TableHead className="text-right w-[25%]">Providers Count</TableHead>
-                    <TableHead className="w-[5%]"></TableHead>
+                    <TableHead className="text-right w-[20%]">Providers Count</TableHead>
+                    <TableHead className="text-right w-[15%]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -95,9 +123,42 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
                       </TableCell>
                       <TableCell>{stat.type}</TableCell>
                       <TableCell className="text-right">{stat.count}</TableCell>
-                      <TableCell className="text-right">
-                        <Link href={`/admin/ehr-vendors/${stat.value}`}>
-                          <ChevronRight className="h-5 w-5 text-muted-foreground hover:text-primary" />
+                      <TableCell className="text-right flex justify-end items-center space-x-1">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={stat.count > 0}
+                              title={stat.count > 0 ? "Cannot remove: Vendor is linked to HCOs" : "Remove vendor"}
+                            >
+                              <Trash2 className={`h-4 w-4 ${stat.count > 0 ? 'text-muted-foreground opacity-50 cursor-not-allowed' : 'text-destructive hover:text-destructive/80'}`} />
+                            </Button>
+                          </AlertDialogTrigger>
+                          {stat.count === 0 && (
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action will remove "{stat.label}" from the list on this page. This vendor is not linked to any HCOs. This change is for the current session only and cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleRemoveVendor(stat.value)}
+                                  className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                                >
+                                  Remove
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          )}
+                        </AlertDialog>
+                        <Link href={`/admin/ehr-vendors/${stat.value}`} passHref legacyBehavior>
+                          <Button variant="ghost" size="icon" title="View Vendor Details" asChild>
+                            <a><ChevronRight className="h-5 w-5 text-muted-foreground hover:text-primary" /></a>
+                          </Button>
                         </Link>
                       </TableCell>
                     </TableRow>
@@ -107,7 +168,7 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
             </ScrollArea>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No EHR/LIMS vendor data available.
+              No EHR/LIMS vendor data available or all vendors have been removed from view.
             </p>
           )}
         </CardContent>
@@ -115,3 +176,4 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
     </div>
   );
 }
+
