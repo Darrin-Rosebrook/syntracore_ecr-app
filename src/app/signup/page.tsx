@@ -29,19 +29,20 @@ export default function SignupPage() {
   const [hasPendingEnrollment, setHasPendingEnrollment] = useState(false);
 
   useEffect(() => {
-    if (currentUser) {
-      router.push('/'); 
-    }
-  }, [currentUser, router]);
-
-  useEffect(() => {
     const pendingData = localStorage.getItem(PENDING_ENROLLMENT_DATA_KEY);
     if (pendingData) {
       setHasPendingEnrollment(true);
+      // If there's pending data, we don't redirect even if currentUser exists,
+      // as the user needs to "sign up" to associate the enrollment.
     } else {
       setHasPendingEnrollment(false);
+      // Only redirect if no pending data AND currentUser exists
+      if (currentUser) {
+        router.push('/'); 
+      }
     }
-  }, []);
+  }, [currentUser, router]);
+
 
   const clearPendingEnrollmentData = () => {
     localStorage.removeItem(PENDING_ENROLLMENT_DATA_KEY);
@@ -189,3 +190,4 @@ export default function SignupPage() {
     </div>
   );
 }
+
