@@ -1,15 +1,12 @@
-
 'use client';
 
 import React from 'react';
 import Link from "next/link";
-import Image from "next/image"; // Added Image import
+import Image from "next/image"; 
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { LogIn, LogOut, UserCircle } from "lucide-react";
 import { useRouter } from 'next/navigation';
-
-// Removed the OnboardEcRLogo SVG component
 
 export function MainHeader() {
   const { currentUser, logOut, loading } = useAuth();
@@ -25,17 +22,16 @@ export function MainHeader() {
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
           {/* 
-            Replace with actual logo path. 
-            User should place their logo image (e.g., onboard-ecr-logo.svg or .png) 
+            The user should place their logo image (e.g., onboard-ecr-logo.svg or .png) 
             in the `public/images/` directory.
             The width and height should be adjusted to match the actual logo aspect ratio.
           */}
           <Image
-            src="https://picsum.photos/150/38" // Placeholder image
+            src="/images/onboard-ecr-logo.svg" 
             alt="Onboard eCR Logo"
-            width={150} // Adjust width as needed
-            height={38} // Adjust height as needed
-            priority // Load logo quickly
+            width={150} 
+            height={38} 
+            priority 
             data-ai-hint="company logo"
           />
         </Link>
