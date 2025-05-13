@@ -23,15 +23,15 @@ export function MainHeader() {
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
           {/* 
-            The user should place their logo image (e.g., onboard-ecr-logo.svg or .png) 
+            The user should place their logo image (e.g., OnboardeCR.png) 
             in the `public/images/` directory.
             The width and height should be adjusted to match the actual logo aspect ratio.
           */}
           <Image
-            src="/images/onboard-ecr-logo.svg" 
+            src="/images/OnboardeCR.png" 
             alt="Onboard eCR Logo"
-            width={150} 
-            height={38} 
+            width={100} 
+            height={50} 
             priority 
             data-ai-hint="company logo"
           />
