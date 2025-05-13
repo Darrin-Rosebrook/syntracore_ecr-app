@@ -129,17 +129,21 @@ export default function ManageUsersPage() {
 
   const handleOpenEditDialog = (user: PhaUser) => {
     setEditingUser(user);
-    setEditValue('name', user.name);
-    setEditValue('email', user.email);
-    setEditValue('phone', user.phone || '');
-    setEditValue('program', user.program);
-    setEditValue('role', user.role);
-    setEditValue('status', user.status);
+    resetEditForm({ // Use reset with values to ensure form state is clean
+      name: user.name,
+      email: user.email,
+      phone: user.phone || '',
+      program: user.program,
+      role: user.role,
+      status: user.status,
+    });
     setIsEditDialogOpen(true);
   };
 
 
   const handlePasswordResetRequest = async (email: string, userName: string) => {
+    // It's better to have a separate loading state for this if it can be triggered independently
+    // For now, using isSubmittingAdd to prevent concurrent form submissions, but this could be refined
     setIsSubmittingAdd(true); 
     const result = await requestPasswordResetAction(email);
     setIsSubmittingAdd(false);
@@ -173,11 +177,16 @@ export default function ManageUsersPage() {
 
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast({ title: 'Copied!', description: 'Value copied to clipboard.' });
-    }).catch(err => {
-      toast({ title: 'Copy Failed', description: 'Could not copy value.', variant: 'destructive' });
-    });
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        toast({ title: 'Copied!', description: 'Value copied to clipboard.' });
+      }).catch(err => {
+        console.error("Failed to copy: ", err);
+        toast({ title: 'Copy Failed', description: 'Could not copy value. Check console for details.', variant: 'destructive' });
+      });
+    } else {
+       toast({ title: 'Copy Failed', description: 'Clipboard API not available. Try manual copy.', variant: 'destructive' });
+    }
   };
 
   const filteredUsers = useMemo(() => {
@@ -199,8 +208,7 @@ export default function ManageUsersPage() {
     if (status === 'Active') return 'bg-green-500 hover:bg-green-600';
     if (status === 'Inactive') return 'bg-gray-500 hover:bg-gray-600';
     return '';
-  }
-
+  };
 
   return (
     <TooltipProvider>
@@ -380,7 +388,7 @@ export default function ManageUsersPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{user.username || 'N/A'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{user.email}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <Badge variant={user.role === 'Admin' ? 'default' : 'secondary'}>
+                          <Badge variant={user.role === 'Admin' ? 'default' : 'secondary'} className={user.role === 'Admin' ? 'bg-primary' : ''}>
                             {user.role}
                           </Badge>
                         </td>
@@ -512,3 +520,4 @@ export default function ManageUsersPage() {
     </TooltipProvider>
   );
 }
+
