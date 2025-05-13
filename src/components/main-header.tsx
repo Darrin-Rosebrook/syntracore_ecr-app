@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -68,3 +69,4 @@ export function MainHeader() {
     </header>
   );
 }
+
