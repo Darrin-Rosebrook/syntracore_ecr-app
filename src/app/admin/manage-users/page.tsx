@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, ArrowLeft, PlusCircle, Loader2, List, Eye, EyeOff, Copy, KeyRound, Edit3, Search, UserCheck, UserX, ShieldAlert, ChevronDown, XCircle } from 'lucide-react';
+import { Users, ArrowLeft, PlusCircle, Loader2, List, Eye, EyeOff, Copy, KeyRound, Edit3, Search, UserCheck, UserX, ShieldAlert, ChevronDown, XCircle, UserSquare2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PhaUser, PhaUserStatus, PhaRole, PhaProgram } from '@/types';
 import { addPhaUserAction, getPhaUsersAction, requestPasswordResetAction, updatePhaUserAction } from '@/actions/user-actions';
@@ -37,6 +37,7 @@ const editPhaUserSchema = z.object({
   program: z.enum(['Case Reporting'] as [PhaProgram, ...PhaProgram[]]).optional(),
   role: z.enum(['Admin', 'User'] as [PhaRole, ...PhaRole[]]).optional(),
   status: z.enum(['Active', 'Inactive'] as [PhaUserStatus, ...PhaUserStatus[]]).optional(),
+  // Username is not part of the editable form data, it's displayed
 });
 type EditPhaUserFormData = z.infer<typeof editPhaUserSchema>;
 
@@ -129,7 +130,7 @@ export default function ManageUsersPage() {
 
   const handleOpenEditDialog = (user: PhaUser) => {
     setEditingUser(user);
-    resetEditForm({ // Use reset with values to ensure form state is clean
+    resetEditForm({ 
       name: user.name,
       email: user.email,
       phone: user.phone || '',
@@ -142,8 +143,6 @@ export default function ManageUsersPage() {
 
 
   const handlePasswordResetRequest = async (email: string, userName: string) => {
-    // It's better to have a separate loading state for this if it can be triggered independently
-    // For now, using isSubmittingAdd to prevent concurrent form submissions, but this could be refined
     setIsSubmittingAdd(true); 
     const result = await requestPasswordResetAction(email);
     setIsSubmittingAdd(false);
@@ -336,8 +335,8 @@ export default function ManageUsersPage() {
                   Please provide these credentials to the new user. They will be prompted to change their password upon first login (feature to be implemented).
                   <div className="mt-2 space-y-2">
                     <div className="flex items-center space-x-2 bg-muted p-2 rounded-md">
-                      <Label htmlFor="generatedUsername" className="w-20 shrink-0">Username:</Label>
-                      <Input id="generatedUsername" type="text" value={generatedUsername} readOnly className="flex-grow" />
+                      <Label htmlFor="generatedUsernameDisplay" className="w-20 shrink-0">Username:</Label>
+                      <Input id="generatedUsernameDisplay" type="text" value={generatedUsername} readOnly className="flex-grow" />
                       <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => copyToClipboard(generatedUsername)}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Copy username</p></TooltipContent></Tooltip>
                     </div>
                     <div className="flex items-center space-x-2 bg-muted p-2 rounded-md">
@@ -463,10 +462,17 @@ export default function ManageUsersPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Edit PHA User: {editingUser?.name}</DialogTitle>
-              <DialogDescription>Modify the details for this user.</DialogDescription>
+              <DialogDescription>Modify the details for this user. Username cannot be changed.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleEditSubmit(onEditSubmit)}>
               <div className="grid gap-4 py-4">
+                <div>
+                  <Label htmlFor="editUsername">Username</Label>
+                  <div className="flex items-center space-x-2">
+                    <UserSquare2 className="h-5 w-5 text-muted-foreground" />
+                    <Input id="editUsername" type="text" value={editingUser?.username || 'N/A'} readOnly disabled className="bg-muted/50" />
+                  </div>
+                </div>
                 <div>
                   <Label htmlFor="editName">Full Name</Label>
                   <Controller name="name" control={editControl} render={({ field }) => <Input id="editName" {...field} disabled={isSubmittingUpdate}/>} />
@@ -520,6 +526,15 @@ export default function ManageUsersPage() {
                   )} />
                   {editErrors.status && <p className="text-sm text-destructive mt-1">{editErrors.status.message}</p>}
                 </div>
+                 <Button 
+                    type="button" 
+                    variant="link" 
+                    onClick={() => editingUser && handlePasswordResetRequest(editingUser.email, editingUser.name)} 
+                    disabled={isSubmittingUpdate || !editingUser}
+                    className="justify-start p-0 h-auto text-sm"
+                  >
+                    <KeyRound className="mr-2 h-4 w-4"/>Request Password Reset for this User
+                </Button>
               </div>
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="outline" disabled={isSubmittingUpdate}>Cancel</Button></DialogClose>
