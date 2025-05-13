@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, ArrowLeft, PlusCircle, Loader2, List, Eye, EyeOff, Copy, KeyRound, Edit3, Search, UserCheck, UserX, ShieldAlert } from 'lucide-react';
+import { Users, ArrowLeft, PlusCircle, Loader2, List, Eye, EyeOff, Copy, KeyRound, Edit3, Search, UserCheck, UserX, ShieldAlert, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PhaUser, PhaUserStatus, PhaRole, PhaProgram } from '@/types';
 import { addPhaUserAction, getPhaUsersAction, requestPasswordResetAction, updatePhaUserAction } from '@/actions/user-actions';
@@ -390,7 +390,7 @@ export default function ManageUsersPage() {
                           </Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                           <Badge variant={getStatusBadgeVariant(user.status)} className={getStatusBadgeColorClass(user.status) + ' text-white'}>
+                           <Badge variant={getStatusBadgeVariant(user.status)} className={`${getStatusBadgeColorClass(user.status)} text-white`}>
                             {user.status}
                           </Badge>
                         </td>
