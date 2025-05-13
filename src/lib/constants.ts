@@ -11,3 +11,8 @@ export const EHR_VENDORS = [
   { label: "NextGen Healthcare", value: "nextgen" },
   { label: "Other", value: "other" },
 ];
+
+// Constants for localStorage keys
+export const PENDING_ENROLLMENT_DATA_KEY = 'syntrahub_pending_enrollment_data';
+export const PENDING_CCD_FILE_CONTENT_KEY = 'syntrahub_pending_ccd_file_content';
+export const PENDING_VALIDATION_RESULT_KEY = 'syntrahub_pending_validation_result';
