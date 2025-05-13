@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -12,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, ArrowLeft, PlusCircle, Loader2, List, Eye, EyeOff, Copy, KeyRound, Edit3, Search, UserCheck, UserX, ShieldAlert, ChevronDown } from 'lucide-react';
+import { Users, ArrowLeft, PlusCircle, Loader2, List, Eye, EyeOff, Copy, KeyRound, Edit3, Search, UserCheck, UserX, ShieldAlert, ChevronDown, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PhaUser, PhaUserStatus, PhaRole, PhaProgram } from '@/types';
 import { addPhaUserAction, getPhaUsersAction, requestPasswordResetAction, updatePhaUserAction } from '@/actions/user-actions';
@@ -211,6 +210,11 @@ export default function ManageUsersPage() {
     return '';
   };
 
+  const closeCredentialsAlert = () => {
+    setTempPassword(null);
+    setGeneratedUsername(null);
+  }
+
   return (
     <TooltipProvider>
       <div className="container mx-auto py-8 space-y-6">
@@ -318,9 +322,17 @@ export default function ManageUsersPage() {
           {tempPassword && generatedUsername && (
             <CardContent className="mt-4">
               <Alert>
-                <KeyRound className="h-4 w-4" />
-                <AlertTitle>User Credentials Generated!</AlertTitle>
-                <AlertDescription>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <KeyRound className="h-4 w-4 inline-block mr-1" />
+                        <AlertTitle className="inline-block">User Credentials Generated!</AlertTitle>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={closeCredentialsAlert} className="h-6 w-6 p-0 -mt-1 -mr-1">
+                        <XCircle className="h-4 w-4" />
+                        <span className="sr-only">Close</span>
+                    </Button>
+                </div>
+                <AlertDescription className="mt-2">
                   Please provide these credentials to the new user. They will be prompted to change their password upon first login (feature to be implemented).
                   <div className="mt-2 space-y-2">
                     <div className="flex items-center space-x-2 bg-muted p-2 rounded-md">
