@@ -27,7 +27,7 @@ export function MainHeader() {
             in the `public/images/` directory.
           */}
           <Image
-            src="/images/OnboardeCR.png" 
+            src="/public/images/OnboardeCR.png" 
             alt="Onboard eCR Logo"
             width={150} // Adjusted for a 3:1 aspect ratio
             height={50} // Adjusted for a 3:1 aspect ratio
