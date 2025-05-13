@@ -92,13 +92,17 @@ export interface EnrollmentData extends EnrollmentFormData {
 // Types for PHA User Management
 export type PhaProgram = 'Case Reporting'; // Can be expanded later
 export type PhaRole = 'Admin' | 'User'; // Can be expanded later
+export type PhaUserStatus = 'Active' | 'Inactive';
 
 export interface PhaUser {
-  id?: string; // Optional for creation, will be Firebase Auth UID
+  id: string; // Firebase Auth UID or Firestore doc ID
+  username?: string; // Auto-generated or chosen
   name: string;
   email: string;
   phone?: string;
   program: PhaProgram;
   role: PhaRole;
+  status: PhaUserStatus; // New status field
   // Potentially add createdAt, createdBy etc.
 }
+

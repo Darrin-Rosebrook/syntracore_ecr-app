@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -11,33 +11,53 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, ArrowLeft, PlusCircle, Loader2, List, Eye, EyeOff, Copy, KeyRound } from 'lucide-react';
+import { Users, ArrowLeft, PlusCircle, Loader2, List, Eye, EyeOff, Copy, KeyRound, Edit3, Search, UserCheck, UserX, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { PhaUser } from '@/types';
-import { addPhaUserAction, getPhaUsersAction, requestPasswordResetAction } from '@/actions/user-actions';
+import type { PhaUser, PhaUserStatus, PhaRole, PhaProgram } from '@/types';
+import { addPhaUserAction, getPhaUsersAction, requestPasswordResetAction, updatePhaUserAction } from '@/actions/user-actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 
 const phaUserSchema = z.object({
   name: z.string().min(1, { message: "Name is required." }),
   email: z.string().email({ message: "Invalid email address." }),
   phone: z.string().optional(),
-  program: z.enum(['Case Reporting'], { message: "Program is required." }),
-  role: z.enum(['Admin', 'User'], { message: "Role is required." }),
+  program: z.enum(['Case Reporting'] as [PhaProgram, ...PhaProgram[]], { message: "Program is required." }),
+  role: z.enum(['Admin', 'User'] as [PhaRole, ...PhaRole[]], { message: "Role is required." }),
 });
-
 type PhaUserFormData = z.infer<typeof phaUserSchema>;
+
+// Schema for editing, allows partial updates and includes status.
+const editPhaUserSchema = z.object({
+  name: z.string().min(1, { message: "Name is required." }).optional(),
+  email: z.string().email({ message: "Invalid email address." }).optional(),
+  phone: z.string().optional().nullable(),
+  program: z.enum(['Case Reporting'] as [PhaProgram, ...PhaProgram[]]).optional(),
+  role: z.enum(['Admin', 'User'] as [PhaRole, ...PhaRole[]]).optional(),
+  status: z.enum(['Active', 'Inactive'] as [PhaUserStatus, ...PhaUserStatus[]]).optional(),
+});
+type EditPhaUserFormData = z.infer<typeof editPhaUserSchema>;
+
 
 export default function ManageUsersPage() {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingAdd, setIsSubmittingAdd] = useState(false);
+  const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [phaUsers, setPhaUsers] = useState<PhaUser[]>([]);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [generatedUsername, setGeneratedUsername] = useState<string | null>(null);
   const [showTempPassword, setShowTempPassword] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const { control, handleSubmit, reset, formState: { errors } } = useForm<PhaUserFormData>({
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<PhaUser | null>(null);
+
+
+  const { control: addControl, handleSubmit: handleAddSubmit, reset: resetAddForm, formState: { errors: addErrors } } = useForm<PhaUserFormData>({
     resolver: zodResolver(phaUserSchema),
     defaultValues: {
       name: '',
@@ -48,70 +68,144 @@ export default function ManageUsersPage() {
     },
   });
 
+  const { control: editControl, handleSubmit: handleEditSubmit, reset: resetEditForm, setValue: setEditValue, formState: { errors: editErrors } } = useForm<EditPhaUserFormData>({
+    resolver: zodResolver(editPhaUserSchema),
+  });
+
+  const fetchUsers = async () => {
+    setIsLoadingUsers(true);
+    const result = await getPhaUsersAction();
+    if (result.success && result.users) {
+      setPhaUsers(result.users);
+    } else {
+      toast({ title: 'Error Loading Users', description: result.error || 'Could not load PHA users.', variant: 'destructive' });
+    }
+    setIsLoadingUsers(false);
+  };
+
   useEffect(() => {
-    const fetchUsers = async () => {
-      setIsLoadingUsers(true);
-      const result = await getPhaUsersAction();
-      if (result.success && result.users) {
-        setPhaUsers(result.users);
-      } else {
-        toast({ title: 'Error', description: 'Could not load PHA users.', variant: 'destructive' });
-      }
-      setIsLoadingUsers(false);
-    };
     fetchUsers();
   }, [toast]);
 
-  const onSubmit = async (data: PhaUserFormData) => {
-    setIsSubmitting(true);
-    setTempPassword(null); // Clear previous temp password
+  const onAddSubmit: SubmitHandler<PhaUserFormData> = async (data) => {
+    setIsSubmittingAdd(true);
+    setTempPassword(null);
+    setGeneratedUsername(null);
     const result = await addPhaUserAction(data);
-    setIsSubmitting(false);
+    setIsSubmittingAdd(false);
 
-    if (result.success && result.userId && result.temporaryPassword) {
+    if (result.success && result.userId && result.temporaryPassword && result.username) {
       toast({
         title: 'User Added',
         description: `User ${data.name} has been successfully added.`,
       });
       setTempPassword(result.temporaryPassword);
+      setGeneratedUsername(result.username);
       // Refetch users or add to local state
-      setPhaUsers(prev => [...prev, { ...data, id: result.userId! }]); // Add to local state for immediate UI update
-      reset();
+      // For simplicity, refetching to ensure data consistency with backend simulation
+      await fetchUsers(); 
+      resetAddForm();
     } else {
       toast({
-        title: 'Error',
+        title: 'Error Adding User',
         description: result.error || 'Failed to add user.',
         variant: 'destructive',
       });
     }
   };
+  
+  const onEditSubmit: SubmitHandler<EditPhaUserFormData> = async (data) => {
+    if (!editingUser) return;
+    setIsSubmittingUpdate(true);
+    const result = await updatePhaUserAction(editingUser.id, data);
+    setIsSubmittingUpdate(false);
+
+    if (result.success) {
+      toast({ title: 'User Updated', description: `User ${editingUser.name} has been updated.` });
+      setIsEditDialogOpen(false);
+      setEditingUser(null);
+      await fetchUsers(); // Refresh the user list
+    } else {
+      toast({ title: 'Error Updating User', description: result.error || 'Failed to update user.', variant: 'destructive' });
+    }
+  };
+
+  const handleOpenEditDialog = (user: PhaUser) => {
+    setEditingUser(user);
+    // Set form values for the editing dialog
+    setEditValue('name', user.name);
+    setEditValue('email', user.email);
+    setEditValue('phone', user.phone || '');
+    setEditValue('program', user.program);
+    setEditValue('role', user.role);
+    setEditValue('status', user.status);
+    setIsEditDialogOpen(true);
+  };
+
 
   const handlePasswordResetRequest = async (email: string, userName: string) => {
-    setIsSubmitting(true); // Use general submitting state or a specific one for this action
+    // Use a more specific loading state if available, or general one
+    setIsSubmittingAdd(true); // Re-using for now, consider specific state
     const result = await requestPasswordResetAction(email);
-    setIsSubmitting(false);
+    setIsSubmittingAdd(false);
 
     if (result.success) {
       toast({
-        title: 'Password Reset Requested',
+        title: 'Password Reset Initiated',
         description: `A password reset (simulated) has been initiated for ${userName} (${email}).`,
       });
     } else {
       toast({
-        title: 'Error',
+        title: 'Error Resetting Password',
         description: result.error || `Failed to request password reset for ${userName}.`,
         variant: 'destructive',
       });
     }
   };
+  
+  const handleChangeUserStatus = async (userId: string, newStatus: PhaUserStatus) => {
+    setIsSubmittingUpdate(true); // Re-use or create specific loading state
+    const result = await updatePhaUserAction(userId, { status: newStatus });
+    setIsSubmittingUpdate(false);
+
+    if (result.success) {
+      toast({ title: 'Status Updated', description: `User status changed to ${newStatus}.` });
+      await fetchUsers(); // Refresh list
+    } else {
+      toast({ title: 'Error Updating Status', description: result.error || 'Failed to update status.', variant: 'destructive' });
+    }
+  };
+
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
-      toast({ title: 'Copied!', description: 'Temporary password copied to clipboard.' });
+      toast({ title: 'Copied!', description: 'Value copied to clipboard.' });
     }).catch(err => {
-      toast({ title: 'Copy Failed', description: 'Could not copy password.', variant: 'destructive' });
+      toast({ title: 'Copy Failed', description: 'Could not copy value.', variant: 'destructive' });
     });
   };
+
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm) return phaUsers;
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return phaUsers.filter(user =>
+      user.name.toLowerCase().includes(lowerSearchTerm) ||
+      user.email.toLowerCase().includes(lowerSearchTerm) ||
+      (user.username && user.username.toLowerCase().includes(lowerSearchTerm))
+    );
+  }, [phaUsers, searchTerm]);
+  
+  const getStatusBadgeVariant = (status: PhaUserStatus): "default" | "secondary" | "destructive" | "outline" => {
+    if (status === 'Active') return 'default';
+    if (status === 'Inactive') return 'secondary'; // Or 'destructive' if preferred for inactive
+    return 'outline';
+  };
+  const getStatusBadgeColorClass = (status: PhaUserStatus): string => {
+    if (status === 'Active') return 'bg-green-500 hover:bg-green-600';
+    if (status === 'Inactive') return 'bg-gray-500 hover:bg-gray-600';
+    return '';
+  }
+
 
   return (
     <TooltipProvider>
@@ -135,38 +229,38 @@ export default function ManageUsersPage() {
               <PlusCircle className="mr-2 h-6 w-6 text-primary" />
               Add New PHA User
             </CardTitle>
-            <CardDescription>Create accounts for Public Health Agency personnel. A temporary password will be generated.</CardDescription>
+            <CardDescription>Create accounts for Public Health Agency personnel. A username and temporary password will be generated.</CardDescription>
           </CardHeader>
-          <form onSubmit={handleSubmit(onSubmit)}>
+          <form onSubmit={handleAddSubmit(onAddSubmit)}>
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="name">Full Name</Label>
                 <Controller
                   name="name"
-                  control={control}
-                  render={({ field }) => <Input id="name" {...field} placeholder="e.g., Jane Doe" disabled={isSubmitting} />}
+                  control={addControl}
+                  render={({ field }) => <Input id="name" {...field} placeholder="e.g., Jane Doe" disabled={isSubmittingAdd} />}
                 />
-                {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                {addErrors.name && <p className="text-sm text-destructive mt-1">{addErrors.name.message}</p>}
               </div>
 
               <div>
                 <Label htmlFor="email">Email Address</Label>
                 <Controller
                   name="email"
-                  control={control}
-                  render={({ field }) => <Input id="email" type="email" {...field} placeholder="e.g., jane.doe@pha.gov" disabled={isSubmitting} />}
+                  control={addControl}
+                  render={({ field }) => <Input id="email" type="email" {...field} placeholder="e.g., jane.doe@pha.gov" disabled={isSubmittingAdd} />}
                 />
-                {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
+                {addErrors.email && <p className="text-sm text-destructive mt-1">{addErrors.email.message}</p>}
               </div>
 
               <div>
                 <Label htmlFor="phone">Phone Number (Optional)</Label>
                 <Controller
                   name="phone"
-                  control={control}
-                  render={({ field }) => <Input id="phone" type="tel" {...field} placeholder="e.g., (555) 123-4567" disabled={isSubmitting} />}
+                  control={addControl}
+                  render={({ field }) => <Input id="phone" type="tel" {...field} placeholder="e.g., (555) 123-4567" disabled={isSubmittingAdd} />}
                 />
-                {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
+                {addErrors.phone && <p className="text-sm text-destructive mt-1">{addErrors.phone.message}</p>}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -174,7 +268,7 @@ export default function ManageUsersPage() {
                   <Label htmlFor="program">Program</Label>
                   <Controller
                     name="program"
-                    control={control}
+                    control={addControl}
                     render={({ field }) => (
                       <Select onValueChange={field.onChange} value={field.value} disabled={true}>
                         <SelectTrigger id="program">
@@ -186,16 +280,16 @@ export default function ManageUsersPage() {
                       </Select>
                     )}
                   />
-                  {errors.program && <p className="text-sm text-destructive mt-1">{errors.program.message}</p>}
+                  {addErrors.program && <p className="text-sm text-destructive mt-1">{addErrors.program.message}</p>}
                 </div>
 
                 <div>
                   <Label htmlFor="role">Role</Label>
                   <Controller
                     name="role"
-                    control={control}
+                    control={addControl}
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmittingAdd}>
                         <SelectTrigger id="role">
                           <SelectValue placeholder="Select role" />
                         </SelectTrigger>
@@ -206,47 +300,36 @@ export default function ManageUsersPage() {
                       </Select>
                     )}
                   />
-                  {errors.role && <p className="text-sm text-destructive mt-1">{errors.role.message}</p>}
+                  {addErrors.role && <p className="text-sm text-destructive mt-1">{addErrors.role.message}</p>}
                 </div>
               </div>
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-                {isSubmitting ? 'Adding User...' : 'Add User'}
+              <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90" disabled={isSubmittingAdd}>
+                {isSubmittingAdd ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                {isSubmittingAdd ? 'Adding User...' : 'Add User'}
               </Button>
             </CardFooter>
           </form>
-          {tempPassword && (
+          {tempPassword && generatedUsername && (
             <CardContent className="mt-4">
               <Alert>
                 <KeyRound className="h-4 w-4" />
-                <AlertTitle>Temporary Password Generated!</AlertTitle>
+                <AlertTitle>User Credentials Generated!</AlertTitle>
                 <AlertDescription>
-                  Please provide this password to the new user. They will be prompted to change it upon first login (feature to be implemented).
-                  <div className="mt-2 flex items-center space-x-2 bg-muted p-2 rounded-md">
-                    <Input 
-                      type={showTempPassword ? "text" : "password"} 
-                      value={tempPassword} 
-                      readOnly 
-                      className="flex-grow"
-                    />
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => setShowTempPassword(!showTempPassword)}>
-                          {showTempPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>Toggle visibility</p></TooltipContent>
-                    </Tooltip>
-                     <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => copyToClipboard(tempPassword)}>
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>Copy password</p></TooltipContent>
-                    </Tooltip>
+                  Please provide these credentials to the new user. They will be prompted to change their password upon first login (feature to be implemented).
+                  <div className="mt-2 space-y-2">
+                    <div className="flex items-center space-x-2 bg-muted p-2 rounded-md">
+                      <Label htmlFor="generatedUsername" className="w-20 shrink-0">Username:</Label>
+                      <Input id="generatedUsername" type="text" value={generatedUsername} readOnly className="flex-grow" />
+                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => copyToClipboard(generatedUsername)}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Copy username</p></TooltipContent></Tooltip>
+                    </div>
+                    <div className="flex items-center space-x-2 bg-muted p-2 rounded-md">
+                       <Label htmlFor="tempPasswordDisplay" className="w-20 shrink-0">Password:</Label>
+                      <Input id="tempPasswordDisplay" type={showTempPassword ? "text" : "password"} value={tempPassword} readOnly className="flex-grow" />
+                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => setShowTempPassword(!showTempPassword)}>{showTempPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Toggle visibility</p></TooltipContent></Tooltip>
+                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => copyToClipboard(tempPassword)}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Copy password</p></TooltipContent></Tooltip>
+                    </div>
                   </div>
                 </AlertDescription>
               </Alert>
@@ -260,52 +343,83 @@ export default function ManageUsersPage() {
               <List className="mr-2 h-6 w-6 text-primary" />
               Current PHA Users
             </CardTitle>
-            <CardDescription>List of active Public Health Agency user accounts.</CardDescription>
+            <CardDescription>List of active and inactive Public Health Agency user accounts.</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 flex items-center">
+              <Search className="absolute ml-3 h-5 w-5 text-muted-foreground" />
+              <Input 
+                type="text" 
+                placeholder="Search by name, email, or username..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-full md:w-1/2 lg:w-1/3"
+                disabled={isLoadingUsers && phaUsers.length === 0}
+              />
+            </div>
+
             {isLoadingUsers ? (
               <div className="flex justify-center items-center p-6">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 <span className="ml-2">Loading users...</span>
               </div>
-            ) : phaUsers.length === 0 ? (
-              <p className="text-muted-foreground">No PHA users found. Add users using the form above.</p>
+            ) : filteredUsers.length === 0 ? (
+              <p className="text-muted-foreground">{searchTerm ? "No users match your search." : "No PHA users found. Add users using the form above."}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-border">
                   <thead className="bg-muted/50">
                     <tr>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
+                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Username</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Email</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Program</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-background divide-y divide-border">
-                    {phaUsers.map((user) => (
-                      <tr key={user.id || user.email}>
+                    {filteredUsers.map((user) => (
+                      <tr key={user.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">{user.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{user.username || 'N/A'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{user.email}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <Badge variant={user.role === 'Admin' ? 'default' : 'secondary'}>
                             {user.role}
                           </Badge>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{user.program}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handlePasswordResetRequest(user.email, user.name)}
-                            disabled={isSubmitting}
-                          >
-                            <KeyRound className="mr-1 h-4 w-4" />
-                            Reset Password
-                          </Button>
-                          {/* Placeholder for Edit/Delete buttons */}
-                          <Button variant="ghost" size="sm" disabled>Edit</Button>
-                          <Button variant="ghost" size="sm" disabled className="text-destructive hover:text-destructive">Delete</Button>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                           <Badge variant={getStatusBadgeVariant(user.status)} className={getStatusBadgeColorClass(user.status) + ' text-white'}>
+                            {user.status}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                           <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" disabled={isSubmittingAdd || isSubmittingUpdate}>
+                                Actions <ChevronDown className="ml-1 h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleOpenEditDialog(user)} disabled={isSubmittingUpdate}>
+                                <Edit3 className="mr-2 h-4 w-4" /> Edit User
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handlePasswordResetRequest(user.email, user.name)} disabled={isSubmittingAdd /* Using general loading state */}>
+                                <KeyRound className="mr-2 h-4 w-4" /> Reset Password
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              {user.status === 'Active' ? (
+                                <DropdownMenuItem onClick={() => handleChangeUserStatus(user.id, 'Inactive')} disabled={isSubmittingUpdate} className="text-orange-600 focus:text-orange-600">
+                                  <UserX className="mr-2 h-4 w-4" /> Set Inactive
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => handleChangeUserStatus(user.id, 'Active')} disabled={isSubmittingUpdate} className="text-green-600 focus:text-green-600">
+                                  <UserCheck className="mr-2 h-4 w-4" /> Set Active
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </td>
                       </tr>
                     ))}
@@ -313,18 +427,95 @@ export default function ManageUsersPage() {
                 </table>
               </div>
             )}
-            <div className="mt-6 p-6 border-2 border-dashed border-muted rounded-lg text-center bg-muted/30">
-              <Users className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+             <div className="mt-6 p-6 border-2 border-dashed border-muted rounded-lg text-center bg-muted/30">
+              <ShieldAlert className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
               <p className="text-md font-semibold text-muted-foreground">
-                Advanced User Management Coming Soon
+                Important Note on User Management
               </p>
               <p className="text-xs text-muted-foreground">
-                Full editing, deleting, detailed role management, and first-time password change enforcement are under development.
+                Currently, user management operations (add, edit, status change, password reset) are simulated.
+                Full integration with Firebase Authentication and Firestore is required for these actions to persist and have real effect on user accounts and access.
+                First-time password change enforcement requires client-side logic post-login.
               </p>
             </div>
           </CardContent>
         </Card>
+
+        {/* Edit User Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit PHA User: {editingUser?.name}</DialogTitle>
+              <DialogDescription>Modify the details for this user.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleEditSubmit(onEditSubmit)}>
+              <div className="grid gap-4 py-4">
+                <div>
+                  <Label htmlFor="editName">Full Name</Label>
+                  <Controller name="name" control={editControl} render={({ field }) => <Input id="editName" {...field} disabled={isSubmittingUpdate}/>} />
+                  {editErrors.name && <p className="text-sm text-destructive mt-1">{editErrors.name.message}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="editEmail">Email Address</Label>
+                  <Controller name="email" control={editControl} render={({ field }) => <Input id="editEmail" type="email" {...field} disabled={isSubmittingUpdate}/>} />
+                  {editErrors.email && <p className="text-sm text-destructive mt-1">{editErrors.email.message}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="editPhone">Phone Number (Optional)</Label>
+                  <Controller name="phone" control={editControl} render={({ field }) => <Input id="editPhone" type="tel" {...field} value={field.value ?? ""} disabled={isSubmittingUpdate}/>} />
+                  {editErrors.phone && <p className="text-sm text-destructive mt-1">{editErrors.phone.message}</p>}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="editProgram">Program</Label>
+                    <Controller name="program" control={editControl} render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value} disabled={true /* Program not usually editable post-creation without complex logic */}>
+                        <SelectTrigger id="editProgram"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="Case Reporting">Case Reporting</SelectItem></SelectContent>
+                      </Select>
+                    )} />
+                    {editErrors.program && <p className="text-sm text-destructive mt-1">{editErrors.program.message}</p>}
+                  </div>
+                   <div>
+                    <Label htmlFor="editRole">Role</Label>
+                    <Controller name="role" control={editControl} render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmittingUpdate}>
+                        <SelectTrigger id="editRole"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Admin">Admin</SelectItem>
+                          <SelectItem value="User">User</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )} />
+                    {editErrors.role && <p className="text-sm text-destructive mt-1">{editErrors.role.message}</p>}
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="editStatus">Status</Label>
+                  <Controller name="status" control={editControl} render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isSubmittingUpdate}>
+                      <SelectTrigger id="editStatus"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Active">Active</SelectItem>
+                        <SelectItem value="Inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )} />
+                  {editErrors.status && <p className="text-sm text-destructive mt-1">{editErrors.status.message}</p>}
+                </div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="outline" disabled={isSubmittingUpdate}>Cancel</Button></DialogClose>
+                <Button type="submit" disabled={isSubmittingUpdate}>
+                  {isSubmittingUpdate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </TooltipProvider>
   );
 }
+
