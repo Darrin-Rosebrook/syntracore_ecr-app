@@ -43,7 +43,7 @@ export default function EhrVendorProfilePage() {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Loading EHR Vendor profile...</p>
+        <p className="ml-4 text-lg text-muted-foreground">Loading EHR/LIMS Vendor profile...</p>
       </div>
     );
   }
@@ -51,12 +51,12 @@ export default function EhrVendorProfilePage() {
   if (!vendorLabel && !isContextLoading) {
     return (
       <div className="container mx-auto py-8 text-center">
-        <h1 className="text-2xl font-bold mb-4">EHR Vendor Not Found</h1>
+        <h1 className="text-2xl font-bold mb-4">EHR/LIMS Vendor Not Found</h1>
         <p className="text-muted-foreground mb-6">The vendor with ID "{vendorValue}" could not be found.</p>
         <Button asChild variant="outline">
           <Link href="/admin/ehr-vendors"> {/* Assuming the list is at /admin/ehr-vendors or similar. Update if needed */}
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to EHR Vendors List
+            Back to EHR/LIMS Vendors List
           </Link>
         </Button>
       </div>
@@ -75,7 +75,7 @@ export default function EhrVendorProfilePage() {
           </Button>
           <h1 className="text-2xl font-bold text-primary flex items-center">
             <ListTree className="mr-3 h-7 w-7" />
-            EHR Vendor: {vendorLabel}
+            EHR/LIMS Vendor: {vendorLabel}
           </h1>
           <div>{/* Placeholder for global profile actions */}</div>
         </div>
@@ -113,3 +113,4 @@ export default function EhrVendorProfilePage() {
     </ScrollArea>
   );
 }
+

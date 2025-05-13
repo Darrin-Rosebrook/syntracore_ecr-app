@@ -21,7 +21,7 @@ export function EhrVendorDocumentsTab({ vendorValue }: EhrVendorDocumentsTabProp
           Vendor Documents
         </CardTitle>
         <CardDescription>
-          Manage and view documents associated with this EHR Vendor (e.g., integration guides, contracts).
+          Manage and view documents associated with this EHR/LIMS Vendor (e.g., integration guides, contracts).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -29,7 +29,7 @@ export function EhrVendorDocumentsTab({ vendorValue }: EhrVendorDocumentsTabProp
           <Info className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold text-muted-foreground">Document Management Coming Soon</h3>
           <p className="text-sm text-muted-foreground max-w-md">
-            This section will allow uploading, viewing, and managing documents specific to this EHR vendor.
+            This section will allow uploading, viewing, and managing documents specific to this EHR/LIMS vendor.
             Currently, no documents are linked. Functionality to add and manage vendor-specific documents will be implemented in a future update.
           </p>
         </div>
@@ -43,3 +43,4 @@ export function EhrVendorDocumentsTab({ vendorValue }: EhrVendorDocumentsTabProp
     </Card>
   );
 }
+

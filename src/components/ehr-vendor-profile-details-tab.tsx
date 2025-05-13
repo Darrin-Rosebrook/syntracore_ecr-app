@@ -19,7 +19,7 @@ export function EhrVendorProfileDetailsTab({ vendorValue, vendorLabel }: EhrVend
           Vendor Profile: {vendorLabel || 'N/A'}
         </CardTitle>
         <CardDescription>
-          General information about this EHR Vendor.
+          General information about this EHR/LIMS Vendor.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -41,3 +41,4 @@ export function EhrVendorProfileDetailsTab({ vendorValue, vendorLabel }: EhrVend
     </Card>
   );
 }
+

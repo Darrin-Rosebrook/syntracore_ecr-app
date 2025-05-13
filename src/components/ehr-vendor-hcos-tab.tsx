@@ -58,7 +58,7 @@ export function EhrVendorHcosTab({ hcos, isLoading }: EhrVendorHcosTabProps) {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center py-8">
-            No Health Care Organizations are currently using this EHR vendor.
+            No Health Care Organizations are currently using this EHR/LIMS vendor.
           </p>
         </CardContent>
       </Card>
@@ -73,7 +73,7 @@ export function EhrVendorHcosTab({ hcos, isLoading }: EhrVendorHcosTabProps) {
           Health Care Organizations ({hcos.length})
         </CardTitle>
         <CardDescription>
-          List of Health Care Organizations (HCOs) using this EHR vendor.
+          List of Health Care Organizations (HCOs) using this EHR/LIMS vendor.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -117,3 +117,4 @@ export function EhrVendorHcosTab({ hcos, isLoading }: EhrVendorHcosTabProps) {
     </Card>
   );
 }
+

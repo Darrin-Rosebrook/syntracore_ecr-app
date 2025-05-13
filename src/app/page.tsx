@@ -67,7 +67,7 @@ export default function HomePage() {
                   </TabsTrigger>
                   <TabsTrigger value="ehr-vendors" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
                     <ListTree className="mr-2 h-5 w-5" />
-                    EHR Vendors
+                    EHR/LIMS Vendors
                   </TabsTrigger>
                 </>
               )}

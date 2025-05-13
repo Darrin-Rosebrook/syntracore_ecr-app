@@ -61,10 +61,10 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
         <CardHeader>
           <CardTitle className="text-2xl font-semibold flex items-center">
             <ListTree className="mr-3 h-7 w-7 text-primary" />
-            EHR Vendor Distribution
+            EHR/LIMS Vendor Distribution
           </CardTitle>
           <CardDescription>
-            Overview of Electronic Health Record (EHR) vendors used by enrolled providers. Click on a vendor name to view more details.
+            Overview of Electronic Health Record (EHR) and Laboratory Information Management System (LIMS) vendors used by enrolled providers. Click on a vendor name to view more details.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -73,7 +73,7 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
               <Table>
                 <TableHeader className="sticky top-0 bg-background z-10">
                   <TableRow>
-                    <TableHead className="w-[65%]">EHR Vendor</TableHead>
+                    <TableHead className="w-[65%]">EHR/LIMS Vendor</TableHead>
                     <TableHead className="text-right w-[30%]">Providers Count</TableHead>
                     <TableHead className="w-[5%]"></TableHead>
                   </TableRow>
@@ -99,7 +99,7 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
             </ScrollArea>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No EHR vendor data available from enrollments.
+              No EHR/LIMS vendor data available from enrollments.
             </p>
           )}
         </CardContent>
@@ -107,3 +107,4 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
     </div>
   );
 }
+

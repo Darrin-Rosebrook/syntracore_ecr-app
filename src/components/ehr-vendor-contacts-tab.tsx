@@ -21,7 +21,7 @@ export function EhrVendorContactsTab({ vendorValue }: EhrVendorContactsTabProps)
           Vendor Contacts
         </CardTitle>
         <CardDescription>
-          Manage and view key contacts associated with this EHR Vendor (e.g., support, sales).
+          Manage and view key contacts associated with this EHR/LIMS Vendor (e.g., support, sales).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -29,7 +29,7 @@ export function EhrVendorContactsTab({ vendorValue }: EhrVendorContactsTabProps)
           <Info className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold text-muted-foreground">Contact Management Coming Soon</h3>
           <p className="text-sm text-muted-foreground max-w-md">
-            This section will allow adding, viewing, and managing contacts for this EHR vendor.
+            This section will allow adding, viewing, and managing contacts for this EHR/LIMS vendor.
             Currently, no specific contacts are listed. Functionality to add and manage vendor-specific contacts will be implemented in a future update.
           </p>
         </div>
@@ -43,3 +43,4 @@ export function EhrVendorContactsTab({ vendorValue }: EhrVendorContactsTabProps)
     </Card>
   );
 }
+
