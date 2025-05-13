@@ -109,7 +109,7 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
                   <TableRow>
                     <TableHead className="w-[45%]">EHR/LIMS Vendor</TableHead>
                     <TableHead className="w-[20%]">Vendor Type</TableHead>
-                    <TableHead className="text-right w-[20%]">Providers Count</TableHead>
+                    <TableHead className="text-right w-[20%]">HCO Count</TableHead>
                     <TableHead className="text-right w-[15%]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
