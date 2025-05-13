@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useForm, Controller, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,7 +30,6 @@ const phaUserSchema = z.object({
 });
 type PhaUserFormData = z.infer<typeof phaUserSchema>;
 
-// Schema for editing, allows partial updates and includes status.
 const editPhaUserSchema = z.object({
   name: z.string().min(1, { message: "Name is required." }).optional(),
   email: z.string().email({ message: "Invalid email address." }).optional(),
@@ -72,7 +71,7 @@ export default function ManageUsersPage() {
     resolver: zodResolver(editPhaUserSchema),
   });
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
     const result = await getPhaUsersAction();
     if (result.success && result.users) {
@@ -81,11 +80,11 @@ export default function ManageUsersPage() {
       toast({ title: 'Error Loading Users', description: result.error || 'Could not load PHA users.', variant: 'destructive' });
     }
     setIsLoadingUsers(false);
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchUsers();
-  }, [toast]);
+  }, [fetchUsers]);
 
   const onAddSubmit: SubmitHandler<PhaUserFormData> = async (data) => {
     setIsSubmittingAdd(true);
@@ -101,8 +100,6 @@ export default function ManageUsersPage() {
       });
       setTempPassword(result.temporaryPassword);
       setGeneratedUsername(result.username);
-      // Refetch users or add to local state
-      // For simplicity, refetching to ensure data consistency with backend simulation
       await fetchUsers(); 
       resetAddForm();
     } else {
@@ -124,7 +121,7 @@ export default function ManageUsersPage() {
       toast({ title: 'User Updated', description: `User ${editingUser.name} has been updated.` });
       setIsEditDialogOpen(false);
       setEditingUser(null);
-      await fetchUsers(); // Refresh the user list
+      await fetchUsers();
     } else {
       toast({ title: 'Error Updating User', description: result.error || 'Failed to update user.', variant: 'destructive' });
     }
@@ -132,7 +129,6 @@ export default function ManageUsersPage() {
 
   const handleOpenEditDialog = (user: PhaUser) => {
     setEditingUser(user);
-    // Set form values for the editing dialog
     setEditValue('name', user.name);
     setEditValue('email', user.email);
     setEditValue('phone', user.phone || '');
@@ -144,8 +140,7 @@ export default function ManageUsersPage() {
 
 
   const handlePasswordResetRequest = async (email: string, userName: string) => {
-    // Use a more specific loading state if available, or general one
-    setIsSubmittingAdd(true); // Re-using for now, consider specific state
+    setIsSubmittingAdd(true); 
     const result = await requestPasswordResetAction(email);
     setIsSubmittingAdd(false);
 
@@ -164,13 +159,13 @@ export default function ManageUsersPage() {
   };
   
   const handleChangeUserStatus = async (userId: string, newStatus: PhaUserStatus) => {
-    setIsSubmittingUpdate(true); // Re-use or create specific loading state
+    setIsSubmittingUpdate(true); 
     const result = await updatePhaUserAction(userId, { status: newStatus });
     setIsSubmittingUpdate(false);
 
     if (result.success) {
       toast({ title: 'Status Updated', description: `User status changed to ${newStatus}.` });
-      await fetchUsers(); // Refresh list
+      await fetchUsers();
     } else {
       toast({ title: 'Error Updating Status', description: result.error || 'Failed to update status.', variant: 'destructive' });
     }
@@ -197,7 +192,7 @@ export default function ManageUsersPage() {
   
   const getStatusBadgeVariant = (status: PhaUserStatus): "default" | "secondary" | "destructive" | "outline" => {
     if (status === 'Active') return 'default';
-    if (status === 'Inactive') return 'secondary'; // Or 'destructive' if preferred for inactive
+    if (status === 'Inactive') return 'secondary'; 
     return 'outline';
   };
   const getStatusBadgeColorClass = (status: PhaUserStatus): string => {
@@ -405,7 +400,7 @@ export default function ManageUsersPage() {
                               <DropdownMenuItem onClick={() => handleOpenEditDialog(user)} disabled={isSubmittingUpdate}>
                                 <Edit3 className="mr-2 h-4 w-4" /> Edit User
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handlePasswordResetRequest(user.email, user.name)} disabled={isSubmittingAdd /* Using general loading state */}>
+                              <DropdownMenuItem onClick={() => handlePasswordResetRequest(user.email, user.name)} disabled={isSubmittingAdd}>
                                 <KeyRound className="mr-2 h-4 w-4" /> Reset Password
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
@@ -441,7 +436,6 @@ export default function ManageUsersPage() {
           </CardContent>
         </Card>
 
-        {/* Edit User Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent>
             <DialogHeader>
@@ -469,7 +463,7 @@ export default function ManageUsersPage() {
                   <div>
                     <Label htmlFor="editProgram">Program</Label>
                     <Controller name="program" control={editControl} render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value} disabled={true /* Program not usually editable post-creation without complex logic */}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={true}>
                         <SelectTrigger id="editProgram"><SelectValue /></SelectTrigger>
                         <SelectContent><SelectItem value="Case Reporting">Case Reporting</SelectItem></SelectContent>
                       </Select>
@@ -518,4 +512,3 @@ export default function ManageUsersPage() {
     </TooltipProvider>
   );
 }
-
