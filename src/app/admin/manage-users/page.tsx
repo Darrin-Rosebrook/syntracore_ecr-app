@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -330,7 +331,9 @@ export default function ManageUsersPage() {
                     <div className="flex items-center space-x-2 bg-muted p-2 rounded-md">
                        <Label htmlFor="tempPasswordDisplay" className="w-20 shrink-0">Password:</Label>
                       <Input id="tempPasswordDisplay" type={showTempPassword ? "text" : "password"} value={tempPassword} readOnly className="flex-grow" />
-                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => setShowTempPassword(!showTempPassword)}>{showTempPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Toggle visibility</p></TooltipContent></Tooltip>
+                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => setShowTempPassword(!showTempPassword)}>{showTempPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                      </TooltipTrigger><TooltipContent><p>Toggle visibility</p></TooltipContent></Tooltip>
                       <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => copyToClipboard(tempPassword)}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Copy password</p></TooltipContent></Tooltip>
                     </div>
                   </div>
