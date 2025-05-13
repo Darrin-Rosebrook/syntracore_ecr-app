@@ -8,10 +8,11 @@ import { ProviderEnrollmentTab } from "@/components/provider-enrollment-tab";
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
 import { AdminConsoleTab } from "@/components/admin-console-tab";
 import { WorkflowDemoTab } from "@/components/workflow-demo-tab";
-import { EhrVendorsTab } from "@/components/ehr-vendors-tab"; // Added import
-import { LayoutDashboard, UserPlus, ShieldCheck, Settings, Loader2, Waypoints, ListTree } from "lucide-react"; // Added ListTree
+import { EhrVendorsTab } from "@/components/ehr-vendors-tab";
+import { HealthSystemsTab } from "@/components/health-systems-tab"; // Added import
+import { LayoutDashboard, UserPlus, ShieldCheck, Settings, Loader2, Waypoints, ListTree, Network } from "lucide-react"; // Added ListTree and Network
 import { useAppContext } from "@/context/AppContext";
-import { useAuth } from "@/context/AuthContext"; // Added for conditional rendering
+import { useAuth } from "@/context/AuthContext"; 
 
 export default function HomePage() {
   const { 
@@ -20,7 +21,7 @@ export default function HomePage() {
     updateEnrollmentStatus, 
     isLoading 
   } = useAppContext();
-  const { currentUser } = useAuth(); // Get current user for conditional tab rendering
+  const { currentUser } = useAuth(); 
   
   const [activeTab, setActiveTab] = React.useState("dashboard");
 
@@ -34,7 +35,7 @@ export default function HomePage() {
   }
 
   // Determine number of columns for TabsList based on currentUser
-  const tabListCols = currentUser ? "sm:grid-cols-6" : "sm:grid-cols-2"; // Example: adjust as needed
+  const tabListCols = currentUser ? "sm:grid-cols-7" : "sm:grid-cols-2"; 
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
@@ -69,6 +70,10 @@ export default function HomePage() {
                     <ListTree className="mr-2 h-5 w-5" />
                     EHR/LIMS Vendors
                   </TabsTrigger>
+                  <TabsTrigger value="health-systems" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
+                    <Network className="mr-2 h-5 w-5" />
+                    Health Systems (Parent)
+                  </TabsTrigger>
                 </>
               )}
             </TabsList>
@@ -92,6 +97,9 @@ export default function HomePage() {
                 </TabsContent>
                 <TabsContent value="ehr-vendors" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
                   <EhrVendorsTab enrollments={enrollments} />
+                </TabsContent>
+                <TabsContent value="health-systems" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
+                  <HealthSystemsTab />
                 </TabsContent>
               </>
             )}
