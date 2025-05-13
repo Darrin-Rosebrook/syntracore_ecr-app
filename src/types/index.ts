@@ -88,3 +88,17 @@ export interface EnrollmentData extends EnrollmentFormData {
   documents?: DocumentEntry[]; // Array for uploaded documents
   additionalContacts?: ContactEntry[]; // Array for additional contacts
 }
+
+// Types for PHA User Management
+export type PhaProgram = 'Case Reporting'; // Can be expanded later
+export type PhaRole = 'Admin' | 'User'; // Can be expanded later
+
+export interface PhaUser {
+  id?: string; // Optional for creation, will be Firebase Auth UID
+  name: string;
+  email: string;
+  phone?: string;
+  program: PhaProgram;
+  role: PhaRole;
+  // Potentially add createdAt, createdBy etc.
+}
