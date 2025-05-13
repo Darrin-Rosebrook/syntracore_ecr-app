@@ -6,11 +6,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from "@/components/dashboard-tab";
 import { ProviderEnrollmentTab } from "@/components/provider-enrollment-tab";
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
-import { AdminConsoleTab } from "@/components/admin-console-tab";
-// import { WorkflowDemoTab } from "@/components/workflow-demo-tab"; // WorkflowDemoTab removed
+// import { AdminConsoleTab } from "@/components/admin-console-tab"; // AdminConsoleTab removed
 import { EhrVendorsTab } from "@/components/ehr-vendors-tab";
 import { HealthSystemsTab } from "@/components/health-systems-tab"; 
-import { LayoutDashboard, UserPlus, ShieldCheck, Settings, Loader2, ListTree, Network } from "lucide-react"; // Waypoints icon removed
+import { LayoutDashboard, UserPlus, ShieldCheck, Loader2, ListTree, Network } from "lucide-react"; // Settings icon removed as tab is removed
 import { useAppContext } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext"; 
 
@@ -35,7 +34,7 @@ export default function HomePage() {
   }
 
   // Determine number of columns for TabsList based on currentUser
-  const tabListCols = currentUser ? "sm:grid-cols-6" : "sm:grid-cols-2"; // Adjusted from 7 to 6
+  const tabListCols = currentUser ? "sm:grid-cols-5" : "sm:grid-cols-2"; // Adjusted from 6 to 5
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
@@ -58,14 +57,10 @@ export default function HomePage() {
                     <ShieldCheck className="mr-2 h-5 w-5" />
                     PHA Reviewer
                   </TabsTrigger>
+                  {/* Admin Console Tab Trigger Removed
                   <TabsTrigger value="admin-console" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
                     <Settings className="mr-2 h-5 w-5" />
                     Admin Console
-                  </TabsTrigger>
-                  {/* Workflow Demo Tab Trigger Removed
-                  <TabsTrigger value="workflow-demo" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
-                    <Waypoints className="mr-2 h-5 w-5" />
-                    Workflow Demo
                   </TabsTrigger>
                   */}
                   <TabsTrigger value="ehr-vendors" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
@@ -91,12 +86,9 @@ export default function HomePage() {
                 <TabsContent value="pha-reviewer" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
                   <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} />
                 </TabsContent>
+                {/* Admin Console Tab Content Removed
                 <TabsContent value="admin-console" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
                   <AdminConsoleTab />
-                </TabsContent>
-                {/* Workflow Demo Tab Content Removed
-                <TabsContent value="workflow-demo" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
-                  <WorkflowDemoTab />
                 </TabsContent>
                 */}
                 <TabsContent value="ehr-vendors" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
