@@ -6,19 +6,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from "@/components/dashboard-tab";
 import { ProviderEnrollmentTab } from "@/components/provider-enrollment-tab";
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
-import { AdminConsoleTab } from "@/components/admin-console-tab";
-import { WorkflowDemoTab } from "@/components/workflow-demo-tab"; // Import new tab
-import { LayoutDashboard, UserPlus, ShieldCheck, Settings, Loader2, Waypoints } from "lucide-react"; // Added Waypoints
+import { AdminConsoleTab } from "@/components/admin-console-tab"; // Will be simplified
+import { WorkflowDemoTab } from "@/components/workflow-demo-tab";
+import { LayoutDashboard, UserPlus, ShieldCheck, Settings, Loader2, Waypoints } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 
 export default function HomePage() {
   const { 
     enrollments, 
-    customFieldDefinitions, 
-    addEnrollment, 
+    customFieldDefinitions, // Still needed for ProviderEnrollmentTab 
+    // addEnrollment, // Not used directly in this component
     updateEnrollmentStatus, 
-    addCustomField, 
-    removeCustomField,
+    // addCustomField, // No longer passed directly to AdminConsoleTab
+    // removeCustomField, // No longer passed directly to AdminConsoleTab
     isLoading 
   } = useAppContext();
   
@@ -38,7 +38,7 @@ export default function HomePage() {
       <main className="flex-1">
         <div className="container mx-auto py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-5 h-auto sm:h-12 mb-6 shadow-md"> {/* Updated grid-cols */}
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-5 h-auto sm:h-12 mb-6 shadow-md">
               <TabsTrigger value="dashboard" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
                 <LayoutDashboard className="mr-2 h-5 w-5" />
                 Project Dashboard
@@ -55,7 +55,7 @@ export default function HomePage() {
                 <Settings className="mr-2 h-5 w-5" />
                 Admin Console
               </TabsTrigger>
-              <TabsTrigger value="workflow-demo" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200"> {/* New Tab Trigger */}
+              <TabsTrigger value="workflow-demo" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
                 <Waypoints className="mr-2 h-5 w-5" />
                 Workflow Demo
               </TabsTrigger>
@@ -64,20 +64,16 @@ export default function HomePage() {
               <DashboardTab />
             </TabsContent>
             <TabsContent value="provider-enrollment" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
-              <ProviderEnrollmentTab addEnrollment={addEnrollment} customFieldDefinitions={customFieldDefinitions} />
+              <ProviderEnrollmentTab customFieldDefinitions={customFieldDefinitions} />
             </TabsContent>
             <TabsContent value="pha-reviewer" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
               <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} />
             </TabsContent>
             <TabsContent value="admin-console" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
-              <AdminConsoleTab
-                customFieldDefinitions={customFieldDefinitions}
-                onAddCustomField={addCustomField}
-                onRemoveCustomField={removeCustomField}
-                isLoadingContext={isLoading}
-              />
+              {/* AdminConsoleTab no longer needs custom field management props directly */}
+              <AdminConsoleTab />
             </TabsContent>
-            <TabsContent value="workflow-demo" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn"> {/* New Tab Content */}
+            <TabsContent value="workflow-demo" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
               <WorkflowDemoTab />
             </TabsContent>
           </Tabs>

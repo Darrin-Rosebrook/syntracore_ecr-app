@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
 import React, { useState } from 'react';
 import type { DocumentEntry, EnrollmentData } from '@/types';
 import { Button } from '@/components/ui/button';
-import { FileUploader } from '@/components/file-uploader'; // Assuming you have this or similar
+import { FileUploader } from '@/components/file-uploader';
 import { useToast } from '@/hooks/use-toast';
 import { useAppContext } from '@/context/AppContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -20,9 +20,8 @@ export function DocumentsTab({ enrollment }: DocumentsTabProps) {
   const { toast } = useToast();
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null); // Store ID of doc being deleted
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [viewDocumentUrl, setViewDocumentUrl] = useState<string | null>(null);
-
 
   const handleFileSelect = (file: File | null, _fileContent: string | null) => {
     setFileToUpload(file);
@@ -35,13 +34,10 @@ export function DocumentsTab({ enrollment }: DocumentsTabProps) {
     }
     setIsUploading(true);
     try {
-      // Assuming 'PHA Admin' or current user for uploadedBy. Adjust as needed.
       await addDocumentToEnrollment(enrollment.id, fileToUpload, 'PHA Admin');
-      setFileToUpload(null); 
-      // Dialog will be closed by DialogClose if successful, toast is in AppContext
+      setFileToUpload(null);
     } catch (error) {
-      console.error("Error uploading document in tab:", error);
-      // Toast for error is handled in AppContext
+      console.error("Error uploading document:", error);
     } finally {
       setIsUploading(false);
     }
@@ -51,68 +47,50 @@ export function DocumentsTab({ enrollment }: DocumentsTabProps) {
     setIsDeleting(documentId);
     try {
       await deleteDocumentFromEnrollment(enrollment.id, documentId);
-      // Toast is in AppContext
     } catch (error) {
-      console.error("Error deleting document in tab:", error);
-      // Toast is in AppContext
+      console.error("Error deleting document:", error);
     } finally {
       setIsDeleting(null);
     }
   };
-  
+
   const handleViewDocument = (doc: DocumentEntry) => {
-    // For now, we'll just use a placeholder.
-    // In a real app, if doc.url exists (from Firebase Storage),
-    // you could open it in a new tab or use a modal with an iframe for PDFs/images.
     if (doc.url) {
-      // For actual display, you might use a modal with an iframe or image tag
-      // For this example, we'll just log it and show a toast.
-      console.log("Viewing document:", doc.url);
-      setViewDocumentUrl(doc.url); // This would trigger a modal
-      toast({title: "View Document", description: `Displaying ${doc.name}. URL: ${doc.url}`});
-
-      // If it's an image or PDF and you have a direct URL, you can open it:
-      // window.open(doc.url, '_blank');
-
+      setViewDocumentUrl(doc.url);
     } else {
-      toast({title: "Cannot View Document", description: "No viewable URL for this document.", variant: "destructive"});
+      toast({ title: "Cannot View Document", description: "No viewable URL for this document.", variant: "destructive" });
     }
   };
 
   const handleDownloadDocument = (doc: DocumentEntry) => {
     if (doc.url) {
-      // Create a temporary link element to trigger download
       const link = document.createElement('a');
       link.href = doc.url;
-      link.target = '_blank'; // Open in new tab, often triggers download for non-viewable types
-      link.download = doc.name; // Suggest a filename for the download
+      link.target = '_blank';
+      link.download = doc.name;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast({title: "Download Started", description: `${doc.name} should begin downloading.`});
+      toast({ title: "Download Started", description: `${doc.name} should begin downloading.` });
     } else {
-       toast({title: "Cannot Download", description: "No downloadable URL for this document.", variant: "destructive"});
+      toast({ title: "Cannot Download", description: "No downloadable URL for this document.", variant: "destructive" });
     }
   };
 
   const handlePrintDocument = (doc: DocumentEntry) => {
     if (doc.url) {
-      // Open in a new window and trigger print dialog
-      // This works best for PDFs or images that the browser can render.
       const printWindow = window.open(doc.url, '_blank');
       if (printWindow) {
         printWindow.onload = () => {
           printWindow.print();
-          // printWindow.close(); // Optional: close after printing
         };
       } else {
-        toast({title: "Print Error", description: "Could not open document for printing.", variant: "destructive"});
+        toast({ title: "Print Error", description: "Could not open document for printing.", variant: "destructive" });
       }
     } else {
-      toast({title: "Cannot Print", description: "No printable URL for this document.", variant: "destructive"});
+      toast({ title: "Cannot Print", description: "No printable URL for this document.", variant: "destructive" });
     }
   };
-
 
   const documents = enrollment.documents || [];
 
@@ -147,7 +125,7 @@ export function DocumentsTab({ enrollment }: DocumentsTabProps) {
 
       {isAppContextLoading && documents.length === 0 && <p>Loading documents...</p>}
       {!isAppContextLoading && documents.length === 0 && <p className="text-muted-foreground">No documents associated with this enrollment.</p>}
-      
+
       {documents.length > 0 && (
         <Table>
           <TableHeader>
@@ -175,46 +153,49 @@ export function DocumentsTab({ enrollment }: DocumentsTabProps) {
                   <Button variant="ghost" size="icon" onClick={() => handleDownloadDocument(doc)} title="Download Document" disabled={!doc.url}>
                     <Download className="h-4 w-4" />
                   </Button>
-                   <Button variant="ghost" size="icon" onClick={() => handlePrintDocument(doc)} title="Print Document" disabled={!doc.url}>
+                  <Button variant="ghost" size="icon" onClick={() => handlePrintDocument(doc)} title="Print Document" disabled={!doc.url}>
                     <Printer className="h-4 w-4" />
-                  Button>
+                  </Button>
                   <Dialog>
                     <DialogTrigger asChild>
-                       <Button variant="ghost" size="icon" title="Delete Document" disabled={isDeleting === doc.id}>
-                         {isDeleting === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
-                       Button>
+                      <Button variant="ghost" size="icon" title="Delete Document" disabled={isDeleting === doc.id}>
+                        {isDeleting === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
+                      </Button>
                     </DialogTrigger>
                     <DialogContent>
-                        <DialogHeader><DialogTitle>Confirm Deletion</DialogTitleDialogHeader>
-                        <p>Are you sure you want to delete the document "{doc.name}"?</p>
-                        <DialogFooter>
-                            <DialogClose asChild><Button variant="outline">Cancel</ButtonDialogClose>
-                            <Button variant="destructive" onClick={() => handleDeleteDocument(doc.id)} disabled={isDeleting === doc.id}>
-                                {isDeleting === doc.id ? <Loader2 className="h-4 w-4 animate-spin"/> : null} Delete
-                            Button>
-                        DialogFooter>
-                    DialogContent>
-                  Dialog>
-                TableCell>
-              TableRow>
+                      <DialogHeader>
+                        <DialogTitle>Confirm Deletion</DialogTitle>
+                      </DialogHeader>
+                      <p>Are you sure you want to delete the document "{doc.name}"?</p>
+                      <DialogFooter>
+                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                        <Button variant="destructive" onClick={() => handleDeleteDocument(doc.id)} disabled={isDeleting === doc.id}>
+                          {isDeleting === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                          Delete
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </TableCell>
+              </TableRow>
             ))}
-          TableBody>
-        Table>
+          </TableBody>
+        </Table>
       )}
-       {/* Basic Modal for Viewing (example, can be improved) */}
-       {viewDocumentUrl && (
+
+      {viewDocumentUrl && (
         <Dialog open={!!viewDocumentUrl} onOpenChange={() => setViewDocumentUrl(null)}>
           <DialogContent className="max-w-3xl h-[80vh]">
             <DialogHeader>
-              <DialogTitle>View Document</DialogTitleDialogHeader>
-            {/* This is a very basic way to display. For PDFs/Images an iframe or img tag is better */}
+              <DialogTitle>View Document</DialogTitle>
+            </DialogHeader>
             <iframe src={viewDocumentUrl} title="Document Viewer" className="w-full h-full border-0" />
-             <DialogFooter>
-                <Button onClick={() => setViewDocumentUrl(null)}>Close</Button>
-            DialogFooter>
-          DialogContent>
-        Dialog>
+            <DialogFooter>
+              <Button onClick={() => setViewDocumentUrl(null)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
-    div>
+    </div>
   );
 }
