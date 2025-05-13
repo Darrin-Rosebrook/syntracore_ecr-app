@@ -30,13 +30,12 @@ export async function addEnrollmentToFirestore(
       consent: formData.consent,
       submissionDate: Timestamp.fromDate(submissionDate),
       validationResult,
-      status: "Pending" as const, // Explicitly type status
+      status: "Pending" as const, 
       activityLog: [{ ...logEntry, timestamp: Timestamp.fromDate(new Date(logEntry.timestamp)) }],
       additionalData: formData.additionalData || {},
       ccdDocumentName: formData.ccdDocumentName,
-      // Consider implications of storing potentially large ccdDocumentContent
-      // For very large files, Firebase Storage would be more appropriate.
       ccdDocumentContent: ccdDocumentContent, 
+      additionalContacts: formData.additionalContacts || [], // Save additional contacts
     };
 
     console.log("Data prepared for Firestore:", JSON.stringify(dataToSave, (key, value) => {
@@ -53,7 +52,6 @@ export async function addEnrollmentToFirestore(
     console.error("❌ Firestore enrollment write failed in addEnrollmentToFirestore:", error);
     console.error("Error name:", error.name);
     console.error("Error message:", error.message);
-    // Firestore errors often have a 'code' property
     if (error.code) {
       console.error("Error code:", error.code);
     }

@@ -38,6 +38,15 @@ export interface CustomFieldDefinition {
   dependentOptionsJson?: string;
 }
 
+export interface ContactEntry {
+  id: string; // Unique ID for the contact
+  name: string;
+  email: string;
+  phone: string;
+  role?: string; // e.g., 'Billing Contact', 'Technical Contact'
+  isAlternative?: boolean; // To mark as an alternative contact
+}
+
 export interface EnrollmentFormData {
   practiceInfo: PracticeInfo;
   contactDetails: ContactDetails; // Primary contact
@@ -45,6 +54,7 @@ export interface EnrollmentFormData {
   ccdDocumentName?: string;
   consent: boolean;
   additionalData?: Record<string, any>;
+  additionalContacts?: ContactEntry[]; // Added to store contacts from signup
 }
 
 export interface FHIRValidationResult extends ExternalFHIRValidationResult {
@@ -66,17 +76,8 @@ export interface DocumentEntry {
   uploadDate: string; // ISO string
   uploadedBy: string; // User ID or 'Provider'/'System'
   url?: string; // URL if stored in Firebase Storage
-  // content?: string; // Not recommended for large files, use Storage instead
 }
 
-export interface ContactEntry {
-  id: string; // Unique ID for the contact
-  name: string;
-  email: string;
-  phone: string;
-  role?: string; // e.g., 'Billing Contact', 'Technical Contact'
-  isAlternative?: boolean; // To mark as an alternative contact
-}
 
 export interface EnrollmentData extends EnrollmentFormData {
   id: string;
@@ -85,8 +86,8 @@ export interface EnrollmentData extends EnrollmentFormData {
   validationResult?: FHIRValidationResult;
   status: 'Pending' | 'Approved' | 'Changes Requested' | 'Denied';
   activityLog?: ActivityLogEntry[];
-  documents?: DocumentEntry[]; // Array for uploaded documents
-  additionalContacts?: ContactEntry[]; // Array for additional contacts
+  documents?: DocumentEntry[]; 
+  // additionalContacts is now part of EnrollmentFormData, inherited here.
 }
 
 // Types for PHA User Management
@@ -103,6 +104,4 @@ export interface PhaUser {
   program: PhaProgram;
   role: PhaRole;
   status: PhaUserStatus; // New status field
-  // Potentially add createdAt, createdBy etc.
 }
-
