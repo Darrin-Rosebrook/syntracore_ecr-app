@@ -46,3 +46,20 @@ export const PENDING_ENROLLMENT_DATA_KEY = 'syntrahub_pending_enrollment_data';
 export const PENDING_CCD_FILE_CONTENT_KEY = 'syntrahub_pending_ccd_file_content';
 export const PENDING_VALIDATION_RESULT_KEY = 'syntrahub_pending_validation_result';
 
+export const OHIO_HEALTH_SYSTEMS = [
+  { label: "Cleveland Clinic", value: "cleveland-clinic", location: "Ohio", hcoCount: 0 },
+  { label: "OhioHealth", value: "ohiohealth", location: "Ohio", hcoCount: 0 },
+  { label: "The Ohio State University Wexner Medical Center", value: "osu-wexner", location: "Ohio", hcoCount: 0 },
+  { label: "University Hospitals (UH)", value: "university-hospitals", location: "Ohio", hcoCount: 0 },
+  { label: "Mercy Health", value: "mercy-health", location: "Ohio", hcoCount: 0 },
+  { label: "ProMedica", value: "promedica", location: "Ohio", hcoCount: 0 },
+  { label: "Premier Health", value: "premier-health", location: "Ohio", hcoCount: 0 },
+  { label: "Kettering Health", value: "kettering-health", location: "Ohio", hcoCount: 0 },
+  { label: "TriHealth", value: "trihealth", location: "Ohio", hcoCount: 0 },
+  { label: "Summa Health", value: "summa-health", location: "Ohio", hcoCount: 0 },
+  { label: "Mount Carmel Health System", value: "mount-carmel", location: "Ohio", hcoCount: 0 },
+  { label: "Aultman Hospital", value: "aultman-hospital", location: "Ohio", hcoCount: 0 },
+  { label: "Adena Health System", value: "adena-health", location: "Ohio", hcoCount: 0 },
+  { label: "The Christ Hospital Health Network", value: "christ-hospital", location: "Ohio", hcoCount: 0 },
+  { label: "Bon Secours Mercy Health", value: "bon-secours-mercy-health", location: "Ohio", hcoCount: 0 },
+];
