@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -10,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Globe, Save, ArrowLeft, Loader2, Palette, ListChecks, MailSignature } from 'lucide-react';
+import { Globe, Save, ArrowLeft, Loader2, Palette, ListChecks, FileSignature } from 'lucide-react'; // Changed MailSignature to FileSignature
 import { US_STATES } from '@/lib/constants';
 import { savePhaJurisdictionAction, getPhaJurisdictionAction } from '@/actions/pha-config-actions';
 import type { PhaJurisdictionConfig } from '@/types';
@@ -179,7 +180,7 @@ export default function ConfigureJurisdictionPage() {
           </div>
 
           <div className="space-y-3 p-4 border rounded-md bg-muted/30 shadow-sm">
-            <h3 className="font-medium text-md flex items-center"><MailSignature className="mr-2 h-5 w-5 text-primary" />Communication Settings</h3>
+            <h3 className="font-medium text-md flex items-center"><FileSignature className="mr-2 h-5 w-5 text-primary" />Communication Settings</h3>
             <div>
               <Label htmlFor="emailSignature">Email Messaging Signature Block (Future)</Label>
               <Textarea id="emailSignature" placeholder="e.g., Sincerely,&#10;The [Your PHA Name] Team" rows={3} disabled className="cursor-not-allowed opacity-50" />
