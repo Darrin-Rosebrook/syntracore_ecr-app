@@ -113,4 +113,32 @@ export interface PhaJurisdictionConfig {
   phaName?: string; // Optional: Official name of the PHA
   logoUrl?: string; // Optional: URL for custom logo
   lastUpdated: string; // ISO string
+
+  // Regulatory Information
+  stateRegulationsUrl?: string;
+  requiredReportingFieldsInfo?: string;
+
+  // Contact Information
+  phaContactName?: string;
+  phaContactEmail?: string;
+  phaContactPhone?: string;
+
+  // Program-Specific Data
+  reportableConditionsUrl?: string;
+  dataStandardsInfo?: string;
+
+  // Geographic Information
+  autoPopulateCounties?: boolean; // If true, attempt to provide county lists
+  autoPopulateHealthSystems?: boolean; // Already present, kept for clarity
+
+  // Branding and Communications
+  stateSealUrl?: string;
+  legalDisclaimers?: string;
+  customWelcomeMessage?: string;
+  emailSignature?: string; // For future use
+
+  // Third-Party Integrations
+  immunizationRegistryUrl?: string;
+  hieConnectionInfo?: string;
 }
+

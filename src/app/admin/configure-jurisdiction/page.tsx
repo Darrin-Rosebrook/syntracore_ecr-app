@@ -11,19 +11,36 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Globe, Save, ArrowLeft, Loader2, Palette, ListChecks, FileSignature } from 'lucide-react'; // Changed MailSignature to FileSignature
+import { Globe, Save, ArrowLeft, Loader2, Palette, ListChecks, FileSignature, Landmark, ShieldCheck, Workflow, BookOpen, Phone, MessageSquare, MapPin, Users } from 'lucide-react';
 import { US_STATES } from '@/lib/constants';
 import { savePhaJurisdictionAction, getPhaJurisdictionAction } from '@/actions/pha-config-actions';
 import type { PhaJurisdictionConfig } from '@/types';
 
+const initialConfigState: PhaJurisdictionConfig = {
+  state: '',
+  phaName: '',
+  logoUrl: '',
+  lastUpdated: '',
+  stateRegulationsUrl: '',
+  requiredReportingFieldsInfo: '',
+  phaContactName: '',
+  phaContactEmail: '',
+  phaContactPhone: '',
+  reportableConditionsUrl: '',
+  dataStandardsInfo: '',
+  autoPopulateCounties: false,
+  autoPopulateHealthSystems: false,
+  stateSealUrl: '',
+  legalDisclaimers: '',
+  customWelcomeMessage: '',
+  emailSignature: '',
+  immunizationRegistryUrl: '',
+  hieConnectionInfo: '',
+};
+
 export default function ConfigureJurisdictionPage() {
-  const [selectedState, setSelectedState] = useState<string>('');
-  const [initialState, setInitialState] = useState<string>('');
-  const [phaName, setPhaName] = useState('');
-  const [initialPhaName, setInitialPhaName] = useState('');
-  const [autoPopulateSystems, setAutoPopulateSystems] = useState(false);
-  const [initialAutoPopulateSystems, setInitialAutoPopulateSystems] = useState(false);
-  // emailSignature state not needed as it's a future feature and disabled
+  const [config, setConfig] = useState<PhaJurisdictionConfig>(initialConfigState);
+  const [initialConfig, setInitialConfig] = useState<PhaJurisdictionConfig>(initialConfigState);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -34,13 +51,10 @@ export default function ConfigureJurisdictionPage() {
       setIsLoading(true);
       const result = await getPhaJurisdictionAction();
       if (result.success && result.data) {
-        setSelectedState(result.data.state || '');
-        setInitialState(result.data.state || '');
-        setPhaName(result.data.phaName || '');
-        setInitialPhaName(result.data.phaName || '');
-        // Assuming autoPopulateSystems and emailSignature might be part of config in future
-        // setAutoPopulateSystems(result.data.autoPopulateSystems || false); 
-        // setInitialAutoPopulateSystems(result.data.autoPopulateSystems || false);
+        // Ensure all fields from initialConfigState are present, even if undefined in result.data
+        const loadedConfig = { ...initialConfigState, ...result.data };
+        setConfig(loadedConfig);
+        setInitialConfig(loadedConfig);
       } else if (result.error) {
         toast({
           title: 'Error Loading Configuration',
@@ -53,8 +67,22 @@ export default function ConfigureJurisdictionPage() {
     fetchJurisdiction();
   }, [toast]);
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setConfig(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleCheckboxChange = (name: keyof PhaJurisdictionConfig, checked: boolean | "indeterminate") => {
+    setConfig(prev => ({ ...prev, [name]: !!checked }));
+  };
+  
+  const handleSelectChange = (name: keyof PhaJurisdictionConfig, value: string) => {
+    setConfig(prev => ({ ...prev, [name]: value }));
+  };
+
+
   const handleSaveConfiguration = async () => {
-    if (!selectedState) {
+    if (!config.state) {
       toast({
         title: 'No State Selected',
         description: 'Please select a state for your PHA jurisdiction.',
@@ -63,15 +91,14 @@ export default function ConfigureJurisdictionPage() {
       return;
     }
     setIsSaving(true);
-    // Currently, savePhaJurisdictionAction only saves the state.
-    // To save other fields, the action and PhaJurisdictionConfig type would need to be updated.
-    const result = await savePhaJurisdictionAction(selectedState); 
+    const { lastUpdated, ...configToSave } = config; // Exclude lastUpdated from save payload
+    const result = await savePhaJurisdictionAction(configToSave);
     setIsSaving(false);
 
     if (result.success) {
-      setInitialState(selectedState);
-      setInitialPhaName(phaName);
-      setInitialAutoPopulateSystems(autoPopulateSystems);
+      const newSavedConfig = { ...config, lastUpdated: new Date().toISOString() };
+      setConfig(newSavedConfig);
+      setInitialConfig(newSavedConfig);
       toast({
         title: 'Configuration Saved',
         description: `PHA jurisdiction configuration has been updated.`,
@@ -85,7 +112,7 @@ export default function ConfigureJurisdictionPage() {
     }
   };
   
-  const hasChanges = selectedState !== initialState || phaName !== initialPhaName || autoPopulateSystems !== initialAutoPopulateSystems;
+  const hasChanges = JSON.stringify(config) !== JSON.stringify(initialConfig);
 
 
   return (
@@ -119,7 +146,7 @@ export default function ConfigureJurisdictionPage() {
           ) : (
             <div>
               <Label htmlFor="stateSelect">Select State *</Label>
-              <Select value={selectedState} onValueChange={setSelectedState} disabled={isSaving}>
+              <Select value={config.state} onValueChange={(value) => handleSelectChange('state', value)} disabled={isSaving}>
                 <SelectTrigger id="stateSelect" className="w-full md:w-[300px]">
                   <SelectValue placeholder="Select your state..." />
                 </SelectTrigger>
@@ -138,61 +165,114 @@ export default function ConfigureJurisdictionPage() {
         <CardHeader className="pt-2 border-t mt-4">
           <CardTitle className="text-xl font-semibold">Jurisdiction Specific Settings</CardTitle>
           <CardDescription>
-            Configure branding, data auto-population, and communication settings for your jurisdiction.
-            These settings are illustrative for now and may not be fully functional.
+            Configure various settings tailored to your jurisdiction.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Branding */}
           <div className="space-y-3 p-4 border rounded-md bg-muted/30 shadow-sm">
             <h3 className="font-medium text-md flex items-center"><Palette className="mr-2 h-5 w-5 text-primary" />Branding</h3>
             <div>
-              <Label htmlFor="phaName">PHA Name (Optional)</Label>
-              <Input 
-                id="phaName" 
-                value={phaName} 
-                onChange={(e) => setPhaName(e.target.value)} 
-                placeholder="e.g., Ohio Department of Health" 
-                disabled={isSaving || isLoading} 
-              />
-              <p className="text-xs text-muted-foreground mt-1">This name may be used in communications and reports (feature to be implemented).</p>
+              <Label htmlFor="phaName">PHA Name</Label>
+              <Input id="phaName" name="phaName" value={config.phaName || ''} onChange={handleInputChange} placeholder="e.g., Ohio Department of Health" disabled={isSaving || isLoading} />
             </div>
             <div>
-              <Label htmlFor="phaLogo">PHA Logo (Future)</Label>
-              <Input id="phaLogo" type="file" disabled className="cursor-not-allowed opacity-50" />
-              <p className="text-xs text-muted-foreground mt-1">Upload your PHA's logo for application branding (feature to be implemented).</p>
+              <Label htmlFor="logoUrl">PHA Logo URL</Label>
+              <Input id="logoUrl" name="logoUrl" value={config.logoUrl || ''} onChange={handleInputChange} placeholder="https://example.com/logo.png" disabled={isSaving || isLoading} />
+            </div>
+             <div>
+              <Label htmlFor="stateSealUrl">State Seal URL</Label>
+              <Input id="stateSealUrl" name="stateSealUrl" value={config.stateSealUrl || ''} onChange={handleInputChange} placeholder="https://example.com/state_seal.png" disabled={isSaving || isLoading} />
             </div>
           </div>
 
+          {/* PHA Contact Information */}
           <div className="space-y-3 p-4 border rounded-md bg-muted/30 shadow-sm">
-            <h3 className="font-medium text-md flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary" />Data Auto-Population</h3>
+            <h3 className="font-medium text-md flex items-center"><Users className="mr-2 h-5 w-5 text-primary" />PHA Contact Information</h3>
+            <div>
+              <Label htmlFor="phaContactName">PHA Contact Name</Label>
+              <Input id="phaContactName" name="phaContactName" value={config.phaContactName || ''} onChange={handleInputChange} placeholder="e.g., Jane Doe, Reporting Lead" disabled={isSaving || isLoading} />
+            </div>
+            <div>
+              <Label htmlFor="phaContactEmail">PHA Contact Email</Label>
+              <Input id="phaContactEmail" name="phaContactEmail" type="email" value={config.phaContactEmail || ''} onChange={handleInputChange} placeholder="contact@pha.state.gov" disabled={isSaving || isLoading} />
+            </div>
+            <div>
+              <Label htmlFor="phaContactPhone">PHA Contact Phone</Label>
+              <Input id="phaContactPhone" name="phaContactPhone" type="tel" value={config.phaContactPhone || ''} onChange={handleInputChange} placeholder="(XXX) XXX-XXXX" disabled={isSaving || isLoading} />
+            </div>
+          </div>
+
+          {/* Data Auto-Population & Program Specifics */}
+          <div className="space-y-3 p-4 border rounded-md bg-muted/30 shadow-sm">
+            <h3 className="font-medium text-md flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary" />Data & Program Settings</h3>
             <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="autoPopulateHealthSystems" 
-                checked={autoPopulateSystems} 
-                onCheckedChange={(checked) => setAutoPopulateSystems(!!checked)} 
-                disabled={isSaving || isLoading} 
-              />
-              <Label htmlFor="autoPopulateHealthSystems" className="font-normal">Auto-populate Health Systems List</Label>
+              <Checkbox id="autoPopulateHealthSystems" checked={!!config.autoPopulateHealthSystems} onCheckedChange={(checked) => handleCheckboxChange('autoPopulateHealthSystems', checked)} disabled={isSaving || isLoading} />
+              <Label htmlFor="autoPopulateHealthSystems" className="font-normal">Auto-populate Health Systems List for {config.state || "selected state"}</Label>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              If enabled, the "Health Systems (Parent)" list will attempt to show systems relevant to your selected state. (Currently defaults to Ohio systems, dynamic population to be implemented).
-            </p>
+             <div className="flex items-center space-x-2">
+              <Checkbox id="autoPopulateCounties" checked={!!config.autoPopulateCounties} onCheckedChange={(checked) => handleCheckboxChange('autoPopulateCounties', checked)} disabled={isSaving || isLoading} />
+              <Label htmlFor="autoPopulateCounties" className="font-normal">Auto-populate County Lists for {config.state || "selected state"}</Label>
+            </div>
+            <div>
+              <Label htmlFor="reportableConditionsUrl">Reportable Conditions URL</Label>
+              <Input id="reportableConditionsUrl" name="reportableConditionsUrl" value={config.reportableConditionsUrl || ''} onChange={handleInputChange} placeholder="https://pha.state.gov/reportable-conditions" disabled={isSaving || isLoading} />
+            </div>
+            <div>
+              <Label htmlFor="dataStandardsInfo">Data Standards Information</Label>
+              <Textarea id="dataStandardsInfo" name="dataStandardsInfo" value={config.dataStandardsInfo || ''} onChange={handleInputChange} rows={3} placeholder="e.g., Required FHIR Profile: US Core R4..." disabled={isSaving || isLoading} />
+            </div>
+          </div>
+          
+          {/* Regulatory Information */}
+          <div className="space-y-3 p-4 border rounded-md bg-muted/30 shadow-sm">
+            <h3 className="font-medium text-md flex items-center"><BookOpen className="mr-2 h-5 w-5 text-primary" />Regulatory Information</h3>
+            <div>
+              <Label htmlFor="stateRegulationsUrl">State Regulations URL</Label>
+              <Input id="stateRegulationsUrl" name="stateRegulationsUrl" value={config.stateRegulationsUrl || ''} onChange={handleInputChange} placeholder="https://pha.state.gov/regulations" disabled={isSaving || isLoading} />
+            </div>
+            <div>
+              <Label htmlFor="requiredReportingFieldsInfo">Required Reporting Fields Information</Label>
+              <Textarea id="requiredReportingFieldsInfo" name="requiredReportingFieldsInfo" value={config.requiredReportingFieldsInfo || ''} onChange={handleInputChange} rows={3} placeholder="List or describe state-mandated reporting fields..." disabled={isSaving || isLoading} />
+            </div>
+            <div>
+              <Label htmlFor="legalDisclaimers">Legal Disclaimers</Label>
+              <Textarea id="legalDisclaimers" name="legalDisclaimers" value={config.legalDisclaimers || ''} onChange={handleInputChange} rows={3} placeholder="State-specific legal disclaimers..." disabled={isSaving || isLoading} />
+            </div>
           </div>
 
+          {/* Communication Settings */}
           <div className="space-y-3 p-4 border rounded-md bg-muted/30 shadow-sm">
-            <h3 className="font-medium text-md flex items-center"><FileSignature className="mr-2 h-5 w-5 text-primary" />Communication Settings</h3>
+            <h3 className="font-medium text-md flex items-center"><MessageSquare className="mr-2 h-5 w-5 text-primary" />Communication Settings</h3>
             <div>
-              <Label htmlFor="emailSignature">Email Messaging Signature Block (Future)</Label>
-              <Textarea id="emailSignature" placeholder="e.g., Sincerely,&#10;The [Your PHA Name] Team" rows={3} disabled className="cursor-not-allowed opacity-50" />
-              <p className="text-xs text-muted-foreground mt-1">This signature will be appended to automated emails sent from the system (feature to be implemented).</p>
+              <Label htmlFor="customWelcomeMessage">Custom Welcome Message Snippet</Label>
+              <Textarea id="customWelcomeMessage" name="customWelcomeMessage" value={config.customWelcomeMessage || ''} onChange={handleInputChange} rows={3} placeholder="Welcome to the [State Name] eCR Onboarding Portal..." disabled={isSaving || isLoading} />
+            </div>
+            <div>
+              <Label htmlFor="emailSignature">Email Messaging Signature Block</Label>
+              <Textarea id="emailSignature" name="emailSignature" value={config.emailSignature || ''} onChange={handleInputChange} placeholder="e.g., Sincerely,&#10;The [Your PHA Name] Team" rows={3} disabled={isSaving || isLoading} />
             </div>
           </div>
+
+          {/* Third-Party Integrations */}
+           <div className="space-y-3 p-4 border rounded-md bg-muted/30 shadow-sm">
+            <h3 className="font-medium text-md flex items-center"><Workflow className="mr-2 h-5 w-5 text-primary" />Third-Party Integrations</h3>
+            <div>
+              <Label htmlFor="immunizationRegistryUrl">Immunization Registry URL/Info</Label>
+              <Input id="immunizationRegistryUrl" name="immunizationRegistryUrl" value={config.immunizationRegistryUrl || ''} onChange={handleInputChange} placeholder="e.g., https://state.iis.gov or connection details" disabled={isSaving || isLoading} />
+            </div>
+            <div>
+              <Label htmlFor="hieConnectionInfo">State HIE Connection Information</Label>
+              <Textarea id="hieConnectionInfo" name="hieConnectionInfo" value={config.hieConnectionInfo || ''} onChange={handleInputChange} rows={3} placeholder="Details about connecting to the state HIE..." disabled={isSaving || isLoading} />
+            </div>
+          </div>
+
         </CardContent>
 
         <CardFooter>
           <Button 
             onClick={handleSaveConfiguration} 
-            disabled={isSaving || isLoading || !hasChanges || !selectedState}
+            disabled={isSaving || isLoading || !hasChanges || !config.state}
             className="bg-accent text-accent-foreground hover:bg-accent/90"
           >
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
@@ -203,3 +283,4 @@ export default function ConfigureJurisdictionPage() {
     </div>
   );
 }
+

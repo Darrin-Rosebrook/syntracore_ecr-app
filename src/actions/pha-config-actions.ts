@@ -7,20 +7,19 @@ import type { PhaJurisdictionConfig } from '@/types';
 
 const JURISDICTION_CONFIG_DOC_ID = 'mainJurisdictionConfig';
 
-export async function savePhaJurisdictionAction(stateAbbreviation: string): Promise<{ success: boolean; error?: string }> {
-  console.log(`Attempting to save PHA jurisdiction state: ${stateAbbreviation}`);
+export async function savePhaJurisdictionAction(config: Omit<PhaJurisdictionConfig, 'lastUpdated'>): Promise<{ success: boolean; error?: string }> {
+  console.log(`Attempting to save PHA jurisdiction configuration:`, config);
   try {
     const configRef = doc(db, 'phaConfiguration', JURISDICTION_CONFIG_DOC_ID);
     const newConfig: PhaJurisdictionConfig = {
-      state: stateAbbreviation,
-      // Potentially add other branding/config fields here later
+      ...config,
       lastUpdated: new Date().toISOString(),
     };
-    await setDoc(configRef, newConfig, { merge: true }); // Use merge to update existing or create new
-    console.log(`PHA jurisdiction state saved successfully to ${stateAbbreviation}.`);
+    await setDoc(configRef, newConfig, { merge: true }); 
+    console.log(`PHA jurisdiction configuration saved successfully.`);
     return { success: true };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'An unknown error occurred while saving PHA jurisdiction.';
+    const message = error instanceof Error ? error.message : 'An unknown error occurred while saving PHA jurisdiction configuration.';
     console.error("Error in savePhaJurisdictionAction:", message, error);
     return { success: false, error: message };
   }
@@ -38,7 +37,29 @@ export async function getPhaJurisdictionAction(): Promise<{ success: boolean; da
       return { success: true, data: configData };
     } else {
       console.log("No PHA jurisdiction configuration found.");
-      return { success: true, data: undefined }; // No config set yet is not an error
+      // Return a default structure if no config is found, ensuring all keys are present
+      const defaultConfig: PhaJurisdictionConfig = {
+        state: '',
+        lastUpdated: new Date().toISOString(),
+        phaName: '',
+        logoUrl: '',
+        stateRegulationsUrl: '',
+        requiredReportingFieldsInfo: '',
+        phaContactName: '',
+        phaContactEmail: '',
+        phaContactPhone: '',
+        reportableConditionsUrl: '',
+        dataStandardsInfo: '',
+        autoPopulateCounties: false,
+        autoPopulateHealthSystems: false,
+        stateSealUrl: '',
+        legalDisclaimers: '',
+        customWelcomeMessage: '',
+        emailSignature: '',
+        immunizationRegistryUrl: '',
+        hieConnectionInfo: '',
+      };
+      return { success: true, data: defaultConfig };
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred while fetching PHA jurisdiction.';
@@ -46,3 +67,4 @@ export async function getPhaJurisdictionAction(): Promise<{ success: boolean; da
     return { success: false, error: message };
   }
 }
+
