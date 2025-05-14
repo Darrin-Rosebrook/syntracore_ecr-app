@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -149,9 +150,9 @@ export default function ConfigureEnrollmentPage() {
           Configure Enrollment Form Fields
         </h1>
         <Button variant="outline" asChild>
-          <Link href="/">
+          <Link href="/admin">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Dashboard
+            Back to Admin Console
           </Link>
         </Button>
       </div>
