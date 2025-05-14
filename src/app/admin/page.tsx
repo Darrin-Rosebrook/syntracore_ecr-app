@@ -5,7 +5,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings, Users, ListChecks, Globe, Mail } from 'lucide-react'; // Changed MailCog to Mail
+import { Settings, Users, ListChecks, Globe, Mail } from 'lucide-react'; 
 
 const AdminConsolePage: React.FC = () => {
   return (
@@ -26,13 +26,13 @@ const AdminConsolePage: React.FC = () => {
                   <CardHeader className="flex flex-row items-center space-x-3 pb-2 pt-4">
                     <ListChecks className="h-8 w-8 text-accent" />
                     <div>
-                      <CardTitle className="text-lg">Configure Enrollment Form</CardTitle>
+                      <CardTitle className="text-lg">Configure HCO Registration Form</CardTitle>
                       <CardDescription className="text-sm mt-1">
-                        Add, remove, or reorder custom fields on the provider enrollment form.
+                        Add, remove, or reorder custom fields on the HCO registration form.
                       </CardDescription>
                     </div>
                   </CardHeader>
-                  <CardContent></CardContent> {/* Empty content for consistent card height styling */}
+                  <CardContent></CardContent> 
                 </Card>
               </a>
             </Link>
@@ -48,7 +48,7 @@ const AdminConsolePage: React.FC = () => {
                       </CardDescription>
                     </div>
                   </CardHeader>
-                  <CardContent></CardContent> {/* Empty content for consistent card height styling */}
+                  <CardContent></CardContent> 
                 </Card>
               </a>
             </Link>
@@ -64,7 +64,7 @@ const AdminConsolePage: React.FC = () => {
                       </CardDescription>
                     </div>
                   </CardHeader>
-                  <CardContent></CardContent> {/* Empty content for consistent card height styling */}
+                  <CardContent></CardContent> 
                 </Card>
               </a>
             </Link>
@@ -72,7 +72,7 @@ const AdminConsolePage: React.FC = () => {
               <a className="block">
                 <Card className="hover:shadow-lg transition-shadow h-full cursor-pointer">
                   <CardHeader className="flex flex-row items-center space-x-3 pb-2 pt-4">
-                    <Mail className="h-8 w-8 text-accent" /> {/* Changed MailCog to Mail */}
+                    <Mail className="h-8 w-8 text-accent" /> 
                     <div>
                       <CardTitle className="text-lg">Configure Email Messages</CardTitle>
                       <CardDescription className="text-sm mt-1">
@@ -80,7 +80,7 @@ const AdminConsolePage: React.FC = () => {
                       </CardDescription>
                     </div>
                   </CardHeader>
-                  <CardContent></CardContent> {/* Empty content for consistent card height styling */}
+                  <CardContent></CardContent> 
                 </Card>
               </a>
             </Link>

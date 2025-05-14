@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -21,7 +22,7 @@ import { validateFHIR } from "@/services/fhir-validator";
 import { fetchNpiDataAction } from '@/actions/workflow-actions';
 import { summarizeValidationResults } from "@/ai/flows/summarize-validation-results";
 import { FHIRValidationDisplay } from "./fhir-validation-display";
-import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays, Hash, Search as SearchIcon, ArrowRight } from "lucide-react";
+import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays, Hash, Search as SearchIcon, ArrowRight, FilePenLine } from "lucide-react"; // Added FilePenLine
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isValid } from 'date-fns';
@@ -32,7 +33,7 @@ const practiceInfoSchema = z.object({
     .string()
     .length(10, "Organization NPI must be 10 digits")
     .regex(/^[0-9]{10}$/, "Organization NPI must be a 10-digit number"),
-  name: z.string().min(1, "Practice name is required"),
+  name: z.string().min(1, "HCO name is required"),
   address: z.string().min(1, "Address is required"),
   phone: z
     .string()
@@ -174,13 +175,9 @@ export function ProviderEnrollmentForm({
       let parsedContent: any;
 
       try {
-        // Attempt to parse as JSON first for FHIR resources commonly in JSON
         parsedContent = JSON.parse(fileContent);
       } catch (jsonError) {
-        // If JSON.parse fails, it might be XML or other non-JSON text format
-        // For this simulation, we'll pass the raw content if it's not JSON.
-        // A more robust solution would detect XML and parse accordingly or use a library that handles both.
-        console.warn("File is not valid JSON. Will attempt validation with raw content.", jsonError);
+        console.warn("File is not valid JSON. Will attempt validation with raw content for XML or other formats.", jsonError);
         parsedContent = fileContent; 
       }
 
@@ -269,21 +266,13 @@ export function ProviderEnrollmentForm({
   const handleClearNpiData = () => {
     setFetchedNpiData(null);
     setNpiLookupError(null);
-    // Reset form fields that might have been populated by NPI lookup
-    // form.setValue('practiceInfo.name', '');
-    // form.setValue('practiceInfo.address', '');
-    // form.setValue('practiceInfo.phone', '');
     toast({ title: 'NPI Data Cleared', description: 'Lookup information has been cleared.' });
   };
 
 
   const onContinue = async (data: FormSchemaType) => {
-    console.log("onContinue function called"); 
     setIsProcessingContinue(true);
-    console.log("Form data for continuation:", JSON.stringify(data, null, 2));
-    console.log("CCD file selected:", ccdFile ? ccdFile.name : "No file");
-    console.log("Validation result:", JSON.stringify(validationResult, null, 2));
-
+    
     if (!ccdFile) {
       toast({
         title: "Missing Document",
@@ -291,7 +280,6 @@ export function ProviderEnrollmentForm({
         variant: "destructive",
       });
       setIsProcessingContinue(false);
-      console.log("onContinue aborted: Missing CCD file."); 
       return;
     }
 
@@ -302,11 +290,9 @@ export function ProviderEnrollmentForm({
         variant: "destructive",
       });
       setIsProcessingContinue(false);
-      console.log("onContinue aborted: Missing or invalid validation result."); 
       return;
     }
     
-    // Form is valid and file checks passed, store data and navigate
     try {
       const enrollmentDataToStore: EnrollmentFormData = {
         ...data,
@@ -318,7 +304,6 @@ export function ProviderEnrollmentForm({
       localStorage.setItem(PENDING_CCD_FILE_CONTENT_KEY, ccdFileContent || '');
       localStorage.setItem(PENDING_VALIDATION_RESULT_KEY, JSON.stringify(validationResult));
       
-      console.log("Enrollment data stored in localStorage. Navigating to /signup.");
       router.push('/signup');
 
     } catch (error) {
@@ -340,20 +325,20 @@ export function ProviderEnrollmentForm({
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
       <CardHeader>
         <div className="flex items-center space-x-2">
-          <ClipboardList className="h-7 w-7 text-primary" />
-          <CardTitle className="text-2xl font-semibold">Provider Self-Enrollment</CardTitle>
+          <FilePenLine className="h-7 w-7 text-primary" />
+          <CardTitle className="text-2xl font-semibold">HCO Registration</CardTitle>
         </div>
         <CardDescription className="text-foreground/80">
-          Complete the form below to enroll your practice.
+          Complete the form below to register your Health Care Organization.
         </CardDescription>
       </CardHeader>
       <form onSubmit={form.handleSubmit(onContinue)}>
         <CardContent className="space-y-8">
-          {/* Practice Info */}
+          {/* HCO Info */}
           <fieldset className="space-y-4 p-4 border rounded-md">
             <legend className="text-lg font-medium px-1 flex items-center">
               <Building className="mr-2 h-5 w-5 text-primary" />
-              Practice Information
+              Health Care Organization (HCO) Information
             </legend>
 
             <div>
@@ -413,8 +398,8 @@ export function ProviderEnrollmentForm({
             )}
 
             <div>
-              <Label htmlFor="practiceName">Practice Name</Label>
-              <Input id="practiceName" {...form.register("practiceInfo.name")} placeholder="Official practice name" className={form.formState.errors.practiceInfo?.name ? "border-destructive" : ""} disabled={isProcessingContinue} />
+              <Label htmlFor="practiceName">HCO Name</Label>
+              <Input id="practiceName" {...form.register("practiceInfo.name")} placeholder="Official HCO name" className={form.formState.errors.practiceInfo?.name ? "border-destructive" : ""} disabled={isProcessingContinue} />
               {form.formState.errors.practiceInfo?.name && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.name.message}</p>}
             </div>
             <div>
@@ -423,7 +408,7 @@ export function ProviderEnrollmentForm({
               {form.formState.errors.practiceInfo?.address && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.address.message}</p>}
             </div>
             <div>
-              <Label htmlFor="practicePhone">Practice Phone</Label>
+              <Label htmlFor="practicePhone">HCO Phone</Label>
               <Input id="practicePhone" type="tel" {...form.register("practiceInfo.phone")} placeholder="(XXX) XXX-XXXX" className={form.formState.errors.practiceInfo?.phone ? "border-destructive" : ""} disabled={isProcessingContinue}/>
               {form.formState.errors.practiceInfo?.phone && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.phone.message}</p>}
             </div>
@@ -433,7 +418,7 @@ export function ProviderEnrollmentForm({
           <fieldset className="space-y-4 p-4 border rounded-md">
             <legend className="text-lg font-medium px-1 flex items-center">
               <User className="mr-2 h-5 w-5 text-primary" />
-              Contact Details
+              Primary Contact Details
             </legend>
             <div>
               <Label htmlFor="contactName">Contact Full Name</Label>
@@ -456,7 +441,7 @@ export function ProviderEnrollmentForm({
           <fieldset className="space-y-4 p-4 border rounded-md">
             <legend className="text-lg font-medium px-1 flex items-center">
               <Settings2 className="mr-2 h-5 w-5 text-primary" />
-              EHR Vendor
+              EHR/LIMS Vendor
             </legend>
             <Controller
               name="ehrVendor"
@@ -465,12 +450,12 @@ export function ProviderEnrollmentForm({
                 <>
                   <Select value={field.value} onValueChange={field.onChange} disabled={isProcessingContinue}>
                     <SelectTrigger className={fieldState.error ? "border-destructive" : ""}>
-                      <SelectValue placeholder="Select EHR Vendor" />
+                      <SelectValue placeholder="Select EHR/LIMS Vendor" />
                     </SelectTrigger>
                     <SelectContent>
                       {EHR_VENDORS.map((vendor) => (
                         <SelectItem key={vendor.value} value={vendor.value}>
-                          {vendor.label}
+                          {vendor.label} ({vendor.type})
                         </SelectItem>
                       ))}
                     </SelectContent>

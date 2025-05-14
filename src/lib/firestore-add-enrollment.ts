@@ -1,3 +1,4 @@
+
 // src/lib/firestore-add-enrollment.ts
 'use server';
 
@@ -19,7 +20,7 @@ export async function addEnrollmentToFirestore(
     const submissionDate = new Date();
     const logEntry: ActivityLogEntry = {
       timestamp: submissionDate.toISOString(),
-      entry: "Enrollment application submitted.",
+      entry: "HCO Registration application submitted.", // Changed entry text
       type: "System",
     };
 
@@ -35,7 +36,7 @@ export async function addEnrollmentToFirestore(
       additionalData: formData.additionalData || {},
       ccdDocumentName: formData.ccdDocumentName,
       ccdDocumentContent: ccdDocumentContent, 
-      additionalContacts: formData.additionalContacts || [], // Save additional contacts
+      additionalContacts: formData.additionalContacts || [], 
     };
 
     console.log("Data prepared for Firestore:", JSON.stringify(dataToSave, (key, value) => {

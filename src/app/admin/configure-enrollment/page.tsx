@@ -57,7 +57,7 @@ export default function ConfigureEnrollmentPage() {
     }));
   };
 
-  const handleCheckboxChange = (checked: boolean | "indeterminate") => { // Updated for shadcn Checkbox
+  const handleCheckboxChange = (checked: boolean | "indeterminate") => { 
     setNewField(prev => ({ ...prev, required: !!checked }));
   };
 
@@ -147,7 +147,7 @@ export default function ConfigureEnrollmentPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold flex items-center">
           <ListChecks className="mr-3 h-8 w-8 text-primary"/>
-          Configure Enrollment Form Fields
+          Configure HCO Registration Form Fields
         </h1>
         <Button variant="outline" asChild>
           <Link href="/admin">
@@ -163,7 +163,7 @@ export default function ConfigureEnrollmentPage() {
             <PlusCircle className="mr-2 h-6 w-6 text-primary" />
             Add New Custom Field
           </CardTitle>
-          <CardDescription>Define additional fields for the Provider Enrollment form.</CardDescription>
+          <CardDescription>Define additional fields for the HCO Registration form.</CardDescription>
         </CardHeader>
         <form onSubmit={handleAddCfdField}>
           <CardContent className="space-y-6">
@@ -278,7 +278,7 @@ export default function ConfigureEnrollmentPage() {
             <ListChecks className="mr-2 h-6 w-6 text-primary" />
             Current Custom Fields
           </CardTitle>
-          <CardDescription>List of currently active custom fields in the enrollment form. Sorted by Order.</CardDescription>
+          <CardDescription>List of currently active custom fields in the HCO Registration form. Sorted by Order.</CardDescription>
         </CardHeader>
         <CardContent>
           {customFieldDefinitions.length === 0 && !isLoadingContext ? (
