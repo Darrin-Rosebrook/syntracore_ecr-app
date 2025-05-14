@@ -1,3 +1,4 @@
+
 import type { FHIRValidationResult as ExternalFHIRValidationResult } from '@/services/fhir-validator';
 
 export interface PracticeInfo {
@@ -104,4 +105,12 @@ export interface PhaUser {
   program: PhaProgram;
   role: PhaRole;
   status: PhaUserStatus; // New status field
+}
+
+// Type for PHA Jurisdiction Configuration
+export interface PhaJurisdictionConfig {
+  state: string; // e.g., 'OH', 'CA'
+  phaName?: string; // Optional: Official name of the PHA
+  logoUrl?: string; // Optional: URL for custom logo
+  lastUpdated: string; // ISO string
 }
