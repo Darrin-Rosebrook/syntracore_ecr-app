@@ -5,7 +5,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings, Users, ListChecks, Globe } from 'lucide-react'; // Added Globe icon
+import { Settings, Users, ListChecks, Globe, MailCog } from 'lucide-react'; // Added MailCog icon
 
 const AdminConsolePage: React.FC = () => {
   return (
@@ -68,6 +68,22 @@ const AdminConsolePage: React.FC = () => {
                 </Card>
               </a>
             </Link>
+            <Link href="/admin/configure-email-messages" passHref legacyBehavior>
+              <a className="block">
+                <Card className="hover:shadow-lg transition-shadow h-full cursor-pointer">
+                  <CardHeader className="flex flex-row items-center space-x-3 pb-2 pt-4">
+                    <MailCog className="h-8 w-8 text-accent" />
+                    <div>
+                      <CardTitle className="text-lg">Configure Email Messages</CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Manage automated email templates for various system events.
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent></CardContent> {/* Empty content for consistent card height styling */}
+                </Card>
+              </a>
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -76,4 +92,3 @@ const AdminConsolePage: React.FC = () => {
 };
 
 export default AdminConsolePage;
-

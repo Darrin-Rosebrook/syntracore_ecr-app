@@ -142,3 +142,41 @@ export interface PhaJurisdictionConfig {
   hieConnectionInfo?: string;
 }
 
+// Types for Email Template Configuration
+export type EmailEventTrigger = 
+  | 'provider_enrollment_submission'
+  | 'new_user_account_invite'
+  | 'enrollment_status_approved'
+  | 'enrollment_status_changes_requested'
+  | 'enrollment_status_denied'
+  | 'password_reset_request'; // Example triggers
+
+export const EMAIL_EVENT_TRIGGERS: { value: EmailEventTrigger; label: string }[] = [
+  { value: 'provider_enrollment_submission', label: 'Provider Enrollment Submitted' },
+  { value: 'new_user_account_invite', label: 'New PHA User Account Invite' },
+  { value: 'enrollment_status_approved', label: 'Enrollment Approved' },
+  { value: 'enrollment_status_changes_requested', label: 'Enrollment Changes Requested' },
+  { value: 'enrollment_status_denied', label: 'Enrollment Denied' },
+  { value: 'password_reset_request', label: 'User Password Reset Requested' },
+];
+
+
+export interface EmailAttachmentInfo {
+  id: string; // Unique ID for the attachment reference
+  fileName: string;
+  description?: string;
+  // In a real scenario, this might include a URL or storage path
+  // For now, it's just informational.
+}
+
+export interface EmailTemplate {
+  id: string; // Firestore document ID
+  name: string; // User-friendly name for the template, e.g., "Welcome Email for New Providers"
+  eventTrigger: EmailEventTrigger;
+  subject: string;
+  htmlBody: string; // HTML content of the email
+  attachments?: EmailAttachmentInfo[]; // List of attachment info
+  placeholders?: string[]; // List of available placeholders for this template type, e.g. ['{{hcoName}}', '{{contactName}}']
+  lastUpdated: string; // ISO string
+  createdAt: string; // ISO string
+}
