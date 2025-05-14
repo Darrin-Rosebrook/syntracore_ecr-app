@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useForm, Controller, SubmitHandler, useFieldArray } from 'react-hook-form';
+import React, { useState, useEffect, useRef } from 'react';
+import { useForm, Controller, SubmitHandler, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import type { EmailTemplate, EmailEventTrigger, EmailAttachmentInfo } from '@/types';
 import { EMAIL_EVENT_TRIGGERS } from '@/types'; // Import the constant
-import { PlusCircle, Trash2, Loader2, Info, Paperclip, Mail } from 'lucide-react'; // Changed MailCog to Mail
+import { PlusCircle, Trash2, Loader2, Info, Paperclip, Mail } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 
@@ -29,8 +29,6 @@ const emailTemplateFormSchema = z.object({
     fileName: z.string().min(1, 'File name is required.'),
     description: z.string().optional(),
   })).optional(),
-  // Placeholders are typically derived from the eventTrigger, not directly editable in this form,
-  // but shown for informational purposes.
 });
 
 type EmailTemplateFormData = z.infer<typeof emailTemplateFormSchema>;
@@ -50,7 +48,7 @@ const ALL_AVAILABLE_PLACEHOLDERS = [
 
 export function EmailTemplateForm({ template, onSave, onCancel, isSaving }: EmailTemplateFormProps) {
   const { toast } = useToast();
-  const { control, handleSubmit, reset, watch, formState: { errors } } = useForm<EmailTemplateFormData>({
+  const { control, handleSubmit, reset, watch, setValue, getValues, formState: { errors } } = useForm<EmailTemplateFormData>({
     resolver: zodResolver(emailTemplateFormSchema),
     defaultValues: template ? {
       name: template.name,
@@ -67,6 +65,8 @@ export function EmailTemplateForm({ template, onSave, onCancel, isSaving }: Emai
     },
   });
 
+  const htmlBodyRef = useRef<HTMLTextAreaElement | null>(null);
+
   const { fields, append, remove } = useFieldArray({
     control,
     name: "attachments",
@@ -76,19 +76,19 @@ export function EmailTemplateForm({ template, onSave, onCancel, isSaving }: Emai
   const [currentPlaceholders, setCurrentPlaceholders] = useState<string[]>([]);
 
   useEffect(() => {
-    // Simulate deriving placeholders based on event trigger
-    // In a real app, this mapping would be more robust.
     if (watchedEventTrigger) {
       switch (watchedEventTrigger) {
         case 'provider_enrollment_submission':
         case 'enrollment_status_approved':
         case 'enrollment_status_changes_requested':
         case 'enrollment_status_denied':
-          setCurrentPlaceholders(['{{hcoName}}', '{{contactName}}', '{{submissionDate}}', '{{phaName}}']);
+          setCurrentPlaceholders(['{{hcoName}}', '{{contactName}}', '{{contactEmail}}', '{{submissionDate}}', '{{phaName}}', '{{phaContactEmail}}']);
           break;
         case 'new_user_account_invite':
+          setCurrentPlaceholders(['{{userName}}', '{{userEmail}}', '{{resetLink}}', '{{phaName}}', '{{phaContactEmail}}']); // Assuming PHA details might be in invite
+          break;
         case 'password_reset_request':
-          setCurrentPlaceholders(['{{userName}}', '{{userEmail}}', '{{resetLink}}', '{{phaName}}']);
+          setCurrentPlaceholders(['{{userName}}', '{{userEmail}}', '{{resetLink}}']);
           break;
         default:
           setCurrentPlaceholders(ALL_AVAILABLE_PLACEHOLDERS);
@@ -97,6 +97,32 @@ export function EmailTemplateForm({ template, onSave, onCancel, isSaving }: Emai
       setCurrentPlaceholders(ALL_AVAILABLE_PLACEHOLDERS);
     }
   }, [watchedEventTrigger]);
+
+  const handlePlaceholderClick = (placeholder: string) => {
+    if (htmlBodyRef.current) {
+      const textarea = htmlBodyRef.current;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const currentValue = getValues("htmlBody") || ""; 
+      
+      const newValue =
+        currentValue.substring(0, start) +
+        placeholder +
+        currentValue.substring(end);
+      
+      setValue("htmlBody", newValue, { shouldValidate: true, shouldDirty: true });
+
+      // Attempt to set cursor position after insertion
+      // This needs to run after React re-renders the textarea with the new value
+      setTimeout(() => {
+        if (htmlBodyRef.current) {
+          const newCursorPosition = start + placeholder.length;
+          htmlBodyRef.current.focus();
+          htmlBodyRef.current.setSelectionRange(newCursorPosition, newCursorPosition);
+        }
+      }, 0);
+    }
+  };
 
   const onSubmit: SubmitHandler<EmailTemplateFormData> = async (data) => {
     await onSave(data, template?.id);
@@ -137,20 +163,51 @@ export function EmailTemplateForm({ template, onSave, onCancel, isSaving }: Emai
       
       <div>
         <Label htmlFor="htmlBody">Email Body (HTML)</Label>
-        <Controller name="htmlBody" control={control} render={({ field }) => <Textarea id="htmlBody" {...field} rows={10} placeholder="Enter HTML content for the email..." disabled={isSaving}/>} />
+        <Controller 
+            name="htmlBody" 
+            control={control} 
+            render={({ field }) => {
+                const { ref: rhfRef, ...restOfField } = field;
+                return (
+                    <Textarea 
+                        id="htmlBody" 
+                        {...restOfField} 
+                        rows={10} 
+                        placeholder="Enter HTML content for the email..." 
+                        disabled={isSaving}
+                        ref={(e) => {
+                            rhfRef(e);
+                            htmlBodyRef.current = e;
+                        }}
+                    />
+                );
+            }} 
+        />
         {errors.htmlBody && <p className="text-sm text-destructive mt-1">{errors.htmlBody.message}</p>}
         <div className="mt-2 p-3 border rounded-md bg-muted/50">
-            <h4 className="text-xs font-semibold text-muted-foreground mb-1 flex items-center"><Info className="mr-1 h-3 w-3"/>Available Placeholders for current trigger:</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-1 flex items-center"><Info className="mr-1 h-3 w-3"/>Available Placeholders (click to insert):</h4>
             {currentPlaceholders.length > 0 ? (
                  <ScrollArea className="h-20">
                     <div className="flex flex-wrap gap-1">
-                        {currentPlaceholders.map(p => <Badge key={p} variant="secondary" className="text-xs">{p}</Badge>)}
+                        {currentPlaceholders.map(p => (
+                          <Button
+                            key={p}
+                            type="button" 
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-auto px-2 py-1 font-mono"
+                            onClick={() => handlePlaceholderClick(p)}
+                            disabled={isSaving}
+                          >
+                            {p}
+                          </Button>
+                        ))}
                     </div>
                  </ScrollArea>
             ) : (
                 <p className="text-xs text-muted-foreground">Select an event trigger to see available placeholders.</p>
             )}
-            <p className="text-xs text-muted-foreground mt-1">Tip: Copy and paste placeholders into the Subject or Body.</p>
+            <p className="text-xs text-muted-foreground mt-1">Tip: Click placeholders to add them to the Email Body at your cursor position.</p>
         </div>
       </div>
 
@@ -193,3 +250,4 @@ export function EmailTemplateForm({ template, onSave, onCancel, isSaving }: Emai
     </form>
   );
 }
+
