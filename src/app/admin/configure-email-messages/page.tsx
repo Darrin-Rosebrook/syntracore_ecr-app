@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, MailCog, PlusCircle, Loader2, List, Edit3, Trash2, Eye } from 'lucide-react';
+import { ArrowLeft, Mail, PlusCircle, Loader2, List, Edit3, Trash2, Eye } from 'lucide-react'; // Changed MailCog to Mail
 import type { EmailTemplate } from '@/types';
 import { saveEmailTemplateAction, getEmailTemplatesAction, deleteEmailTemplateAction, updateEmailTemplateAction } from '@/actions/email-template-actions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from '@/components/ui/dialog';
@@ -15,6 +15,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format, parseISO } from 'date-fns';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EMAIL_EVENT_TRIGGERS } from '@/types';
+
 
 type EmailTemplateFormData = Omit<EmailTemplate, 'id' | 'lastUpdated' | 'createdAt' | 'placeholders'> & { attachments?: Array<{id?: string; fileName: string; description?: string}> };
 
@@ -112,7 +115,7 @@ export default function ConfigureEmailMessagesPage() {
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold flex items-center">
-          <MailCog className="mr-3 h-8 w-8 text-primary" />
+          <Mail className="mr-3 h-8 w-8 text-primary" /> {/* Changed MailCog to Mail */}
           Configure Email Messages
         </h1>
         <Button variant="outline" asChild>
@@ -185,7 +188,7 @@ export default function ConfigureEmailMessagesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-xs truncate" title={template.subject}>{template.subject}</TableCell>
-                      <TableCell>{format(parseISO(template.lastUpdated), 'PPp')}</TableCell>
+                      <TableCell>{template.lastUpdated ? format(parseISO(template.lastUpdated), 'PPp') : 'N/A'}</TableCell>
                       <TableCell className="text-right space-x-1">
                         <Button variant="ghost" size="icon" title="Preview Template" onClick={() => setPreviewTemplate(template)} disabled={isSaving}>
                             <Eye className="h-4 w-4" />

@@ -13,8 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import type { EmailTemplate, EmailEventTrigger, EmailAttachmentInfo } from '@/types';
 import { EMAIL_EVENT_TRIGGERS } from '@/types'; // Import the constant
-import { PlusCircle, Trash2, Loader2, Info, Paperclip, Mail } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, Info, Paperclip, Mail } from 'lucide-react'; // Changed MailCog to Mail
 import { ScrollArea } from './ui/scroll-area';
+import { Badge } from './ui/badge';
+
 
 // Define Zod schema for the form
 const emailTemplateFormSchema = z.object({
