@@ -4,11 +4,11 @@
 import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from "@/components/dashboard-tab";
-import { HcoRegistrationSplashPage } from "@/components/hco-registration-splash-page"; // Changed import
+import { HcoRegistrationSplashPage } from "@/components/hco-registration-splash-page";
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
 import { EhrVendorsTab } from "@/components/ehr-vendors-tab";
 import { HealthSystemsTab } from "@/components/health-systems-tab"; 
-import { LayoutDashboard, UserPlus, ShieldCheck, Loader2, ListTree, Network, FilePenLine } from "lucide-react"; // Added FilePenLine for registration
+import { LayoutDashboard, UserPlus, ShieldCheck, Loader2, ListTree, Network, FilePenLine } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext"; 
 
@@ -21,7 +21,7 @@ export default function HomePage() {
   } = useAppContext();
   const { currentUser } = useAuth(); 
   
-  const [activeTab, setActiveTab] = React.useState("dashboard");
+  const [activeTab, setActiveTab] = React.useState("hco-registration"); // Changed default tab
 
   if (isLoading && !enrollments.length && !customFieldDefinitions.length) { 
     return (
@@ -45,7 +45,7 @@ export default function HomePage() {
                 Project Dashboard
               </TabsTrigger>
               <TabsTrigger value="hco-registration" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
-                <FilePenLine className="mr-2 h-5 w-5" /> {/* Changed icon and text */}
+                <FilePenLine className="mr-2 h-5 w-5" /> 
                 HCO Registration
               </TabsTrigger>
               {currentUser && (
@@ -69,7 +69,7 @@ export default function HomePage() {
               <DashboardTab />
             </TabsContent>
             <TabsContent value="hco-registration" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
-              <HcoRegistrationSplashPage /> {/* Changed component */}
+              <HcoRegistrationSplashPage /> 
             </TabsContent>
             {currentUser && (
               <>
