@@ -21,7 +21,7 @@ export default function HomePage() {
   } = useAppContext();
   const { currentUser } = useAuth(); 
   
-  const [activeTab, setActiveTab] = React.useState("hco-registration"); // Changed default tab
+  const [activeTab, setActiveTab] = React.useState("dashboard"); // Changed default tab
 
   if (isLoading && !enrollments.length && !customFieldDefinitions.length) { 
     return (
