@@ -60,3 +60,4 @@ export async function addEnrollmentToFirestore(
     return { success: false, error: `Failed to save enrollment to Firestore: ${error.message || "Unknown Firestore error."}` };
   }
 }
+

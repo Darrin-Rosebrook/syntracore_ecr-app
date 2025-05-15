@@ -1,4 +1,5 @@
 
+
 import type { FHIRValidationResult as ExternalFHIRValidationResult } from '@/services/fhir-validator';
 
 export interface PracticeInfo {
@@ -178,3 +179,4 @@ export interface EmailTemplate {
   lastUpdated: string; 
   createdAt: string; 
 }
+
