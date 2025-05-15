@@ -2,10 +2,10 @@
 'use client';
 
 import React from 'react';
-import type { EnrollmentData, OnboardingStage, OnboardingStageStatus } from '@/types';
+import type { EnrollmentData, OnboardingStageStatus } from '@/types';
 import { ECR_ONBOARDING_STAGES } from '@/lib/constants';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { CheckCircle2, CircleAlert, Circle, CircleX, RefreshCw, CircleHelp, CircleDashed, WorkflowIcon } from 'lucide-react'; // Added WorkflowIcon
+import { CheckCircle2, CircleAlert, Circle, CircleX, RefreshCw, CircleHelp, CircleDashed, WorkflowIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface HcoOnboardingWorkflowStepsProps {
@@ -42,24 +42,20 @@ const getStageStatus = (stageId: number, enrollmentStatus: EnrollmentData['statu
       if (enrollmentStatus === 'Approved') return 'Complete';
       if (enrollmentStatus === 'Changes Requested') return 'Action Required';
       if (enrollmentStatus === 'Denied') return 'Failed';
-      return 'Not Started'; // Should not happen if status is valid
+      return 'Not Started'; 
     case 4: // eCR Readiness Validation
-      if (enrollmentStatus === 'Approved') return 'Not Started'; // Next step after PHA approval
+      if (enrollmentStatus === 'Approved') return 'Not Started'; 
       if (enrollmentStatus === 'Pending' || enrollmentStatus === 'Changes Requested' || enrollmentStatus === 'Denied') return 'Not Yet Applicable';
       return 'Not Yet Applicable';
     case 8: // Ongoing Monitoring & Support
-      // This stage becomes 'Ongoing' only if stage 7 is complete.
-      // For now, we don't have a way to track stage 7 completion directly from enrollment.status.
-      // We will assume if PHA is Approved, stage 8 is "Not Yet Applicable" until further stages are implemented.
-      // If we had a specific "ProductionLive" status for enrollment, we could make this 'Ongoing'.
       if (enrollmentStatus === 'Approved') {
-          // This is a placeholder. Real logic would depend on Production Approval (Stage 7) being complete.
-          // For now, if PHA has approved, this is the *next major conceptual phase* but not yet active.
+          // This would ideally depend on Stage 7 (Production Approval) being 'Complete'.
+          // For now, if PHA approved (Stage 3 done), this is 'Not Yet Applicable' until next stages are tracked.
           return 'Not Yet Applicable';
       }
       return 'Not Yet Applicable';
-    default: // Stages 5, 6, 7
-      if (enrollmentStatus === 'Approved') return 'Not Started'; // Placeholder for subsequent steps
+    default: // Stages 5 (EHR/LIMS Confirmation), 6 (Data Exchange Testing), 7 (Production Approval)
+      if (enrollmentStatus === 'Approved') return 'Not Started'; 
       return 'Not Yet Applicable';
   }
 };
@@ -69,23 +65,26 @@ export function HcoOnboardingWorkflowSteps({ enrollment }: HcoOnboardingWorkflow
     <Card className="shadow-lg mb-6">
       <CardHeader>
         <CardTitle className="flex items-center text-xl font-semibold">
-          <WorkflowIcon className="mr-2 h-6 w-6 text-primary" /> {/* Using a generic workflow icon */}
-          eCR Onboarding Progress
+          <WorkflowIcon className="mr-2 h-6 w-6 text-primary" /> 
+          Your eCR Onboarding Progress
         </CardTitle>
         <CardDescription>
-          Current status of the Health Care Organization's eCR onboarding process.
+          Current status of your Health Care Organization's eCR onboarding process.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-3"> {/* Added space-y-3 for consistent spacing */}
           {ECR_ONBOARDING_STAGES.map((stage) => {
             const currentStatus = getStageStatus(stage.id, enrollment.status);
             const IconComponent = statusIcons[currentStatus];
             const colorClass = statusColors[currentStatus];
 
             return (
-              <div key={stage.id} className="flex items-start space-x-3 p-3 border-b last:border-b-0">
-                <IconComponent className={cn("h-6 w-6 mt-1 shrink-0", colorClass)} />
+              <div 
+                key={stage.id} 
+                className="flex items-start space-x-3 p-4 border rounded-md shadow-sm bg-background hover:shadow-md transition-shadow" // Added border, rounded, shadow, padding, and margin
+              >
+                <IconComponent className={cn("h-7 w-7 mt-1 shrink-0", colorClass)} />
                 <div className="flex-grow">
                   <p className="font-semibold text-md">{stage.id}. {stage.name}
                     <span className={cn("ml-2 text-xs font-normal px-2 py-0.5 rounded-full", 
@@ -100,7 +99,7 @@ export function HcoOnboardingWorkflowSteps({ enrollment }: HcoOnboardingWorkflow
                         {currentStatus}
                     </span>
                   </p>
-                  <p className="text-sm text-muted-foreground">{stage.description}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{stage.description}</p>
                 </div>
               </div>
             );
