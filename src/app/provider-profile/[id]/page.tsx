@@ -8,7 +8,7 @@ import type { EnrollmentData, CustomFieldDefinition, ActivityLogEntry } from '@/
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Loader2, Info, UserCircle, FileTextIcon, Users, Activity, Edit, Save, Building, Settings2, FileText, CalendarDays, User, Hash } from 'lucide-react'; // Added more icons for HcoProfileTab
+import { ArrowLeft, Loader2, Info, UserCircle, FileTextIcon, Users, Activity, Edit, Save, Building, Settings2, FileText, CalendarDays, User, Hash } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
@@ -17,6 +17,7 @@ import { HcoProfileTab } from '@/components/hco-profile-tab';
 import { DocumentsTab } from '@/components/documents-tab';
 import { ContactsTab } from '@/components/contacts-tab';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps'; // Added import
 
 // Define SectionCard here as it was in the original file, now fixed.
 // This component might be intended for use within the tabs or was part of a previous design.
@@ -89,7 +90,7 @@ export default function ProviderProfilePage() {
     };
 
     await updateEnrollmentData(id, dataToUpdate);
-    setIsEditingHcoProfile(false); // This should be managed within HcoProfileTab or passed as a setter
+    setIsEditingHcoProfile(false); 
     setIsSaving(false);
     // The toast for success/failure is handled in AppContext.updateEnrollmentData
   };
@@ -120,7 +121,7 @@ export default function ProviderProfilePage() {
     );
   }
 
-  if (!currentEnrollment && !isContextLoading) { // Ensure loading is complete before showing "not found"
+  if (!currentEnrollment && !isContextLoading) { 
     return (
       <div className="container mx-auto py-8 text-center">
         <h1 className="text-2xl font-bold mb-4">Provider Profile Not Found</h1>
@@ -135,11 +136,8 @@ export default function ProviderProfilePage() {
     );
   }
   
-  // If currentEnrollment is null but still loading, show loader (covered above)
-  // If currentEnrollment is null after loading, show not found (covered above)
-  // Only proceed if currentEnrollment is available
   if (!currentEnrollment) {
-    return null; // Should be caught by the conditions above
+    return null; 
   }
   
   return (
@@ -153,6 +151,8 @@ export default function ProviderProfilePage() {
           <h1 className="text-2xl font-bold text-primary">Provider: {currentEnrollment.practiceInfo.name}</h1>
           <div>{/* Placeholder for global profile actions if any */}</div>
         </div>
+
+        <HcoOnboardingWorkflowSteps enrollment={currentEnrollment} />
         
         <Tabs defaultValue="hco-profile" className="w-full">
           <TabsList className="grid w-full grid-cols-1 sm:grid-cols-4 h-auto sm:h-12 mb-6 shadow-md">
@@ -180,7 +180,7 @@ export default function ProviderProfilePage() {
               setFormData={setHcoFormData}
               handleSave={handleSaveHcoProfile}
               isSaving={isSaving}
-              currentEnrollment={currentEnrollment} // Pass currentEnrollment for reset
+              currentEnrollment={currentEnrollment} 
             />
           </TabsContent>
           <TabsContent value="documents">
@@ -190,7 +190,6 @@ export default function ProviderProfilePage() {
             <ContactsTab enrollment={currentEnrollment} />
           </TabsContent>
           <TabsContent value="activity">
-            {/* Activity Log Section */}
             <Card className="mt-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center text-xl font-semibold">
@@ -254,5 +253,3 @@ export default function ProviderProfilePage() {
     </ScrollArea>
   );
 }
-
-    

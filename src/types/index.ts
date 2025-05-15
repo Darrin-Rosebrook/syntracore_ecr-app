@@ -180,3 +180,19 @@ export interface EmailTemplate {
   createdAt: string; 
 }
 
+// Onboarding Workflow Types
+export type OnboardingStageStatus = 
+  | 'Not Started' 
+  | 'In Progress' 
+  | 'Complete' 
+  | 'Failed' 
+  | 'Action Required' 
+  | 'Ongoing' 
+  | 'Not Yet Applicable';
+
+export interface OnboardingStage {
+  id: number;
+  name: string;
+  description: string;
+  defaultUiSymbol: '🔵' | '🟡' | '✅' | '❌' | '🟠' | '♻️' | '⚪';
+}

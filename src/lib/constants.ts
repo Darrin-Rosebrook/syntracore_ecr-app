@@ -116,3 +116,23 @@ export const US_STATES = [
   { label: 'Wisconsin', value: 'WI' },
   { label: 'Wyoming', value: 'WY' },
 ];
+
+export type OnboardingStageStatus = 'Not Started' | 'In Progress' | 'Complete' | 'Failed' | 'Action Required' | 'Ongoing' | 'Not Yet Applicable';
+
+export interface OnboardingStage {
+  id: number;
+  name: string;
+  description: string;
+  defaultUiSymbol: '🔵' | '🟡' | '✅' | '❌' | '🟠' | '♻️' | '⚪'; // For initial display, actual determined by logic
+}
+
+export const ECR_ONBOARDING_STAGES: OnboardingStage[] = [
+  { id: 1, name: 'Intent to Register', description: 'HCO submits interest form (basic info + contact).', defaultUiSymbol: '✅' },
+  { id: 2, name: 'Provider Enrollment', description: 'Detailed form: org info, system used, CLIA, NPI, contacts, upload support documents.', defaultUiSymbol: '✅' },
+  { id: 3, name: 'PHA Review', description: 'PHA verifies and approves or requests changes.', defaultUiSymbol: '🟡' },
+  { id: 4, name: 'eCR Readiness Validation', description: 'Auto-checks: FHIR, HL7 readiness. Can include test message validation using eCR test bundle.', defaultUiSymbol: '🔵' },
+  { id: 5, name: 'EHR/LIMS Confirmation', description: 'Linked vendor confirms readiness and assists with config.', defaultUiSymbol: '🔵' },
+  { id: 6, name: 'Data Exchange Testing', description: 'HCO sends test data. PHA reviews for correctness.', defaultUiSymbol: '🔵' },
+  { id: 7, name: 'Production Approval', description: 'PHA grants production go-live approval.', defaultUiSymbol: '🔵' },
+  { id: 8, name: 'Ongoing Monitoring & Support', description: 'Status updates, message error monitoring, contact updates.', defaultUiSymbol: '⚪' },
+];
