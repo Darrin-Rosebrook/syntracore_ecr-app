@@ -2,29 +2,30 @@
 'use server';
 
 import { db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp, type Timestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, type Timestamp } from 'firebase/firestore';
+import type { VendorProfileData } from '@/types'; // Updated import
 
-export interface VendorProfileData {
-  vendorName: string;
-  contactName: string;
-  email: string; // Should match auth email
-  // userId is the doc ID (Firebase Auth UID)
-  createdAt?: Timestamp; 
-  lastLogin?: Timestamp;
-}
-
-// data parameter excludes fields automatically set by the server or derived from userId
-export async function createVendorProfileAction(userId: string, data: { vendorName: string; contactName: string; email: string }): Promise<{ success: boolean; error?: string }> {
+// Data parameter now includes representedEhrSystemValue and excludes fields automatically set by server or derived from userId
+export async function createVendorProfileAction(
+  userId: string, 
+  data: { 
+    vendorName: string; 
+    contactName: string; 
+    email: string; 
+    representedEhrSystemValue: string; 
+  }
+): Promise<{ success: boolean; error?: string }> {
   console.log(`Attempting to create vendor profile for UID: ${userId}`, data);
   try {
     const vendorRef = doc(db, 'vendors', userId); // Store vendors in a 'vendors' collection
     
     // Construct the full payload including server-generated timestamps
-    const profilePayload: VendorProfileData & { userId: string } = {
+    const profilePayload: VendorProfileData = {
       ...data,
       userId: userId, // Storing userId also within the document for easier querying if needed
       // @ts-ignore // Firestore will convert this to a Timestamp
       createdAt: serverTimestamp(),
+      // lastLogin will be updated separately
     };
     await setDoc(vendorRef, profilePayload);
     console.log(`Vendor profile created successfully for UID: ${userId}`);
@@ -32,6 +33,60 @@ export async function createVendorProfileAction(userId: string, data: { vendorNa
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred while creating vendor profile.';
     console.error("Error in createVendorProfileAction:", message, error);
+    return { success: false, error: message };
+  }
+}
+
+export async function getVendorProfileAction(userId: string): Promise<{ success: boolean; data?: VendorProfileData; error?: string }> {
+  console.log(`Attempting to fetch vendor profile for UID: ${userId}`);
+  try {
+    const vendorRef = doc(db, 'vendors', userId);
+    const docSnap = await getDoc(vendorRef);
+
+    if (docSnap.exists()) {
+      const rawData = docSnap.data();
+      // Convert Firestore Timestamps to ISO strings
+      const profileData: VendorProfileData = {
+        userId: rawData.userId,
+        vendorName: rawData.vendorName,
+        contactName: rawData.contactName,
+        email: rawData.email,
+        representedEhrSystemValue: rawData.representedEhrSystemValue,
+        createdAt: (rawData.createdAt as Timestamp)?.toDate ? (rawData.createdAt as Timestamp).toDate().toISOString() : new Date().toISOString(),
+        lastLogin: (rawData.lastLogin as Timestamp)?.toDate ? (rawData.lastLogin as Timestamp).toDate().toISOString() : undefined,
+      };
+      console.log(`Vendor profile fetched successfully for UID: ${userId}`, profileData);
+      return { success: true, data: profileData };
+    } else {
+      console.log(`No vendor profile found for UID: ${userId}`);
+      return { success: false, error: "Vendor profile not found." };
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'An unknown error occurred while fetching vendor profile.';
+    console.error("Error in getVendorProfileAction:", message, error);
+    return { success: false, error: message };
+  }
+}
+
+// Action to update lastLogin for a vendor (call this after successful login)
+export async function updateVendorLastLoginAction(userId: string): Promise<{ success: boolean; error?: string }> {
+  console.log(`Attempting to update last login for vendor UID: ${userId}`);
+  try {
+    const vendorRef = doc(db, 'vendors', userId);
+    await updateDoc(vendorRef, {
+      // @ts-ignore
+      lastLogin: serverTimestamp() 
+    });
+    console.log(`Last login updated successfully for vendor UID: ${userId}`);
+    return { success: true };
+  } catch (error) {
+    // If the document doesn't exist, setDoc with merge might be an option, or just log
+    if ((error as any).code === 'not-found') {
+        console.warn(`Vendor profile not found for UID ${userId} when trying to update last login. This might happen if profile creation is pending or failed.`);
+        return { success: false, error: "Vendor profile not found to update last login." };
+    }
+    const message = error instanceof Error ? error.message : 'An unknown error occurred while updating vendor last login.';
+    console.error("Error in updateVendorLastLoginAction:", message, error);
     return { success: false, error: message };
   }
 }

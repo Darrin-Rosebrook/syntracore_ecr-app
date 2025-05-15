@@ -196,3 +196,14 @@ export interface OnboardingStage {
   description: string;
   defaultUiSymbol: '🔵' | '🟡' | '✅' | '❌' | '🟠' | '♻️' | '⚪';
 }
+
+// Vendor Profile Data
+export interface VendorProfileData {
+  userId: string; // Firebase Auth UID
+  vendorName: string;
+  contactName: string;
+  email: string; // Should match auth email
+  representedEhrSystemValue: string; // Value from EHR_VENDORS
+  createdAt: string; // ISO string
+  lastLogin?: string; // ISO string
+}

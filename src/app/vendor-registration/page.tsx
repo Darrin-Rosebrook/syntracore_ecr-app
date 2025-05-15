@@ -9,9 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added Select
 import { Loader2, Building, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createVendorProfileAction } from '@/actions/vendor-actions';
+import { EHR_VENDORS } from '@/lib/constants'; // Added EHR_VENDORS
 
 export default function VendorRegistrationPage() {
   const [vendorName, setVendorName] = useState('');
@@ -19,6 +21,7 @@ export default function VendorRegistrationPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [representedEhrSystemValue, setRepresentedEhrSystemValue] = useState(''); // New state
 
   const { signUp, loading: authLoading, currentUser } = useAuth();
   const router = useRouter();
@@ -26,10 +29,8 @@ export default function VendorRegistrationPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // If user is already logged in, they might not need to be on this page.
-    // Specific redirection logic can be added if needed (e.g., if already a vendor, go to portal).
     if (currentUser) {
-      // router.push('/vendor-portal'); // Or simply '/'
+      // router.push('/vendor-portal'); // Consider redirecting if already logged in AND is a vendor
     }
   }, [currentUser, router]);
 
@@ -43,6 +44,10 @@ export default function VendorRegistrationPage() {
       toast({ title: "Contact Name Required", description: "Please enter a contact person's name.", variant: "destructive" });
       return;
     }
+    if (!representedEhrSystemValue) { // Check if EHR system is selected
+      toast({ title: "EHR/LIMS System Required", description: "Please select the EHR/LIMS system your company represents.", variant: "destructive" });
+      return;
+    }
     if (password !== confirmPassword) {
       toast({ title: "Password Mismatch", description: "Passwords do not match!", variant: "destructive" });
       return;
@@ -51,7 +56,7 @@ export default function VendorRegistrationPage() {
     const user = await signUp(email, password);
 
     if (user && user.uid) {
-      const profileData = { vendorName, contactName, email };
+      const profileData = { vendorName, contactName, email, representedEhrSystemValue };
       const profileResult = await createVendorProfileAction(user.uid, profileData);
       
       if (profileResult.success) {
@@ -59,11 +64,7 @@ export default function VendorRegistrationPage() {
         router.push('/vendor-portal');
       } else {
         toast({ title: "Profile Creation Failed", description: profileResult.error || "Could not save vendor profile details.", variant: "destructive" });
-        // Potentially, here you might want to delete the Firebase Auth user if profile creation fails criticaly
-        // For now, we let the auth account exist.
       }
-    } else if (!user) {
-      // signUp in AuthContext already handles toasting for auth failure
     }
     setIsSubmitting(false);
   };
@@ -105,6 +106,26 @@ export default function VendorRegistrationPage() {
                 required
                 disabled={authLoading || isSubmitting}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="representedEhrSystemValue">EHR/LIMS System Represented</Label>
+              <Select
+                value={representedEhrSystemValue}
+                onValueChange={setRepresentedEhrSystemValue}
+                required
+                disabled={authLoading || isSubmitting}
+              >
+                <SelectTrigger id="representedEhrSystemValue">
+                  <SelectValue placeholder="Select your primary EHR/LIMS" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EHR_VENDORS.map((vendor) => (
+                    <SelectItem key={vendor.value} value={vendor.value}>
+                      {vendor.label} ({vendor.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Contact Email (for login)</Label>
