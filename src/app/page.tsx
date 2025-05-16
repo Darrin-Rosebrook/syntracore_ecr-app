@@ -28,15 +28,15 @@ export default function HomePage() {
   const tabsToRender: { value: string; label: string; icon: React.ElementType; content: React.ReactNode; condition?: boolean }[] = [];
   let defaultTabValue: string;
 
-  if (isPhaUser) { // Use isPhaUser from context
-    tabListCols = "sm:grid-cols-4"; // Adjusted for 4 tabs
+  if (isPhaUser) {
+    tabListCols = "sm:grid-cols-4";
     tabsToRender.push(
       { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: <DashboardTab />, condition: true },
       { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} />, condition: true },
       { value: "health-systems", label: "Health Systems", icon: Network, content: <HealthSystemsTab />, condition: true },
       { value: "ehr-vendors", label: "EHR/LIMS Vendors", icon: ListTree, content: <EhrVendorsTab enrollments={enrollments} />, condition: true }
     );
-    defaultTabValue = "dashboard";
+    defaultTabValue = "pha-reviewer"; // Changed: Default to PHA Reviewer for PHA users
   } else if (!currentUser) { // Guest user
     tabListCols = "sm:grid-cols-3";
     tabsToRender.push(
@@ -63,10 +63,9 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = React.useState(defaultTabValue);
 
   React.useEffect(() => {
-    // Update defaultTabValue based on the latest currentUser and isPhaUser status
     let newDefaultTabValue;
     if (isPhaUser) {
-        newDefaultTabValue = "dashboard"; // Or "pha-reviewer" if preferred
+        newDefaultTabValue = "pha-reviewer"; // Ensure default is PHA Reviewer for PHA users
     } else if (!currentUser) {
         newDefaultTabValue = "hco-registration";
     } else {
