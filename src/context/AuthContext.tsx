@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, {
@@ -7,7 +8,7 @@ import React, {
   useEffect,
   ReactNode,
 } from 'react';
-import { auth } from '@/firebase-config'; // ✅ Updated path
+import { auth } from '@/firebase-config'; 
 import type { User, AuthError } from 'firebase/auth';
 import {
   createUserWithEmailAndPassword,
@@ -18,12 +19,13 @@ import {
 } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { getPhaUserByUsernameAction } from '@/actions/user-actions'; // Import the new action
 
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
   signUp: (email: string, password: string) => Promise<User | null>;
-  logIn: (email: string, password: string) => Promise<User | null>;
+  logIn: (identifier: string, password: string) => Promise<User | null>; // Changed email to identifier
   logOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
 }
@@ -52,25 +54,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setLoading(false);
+      setShowGlobalLoader(false); 
     });
     return unsubscribe;
   }, []);
-
-  useEffect(() => {
-    if (loading) {
-      if (
-        typeof window !== 'undefined' &&
-        (window.location.pathname === '/login' ||
-          window.location.pathname === '/signup')
-      ) {
-        setShowGlobalLoader(false);
-      } else {
-        setShowGlobalLoader(true);
-      }
-    } else {
-      setShowGlobalLoader(false);
-    }
-  }, [loading]);
 
   const signUp = async (email: string, password: string): Promise<User | null> => {
     setLoading(true);
@@ -92,10 +79,32 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  const logIn = async (email: string, password: string): Promise<User | null> => {
+  const logIn = async (identifier: string, password: string): Promise<User | null> => {
     setLoading(true);
+    let emailToUse = identifier;
+
+    // Check if identifier is likely an email
+    if (!identifier.includes('@')) {
+      // Assume it's a username, try to fetch email
+      console.log(`Identifier "${identifier}" doesn't look like an email. Attempting username lookup.`);
+      const usernameLookupResult = await getPhaUserByUsernameAction(identifier);
+      if (usernameLookupResult.success && usernameLookupResult.user?.email) {
+        emailToUse = usernameLookupResult.user.email;
+        console.log(`Username "${identifier}" maps to email "${emailToUse}".`);
+      } else {
+        console.log(`Failed to find email for username "${identifier}". Error: ${usernameLookupResult.error}`);
+        toast({
+          title: 'Login Failed',
+          description: 'Invalid username or password.',
+          variant: 'destructive',
+        });
+        setLoading(false);
+        return null;
+      }
+    }
+
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, emailToUse, password);
       toast({ title: 'Login Successful', description: 'Welcome back!' });
       return userCredential.user;
     } catch (error) {
@@ -103,7 +112,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       console.error('Login error:', authError);
       toast({
         title: 'Login Failed',
-        description: authError.message,
+        description: 'Invalid username or password.', // Generic message for security
         variant: 'destructive',
       });
       return null;
@@ -163,7 +172,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     resetPassword,
   };
 
-  if (showGlobalLoader) {
+  if (showGlobalLoader && loading) { 
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />

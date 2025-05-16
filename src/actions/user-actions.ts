@@ -1,8 +1,9 @@
+
 'use server';
 
 import type { PhaUser, PhaUserStatus } from '@/types';
-import { db } from '@/lib/firebase'; 
-import { serverTimestamp, collection, doc, setDoc, getDoc, updateDoc, getDocs, addDoc, query, orderBy, deleteDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { serverTimestamp, collection, doc, setDoc, getDoc, updateDoc, getDocs, addDoc, query, orderBy, deleteDoc, where, limit, Timestamp } from 'firebase/firestore';
 
 // Helper function to generate a random string (for username or password)
 function generateRandomString(length = 10): string {
@@ -50,13 +51,12 @@ export async function addPhaUserAction(userData: Omit<PhaUser, 'id' | 'status' |
       username: username,
       name: userData.name,
       email: userData.email,
-      phone: userData.phone || undefined, // Store as undefined if empty, not null for Firestore consistency
+      phone: userData.phone || undefined, 
       program: userData.program,
       role: userData.role,
       status: 'Active', 
-      // @ts-ignore // Firestore will convert this to a Timestamp
+      // @ts-ignore 
       createdAt: serverTimestamp(), 
-      // requiresPasswordChange: true, // Add if this field is part of your PhaUser type and needed
     };
 
     const usersColRef = collection(db, 'phaUsers');
@@ -81,10 +81,7 @@ export async function requestPasswordResetAction(email: string): Promise<{ succe
   }
 
   try {
-    // --- Simulated Firebase Auth password reset email ---
-    // For actual Firebase Auth, you'd use getAuth(adminApp).generatePasswordResetLink(email) on the server
-    // Or sendPasswordResetEmail(getAuth(clientApp), email) on the client (if configured)
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async operation
+    await new Promise(resolve => setTimeout(resolve, 1000)); 
     console.log(`Simulated password reset email sent to ${email}.`);
     return { success: true };
 
@@ -99,14 +96,11 @@ export async function getPhaUsersAction(): Promise<{ success: boolean; users?: P
   console.log("Attempting to fetch PHA users from Firestore (server action)");
   try {
     const usersCol = collection(db, 'phaUsers');
-    // Consider adding orderBy if you want a specific default sort order, e.g., orderBy('name')
-    const q = query(usersCol, orderBy('name')); // Example: order by name
+    const q = query(usersCol, orderBy('name')); 
     const userSnapshot = await getDocs(q);
     
     const usersList = userSnapshot.docs.map(docSnap => {
       const data = docSnap.data();
-      // Convert Firestore Timestamps to string if they exist (e.g., createdAt)
-      // For this PhaUser type, only ensure basic fields are mapped.
       return { 
         id: docSnap.id, 
         name: data.name,
@@ -116,7 +110,6 @@ export async function getPhaUsersAction(): Promise<{ success: boolean; users?: P
         program: data.program,
         role: data.role,
         status: data.status,
-        // createdAt: data.createdAt ? (data.createdAt as Timestamp).toDate().toISOString() : undefined, 
       } as PhaUser;
     });
     
@@ -126,7 +119,7 @@ export async function getPhaUsersAction(): Promise<{ success: boolean; users?: P
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch users from Firestore.";
     console.error("Error fetching PHA users from Firestore:", message, error);
-    return { success: false, error: message, users: [] }; // Return empty array on error
+    return { success: false, error: message, users: [] }; 
   }
 }
 
@@ -140,7 +133,6 @@ export async function updatePhaUserAction(userId: string, userData: Partial<Omit
   try {
     const userDocRef = doc(db, 'phaUsers', userId);
     
-    // Filter out undefined values from userData to avoid overwriting fields with undefined
     const updatePayload: Partial<PhaUser> = {};
     for (const key in userData) {
       if (userData[key as keyof typeof userData] !== undefined) {
@@ -148,11 +140,11 @@ export async function updatePhaUserAction(userId: string, userData: Partial<Omit
         updatePayload[key as keyof PhaUser] = userData[key as keyof typeof userData];
       }
     }
-    // @ts-ignore // Firestore will convert this to a Timestamp
+    // @ts-ignore 
     updatePayload.updatedAt = serverTimestamp(); 
 
 
-    if (Object.keys(updatePayload).length === 0) {
+    if (Object.keys(updatePayload).length === 1 && 'updatedAt' in updatePayload) { // Only updatedAt means no actual data changes
         return { success: false, error: "No valid fields provided for update." };
     }
 
@@ -168,7 +160,6 @@ export async function updatePhaUserAction(userId: string, userData: Partial<Omit
   }
 }
 
-// This action is for hard delete. Deactivation is preferred via updatePhaUserAction status.
 export async function deletePhaUserAction(userId: string): Promise<{ success: boolean; error?: string }> {
   console.log(`Attempting to (hard) delete PHA user ${userId} from Firestore (server action)`);
   
@@ -178,18 +169,50 @@ export async function deletePhaUserAction(userId: string): Promise<{ success: bo
 
   try {
     const userDocRef = doc(db, 'phaUsers', userId);
-    await deleteDoc(userDocRef); // Delete from Firestore
-    
-    // If also integrated with Firebase Auth, you would delete the Auth user here:
-    // const authAdmin = getAuth(adminApp); // Assuming adminApp is configured
-    // await authAdmin.deleteUser(userId);
+    await deleteDoc(userDocRef); 
     
     console.log(`User ${userId} successfully deleted from Firestore.`);
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "An unknown error occurred while deleting the user from Firestore.";
     console.error("Error in deletePhaUserAction (Firestore):", message, error);
-    // Provide a more specific error if it's an Auth error vs Firestore, e.g. check error.code
+    return { success: false, error: message };
+  }
+}
+
+export async function getPhaUserByUsernameAction(username: string): Promise<{ success: boolean; user?: PhaUser; error?: string }> {
+  console.log(`Attempting to fetch PHA user by username: ${username}`);
+  if (!username) {
+    return { success: false, error: "Username is required." };
+  }
+
+  try {
+    const usersColRef = collection(db, 'phaUsers');
+    const q = query(usersColRef, where("username", "==", username), limit(1));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      console.log(`No user found with username: ${username}`);
+      return { success: false, error: "User not found." };
+    }
+
+    const userDoc = querySnapshot.docs[0];
+    const userData = userDoc.data();
+    const user: PhaUser = {
+      id: userDoc.id,
+      name: userData.name,
+      email: userData.email,
+      username: userData.username,
+      phone: userData.phone,
+      program: userData.program,
+      role: userData.role,
+      status: userData.status,
+    };
+    console.log(`User found for username ${username}:`, user);
+    return { success: true, user };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "An unknown error occurred while fetching user by username.";
+    console.error("Error in getPhaUserByUsernameAction:", message, error);
     return { success: false, error: message };
   }
 }
