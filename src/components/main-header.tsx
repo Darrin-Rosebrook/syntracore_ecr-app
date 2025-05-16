@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"; // Removed buttonVariants as it's not used
 import { LogIn, LogOut, UserCircle, Settings, Building, LayoutDashboard, Loader2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { getVendorProfileAction } from '@/actions/vendor-actions';
@@ -33,7 +33,7 @@ export function MainHeader() {
           }
         } catch (error) {
           console.error("Error checking vendor role:", error);
-          setIsVendorRole(false); 
+          setIsVendorRole(false);
         } finally {
           setIsCheckingVendorRole(false);
         }
@@ -43,7 +43,7 @@ export function MainHeader() {
       }
     };
 
-    if (!authLoading) { 
+    if (!authLoading) {
       determineVendorRole();
     }
   }, [currentUser, authLoading, isPhaAdmin]);
@@ -84,8 +84,7 @@ export function MainHeader() {
               </span>
 
               {/* Links for specific user roles */}
-              {isPhaAdmin ? (
-                // PHA Admin only sees Admin button
+              {isPhaAdmin && ( // Show Admin button if PHA admin
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" size="sm" asChild>
                     <Link href="/admin">
@@ -94,8 +93,8 @@ export function MainHeader() {
                     </Link>
                   </Button>
                 </div>
-              ) : isVendorRole ? (
-                // Vendor sees Vendor Portal button
+              )}
+              {isVendorRole && !isPhaAdmin && ( // Show Vendor Portal if vendor AND NOT PHA admin
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" size="sm" asChild>
                     <Link href="/vendor-portal">
@@ -104,8 +103,8 @@ export function MainHeader() {
                     </Link>
                   </Button>
                 </div>
-              ) : isHcoUser ? (
-                // HCO User sees Provider Portal button
+              )}
+              {isHcoUser && !isPhaAdmin && !isVendorRole && ( // Show Provider Portal if HCO User AND NOT PHA admin or Vendor
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" size="sm" asChild>
                     <Link href="/provider-portal">
@@ -114,7 +113,7 @@ export function MainHeader() {
                     </Link>
                   </Button>
                 </div>
-              ) : null}
+              )}
 
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="mr-0 sm:mr-2 h-4 w-4" />
@@ -130,6 +129,7 @@ export function MainHeader() {
                   Login
                 </Link>
               </Button>
+              {/* Vendor Registration button was removed here earlier */}
             </>
           )}
         </div>
