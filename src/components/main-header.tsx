@@ -83,48 +83,38 @@ export function MainHeader() {
                 {currentUser.email}
               </span>
 
-              {/* Desktop Links: Prioritize PHA Admin, then Vendor, then HCO */}
-              <div className="hidden md:inline-flex items-center gap-2">
-                {isPhaAdmin ? (
+              {/* Links for specific user roles */}
+              {isPhaAdmin ? (
+                // PHA Admin only sees Admin button
+                <div className="flex items-center gap-2">
                   <Button variant="ghost" size="sm" asChild>
                     <Link href="/admin">
                       <Settings className="mr-2 h-4 w-4" />
                       Admin
                     </Link>
                   </Button>
-                ) : isVendorRole ? (
+                </div>
+              ) : isVendorRole ? (
+                // Vendor sees Vendor Portal button
+                <div className="flex items-center gap-2">
                   <Button variant="ghost" size="sm" asChild>
                     <Link href="/vendor-portal">
                       <Building className="mr-2 h-4 w-4" />
                       Vendor Portal
                     </Link>
                   </Button>
-                ) : isHcoUser ? ( 
+                </div>
+              ) : isHcoUser ? (
+                // HCO User sees Provider Portal button
+                <div className="flex items-center gap-2">
                   <Button variant="ghost" size="sm" asChild>
                     <Link href="/provider-portal">
                       <LayoutDashboard className="mr-2 h-4 w-4" />
                       Provider Portal
                     </Link>
                   </Button>
-                ) : null}
-              </div>
-
-              {/* Mobile Links (Simplified): Shows the first applicable portal */}
-              <div className="md:hidden">
-                {isPhaAdmin ? (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/admin">Admin</Link>
-                  </Button>
-                ) : isVendorRole ? (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/vendor-portal">Vendor</Link>
-                  </Button>
-                ) : isHcoUser ? (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/provider-portal">Portal</Link>
-                  </Button>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
 
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="mr-0 sm:mr-2 h-4 w-4" />
@@ -132,6 +122,7 @@ export function MainHeader() {
               </Button>
             </>
           ) : (
+            // Guest Links (Login Only)
             <>
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/login">

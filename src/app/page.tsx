@@ -26,43 +26,58 @@ export default function HomePage() {
   
   const isPhaAdmin = currentUser?.email?.includes('@pha.gov');
 
-  const getDefaultTab = () => {
+  const getDefaultTab = React.useCallback(() => {
     if (isPhaAdmin) return "pha-reviewer";
     if (!currentUser) return "hco-registration"; // Default for guests
     return "dashboard"; // Default for other logged-in users (vendors, HCOs)
-  };
-  
-  const [activeTab, setActiveTab] = React.useState(getDefaultTab()); 
+  }, [isPhaAdmin, currentUser]);
+
+  const [activeTab, setActiveTab] = React.useState(getDefaultTab());
 
   React.useEffect(() => {
-    // Update active tab if user logs in/out or role changes
     setActiveTab(getDefaultTab());
-  }, [currentUser, isPhaAdmin]);
-
+  }, [getDefaultTab]);
 
   if (isLoading && !enrollments.length && !customFieldDefinitions.length) { 
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-lg text-muted-foreground">Loading SyntraHub...</p>
+        <p className="mt-4 text-lg text-muted-foreground">Loading SyntraCore...</p>
       </div>
     );
   }
   
-  let tabListCols = "sm:grid-cols-1"; // Default to 1 for safety
-  if (isPhaAdmin) {
-    tabListCols = "sm:grid-cols-3"; // PHA Reviewer, EHR/LIMS Vendors, Health Systems
-  } else if (!currentUser) {
-    tabListCols = "sm:grid-cols-3"; // Dashboard, HCO Registration, EHR/LIMS Vendor Registration
-  } else { // Logged-in non-PHA admin (Vendor or HCO)
-    tabListCols = "sm:grid-cols-1"; // Only Dashboard initially, portal links are in header
-                                   // Or we could show specific tabs for vendors/HCOs here too if desired.
-                                   // For now, keeping it simple for non-PHA admins on this page.
-                                   // A vendor might see "Dashboard", "Client HCOs" here in future.
-                                   // An HCO might see "Dashboard", "My Onboarding Status" here.
-                                   // For now, just "Dashboard" if logged in and not PHA Admin.
-  }
+  // Determine tab layout and visible tabs based on user type
+  let tabListCols = "sm:grid-cols-1";
+  const tabsToRender: { value: string; label: string; icon: React.ElementType; content: React.ReactNode; }[] = [];
 
+  if (isPhaAdmin) {
+    tabListCols = "sm:grid-cols-3";
+    tabsToRender.push(
+      { value: "pha-reviewer", label: "PHA Reviewer", icon: ShieldCheck, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} /> },
+      { value: "ehr-vendors", label: "EHR/LIMS Vendors", icon: ListTree, content: <EhrVendorsTab enrollments={enrollments} /> },
+      { value: "health-systems", label: "Health Systems (Parent)", icon: Network, content: <HealthSystemsTab /> }
+    );
+  } else if (!currentUser) { // Guest user
+    tabListCols = "sm:grid-cols-3";
+    tabsToRender.push(
+      { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: <DashboardTab /> },
+      { value: "hco-registration", label: "HCO Registration", icon: FilePenLine, content: <HcoRegistrationSplashPage /> },
+      { value: "vendor-registration", label: "EHR/LIMS Vendor Registration", icon: Building, content: (
+        <Card className="w-full max-w-2xl mx-auto shadow-xl text-center">
+          <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center"><Building className="mr-3 h-8 w-8 text-primary" />EHR/LIMS Vendor Registration</CardTitle><CardDescription className="text-lg text-foreground/80 mt-2">For Electronic Health Record (EHR) or Laboratory Information Management System (LIMS) vendors.</CardDescription></CardHeader>
+          <CardContent className="space-y-6"><p className="text-md leading-relaxed">If you represent an EHR or LIMS vendor, create an account to access the Vendor Portal. The portal will allow you to view the onboarding status of your client Health Care Organizations and access tools to assist them through the eCR onboarding process.</p><Button asChild size="lg" className="mt-6 bg-accent text-accent-foreground hover:bg-accent/90"><Link href="/vendor-registration">Proceed to Vendor Registration <ArrowRight className="ml-2 h-5 w-5" /></Link></Button></CardContent>
+        </Card>
+      )}
+    );
+  } else { // Other logged-in users (e.g., Vendor, HCO after login)
+    tabListCols = "sm:grid-cols-1"; // Default for now
+    tabsToRender.push(
+      { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: <DashboardTab /> }
+      // Potentially add HCO Registration tab here if needed for logged-in HCO users to start another
+      // { value: "hco-registration", label: "HCO Registration", icon: FilePenLine, content: <HcoRegistrationSplashPage />, condition: true },
+    );
+  }
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
@@ -70,98 +85,18 @@ export default function HomePage() {
         <div className="container mx-auto py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className={`grid w-full grid-cols-1 ${tabListCols} h-auto sm:h-12 mb-6 shadow-md`}>
-              {/* Tabs for All Users or Guests */}
-              {!isPhaAdmin && (
-                <>
-                  <TabsTrigger value="dashboard" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
-                    <LayoutDashboard className="mr-2 h-5 w-5" />
-                    Project Dashboard
-                  </TabsTrigger>
-                  <TabsTrigger value="hco-registration" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
-                    <FilePenLine className="mr-2 h-5 w-5" /> 
-                    HCO Registration
-                  </TabsTrigger>
-                  {!currentUser && (
-                    <TabsTrigger value="vendor-registration" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
-                      <Building className="mr-2 h-5 w-5" />
-                      EHR/LIMS Vendor Registration
-                    </TabsTrigger>
-                  )}
-                </>
-              )}
-
-              {/* Tabs for PHA Admin Users */}
-              {isPhaAdmin && (
-                <>
-                  <TabsTrigger value="pha-reviewer" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
-                    <ShieldCheck className="mr-2 h-5 w-5" />
-                    PHA Reviewer
-                  </TabsTrigger>
-                  <TabsTrigger value="ehr-vendors" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
-                    <ListTree className="mr-2 h-5 w-5" />
-                    EHR/LIMS Vendors
-                  </TabsTrigger>
-                  <TabsTrigger value="health-systems" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
-                    <Network className="mr-2 h-5 w-5" />
-                    Health Systems (Parent)
-                  </TabsTrigger>
-                </>
-              )}
+              {tabsToRender.map(tab => (
+                <TabsTrigger key={tab.value} value={tab.value} className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
+                  <tab.icon className="mr-2 h-5 w-5" />
+                  {tab.label}
+                </TabsTrigger>
+              ))}
             </TabsList>
-
-            {/* Content for All Users or Guests */}
-            {!isPhaAdmin && (
-                <>
-                  <TabsContent value="dashboard" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
-                    <DashboardTab />
-                  </TabsContent>
-                  <TabsContent value="hco-registration" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
-                    <HcoRegistrationSplashPage /> 
-                  </TabsContent>
-                  {!currentUser && (
-                    <TabsContent value="vendor-registration" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
-                      <Card className="w-full max-w-2xl mx-auto shadow-xl text-center">
-                        <CardHeader>
-                          <CardTitle className="text-3xl font-bold flex items-center justify-center">
-                            <Building className="mr-3 h-8 w-8 text-primary" />
-                            EHR/LIMS Vendor Registration
-                          </CardTitle>
-                          <CardDescription className="text-lg text-foreground/80 mt-2">
-                            For Electronic Health Record (EHR) or Laboratory Information Management System (LIMS) vendors.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                          <p className="text-md leading-relaxed">
-                            If you represent an EHR or LIMS vendor, create an account to access the Vendor Portal.
-                            The portal will allow you to view the onboarding status of your client Health Care Organizations
-                            and access tools to assist them through the eCR onboarding process.
-                          </p>
-                          <Button asChild size="lg" className="mt-6 bg-accent text-accent-foreground hover:bg-accent/90">
-                            <Link href="/vendor-registration">
-                              Proceed to Vendor Registration <ArrowRight className="ml-2 h-5 w-5" />
-                            </Link>
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                  )}
-                </>
-            )}
-            
-            {/* Content for PHA Admin Users */}
-            {isPhaAdmin && (
-              <>
-                <TabsContent value="pha-reviewer" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
-                  <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} />
-                </TabsContent>
-                <TabsContent value="ehr-vendors" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
-                  <EhrVendorsTab enrollments={enrollments} />
-                </TabsContent>
-                <TabsContent value="health-systems" className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
-                  <HealthSystemsTab />
-                </TabsContent>
-              </>
-            )}
+            {tabsToRender.map(tab => (
+              <TabsContent key={tab.value} value={tab.value} className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
+                {tab.content}
+              </TabsContent>
+            ))}
           </Tabs>
         </div>
       </main>
