@@ -27,6 +27,7 @@ const phaUserSchema = z.object({
   phone: z.string().optional(),
   program: z.enum(['Case Reporting'] as [PhaProgram, ...PhaProgram[]], { message: "Program is required." }),
   role: z.enum(['Admin', 'User'] as [PhaRole, ...PhaRole[]], { message: "Role is required." }),
+  temporaryPassword: z.string().min(8, { message: "Password must be at least 8 characters." }),
 });
 type PhaUserFormData = z.infer<typeof phaUserSchema>;
 
@@ -37,7 +38,6 @@ const editPhaUserSchema = z.object({
   program: z.enum(['Case Reporting'] as [PhaProgram, ...PhaProgram[]]).optional(),
   role: z.enum(['Admin', 'User'] as [PhaRole, ...PhaRole[]]).optional(),
   status: z.enum(['Active', 'Inactive'] as [PhaUserStatus, ...PhaUserStatus[]]).optional(),
-  // Username is not part of the editable form data, it's displayed
 });
 type EditPhaUserFormData = z.infer<typeof editPhaUserSchema>;
 
@@ -48,9 +48,10 @@ export default function ManageUsersPage() {
   const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [phaUsers, setPhaUsers] = useState<PhaUser[]>([]);
-  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [displayedPassword, setDisplayedPassword] = useState<string | null>(null);
   const [generatedUsername, setGeneratedUsername] = useState<string | null>(null);
-  const [showTempPassword, setShowTempPassword] = useState(false);
+  const [showDisplayedPassword, setShowDisplayedPassword] = useState(false);
+  const [showAddFormPassword, setShowAddFormPassword] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -65,10 +66,11 @@ export default function ManageUsersPage() {
       phone: '',
       program: 'Case Reporting',
       role: 'User',
+      temporaryPassword: '',
     },
   });
 
-  const { control: editControl, handleSubmit: handleEditSubmit, reset: resetEditForm, setValue: setEditValue, formState: { errors: editErrors } } = useForm<EditPhaUserFormData>({
+  const { control: editControl, handleSubmit: handleEditSubmit, reset: resetEditForm, formState: { errors: editErrors } } = useForm<EditPhaUserFormData>({
     resolver: zodResolver(editPhaUserSchema),
   });
 
@@ -89,9 +91,19 @@ export default function ManageUsersPage() {
 
   const onAddSubmit: SubmitHandler<PhaUserFormData> = async (data) => {
     setIsSubmittingAdd(true);
-    setTempPassword(null);
+    setDisplayedPassword(null);
     setGeneratedUsername(null);
-    const result = await addPhaUserAction(data);
+    
+    // Data passed to action includes temporaryPassword from the form
+    const userDataForAction = {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        program: data.program,
+        role: data.role,
+    };
+
+    const result = await addPhaUserAction(userDataForAction, data.temporaryPassword);
     setIsSubmittingAdd(false);
 
     if (result.success && result.userId && result.temporaryPassword && result.username) {
@@ -99,7 +111,7 @@ export default function ManageUsersPage() {
         title: 'User Added',
         description: `User ${data.name} has been successfully added.`,
       });
-      setTempPassword(result.temporaryPassword);
+      setDisplayedPassword(result.temporaryPassword); // This is the password admin set
       setGeneratedUsername(result.username);
       await fetchUsers(); 
       resetAddForm();
@@ -143,9 +155,10 @@ export default function ManageUsersPage() {
 
 
   const handlePasswordResetRequest = async (email: string, userName: string) => {
-    setIsSubmittingAdd(true); 
+    // For Edit Dialog password reset, it's fine to use isSubmittingUpdate
+    setIsSubmittingUpdate(true); 
     const result = await requestPasswordResetAction(email);
-    setIsSubmittingAdd(false);
+    setIsSubmittingUpdate(false);
 
     if (result.success) {
       toast({
@@ -210,7 +223,7 @@ export default function ManageUsersPage() {
   };
 
   const closeCredentialsAlert = () => {
-    setTempPassword(null);
+    setDisplayedPassword(null);
     setGeneratedUsername(null);
   }
 
@@ -236,7 +249,7 @@ export default function ManageUsersPage() {
               <PlusCircle className="mr-2 h-6 w-6 text-primary" />
               Add New PHA User
             </CardTitle>
-            <CardDescription>Create accounts for Public Health Agency personnel. A username and temporary password will be generated.</CardDescription>
+            <CardDescription>Create accounts for Public Health Agency personnel. Username will be auto-generated. Set a temporary password.</CardDescription>
           </CardHeader>
           <form onSubmit={handleAddSubmit(onAddSubmit)}>
             <CardContent className="space-y-4">
@@ -259,6 +272,44 @@ export default function ManageUsersPage() {
                 />
                 {addErrors.email && <p className="text-sm text-destructive mt-1">{addErrors.email.message}</p>}
               </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="temporaryPassword">Set Temporary Password</Label>
+                <div className="flex items-center space-x-2">
+                  <Controller
+                    name="temporaryPassword"
+                    control={addControl}
+                    render={({ field }) => (
+                      <Input
+                        id="temporaryPassword"
+                        type={showAddFormPassword ? 'text' : 'password'}
+                        {...field}
+                        placeholder="Enter temporary password (min 8 chars)"
+                        disabled={isSubmittingAdd}
+                        className="flex-grow"
+                      />
+                    )}
+                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowAddFormPassword(!showAddFormPassword)}
+                        disabled={isSubmittingAdd}
+                      >
+                        {showAddFormPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{showAddFormPassword ? 'Hide' : 'Show'} password</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                {addErrors.temporaryPassword && <p className="text-sm text-destructive mt-1">{addErrors.temporaryPassword.message}</p>}
+              </div>
+
 
               <div>
                 <Label htmlFor="phone">Phone Number (Optional)</Label>
@@ -318,13 +369,13 @@ export default function ManageUsersPage() {
               </Button>
             </CardFooter>
           </form>
-          {tempPassword && generatedUsername && (
+          {displayedPassword && generatedUsername && (
             <CardContent className="mt-4">
               <Alert>
                 <div className="flex justify-between items-start">
                     <div>
                         <KeyRound className="h-4 w-4 inline-block mr-1" />
-                        <AlertTitle className="inline-block">User Credentials Generated!</AlertTitle>
+                        <AlertTitle className="inline-block">User Credentials Set!</AlertTitle>
                     </div>
                     <Button variant="ghost" size="icon" onClick={closeCredentialsAlert} className="h-6 w-6 p-0 -mt-1 -mr-1">
                         <XCircle className="h-4 w-4" />
@@ -341,11 +392,11 @@ export default function ManageUsersPage() {
                     </div>
                     <div className="flex items-center space-x-2 bg-muted p-2 rounded-md">
                        <Label htmlFor="tempPasswordDisplay" className="w-20 shrink-0">Password:</Label>
-                      <Input id="tempPasswordDisplay" type={showTempPassword ? "text" : "password"} value={tempPassword} readOnly className="flex-grow" />
-                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => setShowTempPassword(!showTempPassword)}>{showTempPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      <Input id="tempPasswordDisplay" type={showDisplayedPassword ? "text" : "password"} value={displayedPassword} readOnly className="flex-grow" />
+                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => setShowDisplayedPassword(!showDisplayedPassword)}>{showDisplayedPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
                       </TooltipTrigger><TooltipContent><p>Toggle visibility</p></TooltipContent></Tooltip>
-                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => copyToClipboard(tempPassword)}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Copy password</p></TooltipContent></Tooltip>
+                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => copyToClipboard(displayedPassword)}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Copy password</p></TooltipContent></Tooltip>
                     </div>
                   </div>
                 </AlertDescription>
@@ -422,7 +473,7 @@ export default function ManageUsersPage() {
                               <DropdownMenuItem onClick={() => handleOpenEditDialog(user)} disabled={isSubmittingUpdate}>
                                 <Edit3 className="mr-2 h-4 w-4" /> Edit User
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handlePasswordResetRequest(user.email, user.name)} disabled={isSubmittingAdd}>
+                              <DropdownMenuItem onClick={() => handlePasswordResetRequest(user.email, user.name)} disabled={isSubmittingUpdate}>
                                 <KeyRound className="mr-2 h-4 w-4" /> Reset Password
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
@@ -450,8 +501,8 @@ export default function ManageUsersPage() {
                 Important Note on User Management
               </p>
               <p className="text-xs text-muted-foreground">
-                Currently, user management operations (add, edit, status change, password reset) are simulated.
-                Full integration with Firebase Authentication and Firestore is required for these actions to persist and have real effect on user accounts and access.
+                Currently, user management operations (edit, status change, password reset) are simulated for this prototype regarding direct Firebase Auth modifications beyond initial creation.
+                Full integration with Firebase Authentication for updating email/password or disabling Auth users requires Admin SDK or re-authentication flows.
                 First-time password change enforcement requires client-side logic post-login.
               </p>
             </div>
@@ -550,4 +601,3 @@ export default function ManageUsersPage() {
     </TooltipProvider>
   );
 }
-

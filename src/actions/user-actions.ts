@@ -2,12 +2,12 @@
 'use server';
 
 import type { PhaUser, PhaUserStatus } from '@/types';
-import { db, auth as firebaseAuth } from '@/lib/firebase'; // Import firebaseAuth
-import { createUserWithEmailAndPassword } from 'firebase/auth'; // Import createUserWithEmailAndPassword
+import { db, auth as firebaseAuth } from '@/lib/firebase'; 
+import { createUserWithEmailAndPassword } from 'firebase/auth'; 
 import { serverTimestamp, collection, doc, setDoc, getDoc, updateDoc, getDocs, addDoc, query, orderBy, deleteDoc, where, limit, Timestamp } from 'firebase/firestore';
 
-// Helper function to generate a random string (for username or password)
-function generateRandomString(length = 10): string {
+// Helper function to generate a random string (for username)
+function generateRandomString(length = 4): string {
   const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let result = "";
   for (let i = 0; i < length; i++) {
@@ -16,26 +16,17 @@ function generateRandomString(length = 10): string {
   return result;
 }
 
-// Helper function to generate a random password
-function generateTemporaryPassword(length = 12): string {
-  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=";
-  let password = "";
-  for (let i = 0, n = charset.length; i < length; ++i) {
-    password += charset.charAt(Math.floor(Math.random() * n));
-  }
-  if (!/\d/.test(password)) password += Math.floor(Math.random() * 10);
-  if (!/[a-z]/.test(password)) password += "a";
-  if (!/[A-Z]/.test(password)) password += "Z";
-  if (password.length > length) password = password.slice(0, length);
-  return password;
-}
-
-
-export async function addPhaUserAction(userData: Omit<PhaUser, 'id' | 'status' | 'username'>): Promise<{ success: boolean; userId?: string; username?: string; error?: string; temporaryPassword?: string }> {
+export async function addPhaUserAction(
+  userData: Omit<PhaUser, 'id' | 'status' | 'username'>,
+  temporaryPasswordProvided: string // Added parameter for admin-set password
+): Promise<{ success: boolean; userId?: string; username?: string; error?: string; temporaryPassword?: string }> {
   console.log("Attempting to add PHA user (server action):", userData);
 
   if (!userData.name || !userData.email || !userData.program || !userData.role) {
     return { success: false, error: "Missing required fields (name, email, program, role)." };
+  }
+  if (temporaryPasswordProvided.length < 8) {
+      return { success: false, error: "Password must be at least 8 characters."};
   }
   if (!['Case Reporting'].includes(userData.program)) {
     return { success: false, error: "Invalid program specified." };
@@ -45,13 +36,12 @@ export async function addPhaUserAction(userData: Omit<PhaUser, 'id' | 'status' |
   }
 
   try {
-    const temporaryPassword = generateTemporaryPassword();
-    const username = `${userData.name.split(' ')[0].toLowerCase()}${generateRandomString(4)}`; 
+    const username = `${userData.name.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/gi, '')}${generateRandomString(4)}`; 
     
-    // 1. Create user in Firebase Authentication
     let authUserUid: string;
     try {
-      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, userData.email, temporaryPassword);
+      // Use the password provided by the admin
+      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, userData.email, temporaryPasswordProvided);
       authUserUid = userCredential.user.uid;
       console.log(`Firebase Auth user created successfully for ${userData.email} with UID ${authUserUid}.`);
     } catch (authError: any) {
@@ -60,12 +50,11 @@ export async function addPhaUserAction(userData: Omit<PhaUser, 'id' | 'status' |
       if (authError.code === 'auth/email-already-in-use') {
         errorMessage = "This email address is already registered. Please use a different email.";
       } else if (authError.code === 'auth/weak-password') {
-        errorMessage = "The generated password is too weak. Please try again (this is unlikely with auto-generation but possible).";
+        errorMessage = "The provided password is too weak. Please choose a stronger password.";
       }
       return { success: false, error: errorMessage };
     }
-
-    // 2. Create user record in Firestore
+    
     const newUserForFirestore: Omit<PhaUser, 'id'> = {
       username: username,
       name: userData.name,
@@ -76,21 +65,16 @@ export async function addPhaUserAction(userData: Omit<PhaUser, 'id' | 'status' |
       status: 'Active', 
       // @ts-ignore 
       createdAt: serverTimestamp(), 
+      authUid: authUserUid, // Store Firebase Auth UID
     };
-
-    // Using authUserUid as the document ID in Firestore for better linking,
-    // or you can let Firestore auto-generate an ID and store authUserUid as a field.
-    // For consistency with potential existing logic that doesn't expect UID as ID,
-    // I'll add it as a field and let Firestore generate the doc ID for 'phaUsers'.
-    // If you want to use UID as doc ID, change to: const userDocRef = doc(db, 'phaUsers', authUserUid); await setDoc(userDocRef, newUserForFirestore);
     
     const usersColRef = collection(db, 'phaUsers');
-    // Add authUserUid to the Firestore document
-    const docRef = await addDoc(usersColRef, { ...newUserForFirestore, authUid: authUserUid });
+    const docRef = await addDoc(usersColRef, newUserForFirestore); 
     
-    console.log(`PHA user Firestore record created for ${userData.email} with Firestore ID ${docRef.id}, Username: ${username}. Temporary Password: ${temporaryPassword}`);
+    console.log(`PHA user Firestore record created for ${userData.email} with Firestore ID ${docRef.id}, Username: ${username}. Temporary Password: ${temporaryPasswordProvided}`);
     
-    return { success: true, userId: docRef.id, username, temporaryPassword };
+    // Return the password that was set by the admin
+    return { success: true, userId: docRef.id, username, temporaryPassword: temporaryPasswordProvided };
 
   } catch (error) {
     const message = error instanceof Error ? error.message : "An unknown error occurred while adding the PHA user.";
@@ -141,7 +125,7 @@ export async function getPhaUsersAction(): Promise<{ success: boolean; users?: P
         program: data.program,
         role: data.role,
         status: data.status,
-        // authUid: data.authUid, // If you store it
+        // authUid: data.authUid, 
       } as PhaUser;
     });
     
@@ -165,20 +149,20 @@ export async function updatePhaUserAction(userId: string, userData: Partial<Omit
   try {
     const userDocRef = doc(db, 'phaUsers', userId);
     
-    const updatePayload: Partial<PhaUser> = {};
+    const updatePayload: Partial<PhaUser> & { updatedAt?: any } = {}; // Ensure updatedAt can be assigned serverTimestamp
     for (const key in userData) {
       if (userData[key as keyof typeof userData] !== undefined) {
         // @ts-ignore
         updatePayload[key as keyof PhaUser] = userData[key as keyof typeof userData];
       }
     }
-    // @ts-ignore 
+    
     updatePayload.updatedAt = serverTimestamp(); 
 
 
-    if (Object.keys(updatePayload).length === 1 && 'updatedAt' in updatePayload) { // Only updatedAt means no actual data changes
+    if (Object.keys(updatePayload).length === 1 && 'updatedAt' in updatePayload) { 
         console.warn("No actual data fields provided for update, only timestamp. Skipping Firestore write.");
-        return { success: true }; // Or return an error/warning if this is not desired
+        return { success: true }; 
     }
 
     await updateDoc(userDocRef, updatePayload);
@@ -199,10 +183,6 @@ export async function deletePhaUserAction(userId: string): Promise<{ success: bo
   if (!userId) {
     return { success: false, error: "User ID is required for deletion." };
   }
-  // IMPORTANT: This action currently only deletes the Firestore record.
-  // Deleting the Firebase Auth user record needs to be handled separately,
-  // typically via Firebase Admin SDK in a backend environment or by re-authenticating the user.
-  // For now, it will only delete the Firestore part.
 
   try {
     const userDocRef = doc(db, 'phaUsers', userId);
@@ -244,7 +224,7 @@ export async function getPhaUserByUsernameAction(username: string): Promise<{ su
       program: userData.program,
       role: userData.role,
       status: userData.status,
-      // authUid: userData.authUid, // If you store it
+      // authUid: userData.authUid, 
     };
     console.log(`User found for username ${username}:`, user);
     return { success: true, user };
@@ -254,3 +234,4 @@ export async function getPhaUserByUsernameAction(username: string): Promise<{ su
     return { success: false, error: message };
   }
 }
+
