@@ -17,9 +17,12 @@ export function MainHeader() {
   const [isVendorRole, setIsVendorRole] = useState(false);
   const [isCheckingVendorRole, setIsCheckingVendorRole] = useState(false);
 
+  // Role determination logic
+  const isPhaAdmin = currentUser?.email?.includes('@pha.gov');
+
   useEffect(() => {
     const determineVendorRole = async () => {
-      if (currentUser && currentUser.uid) {
+      if (currentUser && currentUser.uid && !isPhaAdmin) { // Only check if not PHA admin
         setIsCheckingVendorRole(true);
         try {
           const profileResult = await getVendorProfileAction(currentUser.uid);
@@ -30,35 +33,28 @@ export function MainHeader() {
           }
         } catch (error) {
           console.error("Error checking vendor role:", error);
-          setIsVendorRole(false); // Default to not vendor on error
+          setIsVendorRole(false); 
         } finally {
           setIsCheckingVendorRole(false);
         }
       } else {
-        // Clear vendor role if no user or uid
         setIsVendorRole(false);
         setIsCheckingVendorRole(false);
       }
     };
 
-    if (!authLoading) { // Only check role once auth state is resolved
+    if (!authLoading) { 
       determineVendorRole();
     }
-  }, [currentUser, authLoading]);
+  }, [currentUser, authLoading, isPhaAdmin]);
 
   const handleLogout = async () => {
     await logOut();
     router.push('/login');
   };
 
-  // Role determination logic
-  const isPhaAdmin = currentUser?.email?.includes('@pha.gov'); // Heuristic, consider more robust role management
-  // isVendorRole is determined by useEffect after checking Firestore
-
-  // Determine if HCO user: logged in, not PHA admin, not a vendor, and auth/role checks are complete
   const isHcoUser = currentUser && !isPhaAdmin && !isVendorRole && !authLoading && !isCheckingVendorRole;
-
-  const overallLoading = authLoading || (!!currentUser && isCheckingVendorRole);
+  const overallLoading = authLoading || (!!currentUser && !isPhaAdmin && isCheckingVendorRole);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background shadow-sm">
@@ -103,14 +99,14 @@ export function MainHeader() {
                       Vendor Portal
                     </Link>
                   </Button>
-                ) : isHcoUser ? ( // This condition ensures it only shows if not admin or vendor
+                ) : isHcoUser ? ( 
                   <Button variant="ghost" size="sm" asChild>
                     <Link href="/provider-portal">
                       <LayoutDashboard className="mr-2 h-4 w-4" />
                       Provider Portal
                     </Link>
                   </Button>
-                ) : null /* No specific portal link if roles are mixed or none of the above */}
+                ) : null}
               </div>
 
               {/* Mobile Links (Simplified): Shows the first applicable portal */}
@@ -143,7 +139,6 @@ export function MainHeader() {
                   Login
                 </Link>
               </Button>
-              {/* Vendor Registration button removed from here */}
             </>
           )}
         </div>
