@@ -7,7 +7,7 @@ import { useAppContext } from '@/context/AppContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, UserCircle, LayoutDashboard, LogOut, Workflow } from 'lucide-react';
+import { Loader2, UserCircle, LayoutDashboard, LogOut, Workflow, Settings } from 'lucide-react'; // Added Settings
 import Link from 'next/link';
 import type { EnrollmentData } from '@/types';
 import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps';
@@ -75,10 +75,18 @@ export default function ProviderPortalPage() {
           <LayoutDashboard className="mr-3 h-8 w-8 text-primary" />
           HCO Provider Portal
         </h1>
-        <Button variant="outline" onClick={handleLogout}>
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout
-        </Button>
+        <div className="flex space-x-2">
+          {/* Temporary Admin Console Button */}
+          <Button variant="outline" asChild>
+            <Link href="/admin">
+              <Settings className="mr-2 h-4 w-4" /> Admin Console (Temp)
+            </Link>
+          </Button>
+          <Button variant="outline" onClick={handleLogout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </Button>
+        </div>
       </div>
 
       {hcoEnrollment ? (
