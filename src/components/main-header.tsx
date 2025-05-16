@@ -143,10 +143,7 @@ export function MainHeader() {
                   Login
                 </Link>
               </Button>
-              {/* PHA Sign Up link removed */}
-              <Link href="/vendor-registration" className={buttonVariants({ variant: "outline", size: "sm", className: "hidden sm:inline-flex" })}>
-                Vendor Registration
-              </Link>
+              {/* Vendor Registration button removed from here */}
             </>
           )}
         </div>
