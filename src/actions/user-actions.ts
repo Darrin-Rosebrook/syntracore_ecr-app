@@ -2,7 +2,8 @@
 'use server';
 
 import type { PhaUser, PhaUserStatus } from '@/types';
-import { db } from '@/lib/firebase';
+import { db, auth as firebaseAuth } from '@/lib/firebase'; // Import firebaseAuth
+import { createUserWithEmailAndPassword } from 'firebase/auth'; // Import createUserWithEmailAndPassword
 import { serverTimestamp, collection, doc, setDoc, getDoc, updateDoc, getDocs, addDoc, query, orderBy, deleteDoc, where, limit, Timestamp } from 'firebase/firestore';
 
 // Helper function to generate a random string (for username or password)
@@ -47,7 +48,25 @@ export async function addPhaUserAction(userData: Omit<PhaUser, 'id' | 'status' |
     const temporaryPassword = generateTemporaryPassword();
     const username = `${userData.name.split(' ')[0].toLowerCase()}${generateRandomString(4)}`; 
     
-    const newUser: Omit<PhaUser, 'id'> = {
+    // 1. Create user in Firebase Authentication
+    let authUserUid: string;
+    try {
+      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, userData.email, temporaryPassword);
+      authUserUid = userCredential.user.uid;
+      console.log(`Firebase Auth user created successfully for ${userData.email} with UID ${authUserUid}.`);
+    } catch (authError: any) {
+      console.error("Error creating user in Firebase Authentication:", authError);
+      let errorMessage = "Failed to create user account in authentication system.";
+      if (authError.code === 'auth/email-already-in-use') {
+        errorMessage = "This email address is already registered. Please use a different email.";
+      } else if (authError.code === 'auth/weak-password') {
+        errorMessage = "The generated password is too weak. Please try again (this is unlikely with auto-generation but possible).";
+      }
+      return { success: false, error: errorMessage };
+    }
+
+    // 2. Create user record in Firestore
+    const newUserForFirestore: Omit<PhaUser, 'id'> = {
       username: username,
       name: userData.name,
       email: userData.email,
@@ -59,10 +78,17 @@ export async function addPhaUserAction(userData: Omit<PhaUser, 'id' | 'status' |
       createdAt: serverTimestamp(), 
     };
 
-    const usersColRef = collection(db, 'phaUsers');
-    const docRef = await addDoc(usersColRef, newUser);
+    // Using authUserUid as the document ID in Firestore for better linking,
+    // or you can let Firestore auto-generate an ID and store authUserUid as a field.
+    // For consistency with potential existing logic that doesn't expect UID as ID,
+    // I'll add it as a field and let Firestore generate the doc ID for 'phaUsers'.
+    // If you want to use UID as doc ID, change to: const userDocRef = doc(db, 'phaUsers', authUserUid); await setDoc(userDocRef, newUserForFirestore);
     
-    console.log(`PHA user created successfully for ${userData.email} with ID ${docRef.id}, Username: ${username}. Temporary Password: ${temporaryPassword}`);
+    const usersColRef = collection(db, 'phaUsers');
+    // Add authUserUid to the Firestore document
+    const docRef = await addDoc(usersColRef, { ...newUserForFirestore, authUid: authUserUid });
+    
+    console.log(`PHA user Firestore record created for ${userData.email} with Firestore ID ${docRef.id}, Username: ${username}. Temporary Password: ${temporaryPassword}`);
     
     return { success: true, userId: docRef.id, username, temporaryPassword };
 
@@ -81,13 +107,18 @@ export async function requestPasswordResetAction(email: string): Promise<{ succe
   }
 
   try {
+    // In a real scenario, this would use Firebase Auth's sendPasswordResetEmail
+    // await sendPasswordResetEmail(firebaseAuth, email);
     await new Promise(resolve => setTimeout(resolve, 1000)); 
-    console.log(`Simulated password reset email sent to ${email}.`);
+    console.log(`Simulated password reset email sent to ${email}. Full Firebase Auth password reset needs to be implemented.`);
     return { success: true };
 
   } catch (error) {
     const message = error instanceof Error ? error.message : "An unknown error occurred while requesting password reset.";
     console.error("Error in requestPasswordResetAction:", message, error);
+    // if (error.code === 'auth/user-not-found') {
+    //   return { success: false, error: "No user found with this email address." };
+    // }
     return { success: false, error: message };
   }
 }
@@ -110,6 +141,7 @@ export async function getPhaUsersAction(): Promise<{ success: boolean; users?: P
         program: data.program,
         role: data.role,
         status: data.status,
+        // authUid: data.authUid, // If you store it
       } as PhaUser;
     });
     
@@ -145,7 +177,8 @@ export async function updatePhaUserAction(userId: string, userData: Partial<Omit
 
 
     if (Object.keys(updatePayload).length === 1 && 'updatedAt' in updatePayload) { // Only updatedAt means no actual data changes
-        return { success: false, error: "No valid fields provided for update." };
+        console.warn("No actual data fields provided for update, only timestamp. Skipping Firestore write.");
+        return { success: true }; // Or return an error/warning if this is not desired
     }
 
     await updateDoc(userDocRef, updatePayload);
@@ -166,12 +199,16 @@ export async function deletePhaUserAction(userId: string): Promise<{ success: bo
   if (!userId) {
     return { success: false, error: "User ID is required for deletion." };
   }
+  // IMPORTANT: This action currently only deletes the Firestore record.
+  // Deleting the Firebase Auth user record needs to be handled separately,
+  // typically via Firebase Admin SDK in a backend environment or by re-authenticating the user.
+  // For now, it will only delete the Firestore part.
 
   try {
     const userDocRef = doc(db, 'phaUsers', userId);
     await deleteDoc(userDocRef); 
     
-    console.log(`User ${userId} successfully deleted from Firestore.`);
+    console.log(`User ${userId} successfully deleted from Firestore. Auth record may still exist.`);
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "An unknown error occurred while deleting the user from Firestore.";
@@ -207,6 +244,7 @@ export async function getPhaUserByUsernameAction(username: string): Promise<{ su
       program: userData.program,
       role: userData.role,
       status: userData.status,
+      // authUid: userData.authUid, // If you store it
     };
     console.log(`User found for username ${username}:`, user);
     return { success: true, user };
