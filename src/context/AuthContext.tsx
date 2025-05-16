@@ -55,19 +55,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("Auth state changed. User:", user ? user.email : null);
       setCurrentUser(user);
       if (user && user.email) {
+        console.log(`AuthContext: Checking PHA status for ${user.email}`);
         try {
           const phaUsersRef = collection(db, 'phaUsers');
           const q = query(phaUsersRef, where("email", "==", user.email), limit(1));
           const querySnapshot = await getDocs(q);
-          setIsPhaUser(!querySnapshot.empty);
+          const isPha = !querySnapshot.empty;
+          setIsPhaUser(isPha);
+          console.log(`AuthContext: ${user.email} isPhaUser status: ${isPha}`);
         } catch (error) {
-          console.error("Error checking PHA user status:", error);
+          console.error("AuthContext: Error checking PHA user status:", error);
           setIsPhaUser(false);
         }
       } else {
         setIsPhaUser(false);
+        console.log("AuthContext: No user or user email, isPhaUser set to false.");
       }
       setLoading(false);
       setShowGlobalLoader(false);
@@ -77,11 +82,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signUp = async (email: string, password: string): Promise<User | null> => {
     setLoading(true);
-    setIsPhaUser(false); // Reset PHA status on new signup, determined on next auth state change
+    setIsPhaUser(false); 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       toast({ title: 'Sign Up Successful', description: 'Welcome!' });
-      // isPhaUser will be determined by onAuthStateChanged
       return userCredential.user;
     } catch (error) {
       const authError = error as AuthError;
@@ -99,14 +103,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const logIn = async (identifier: string, password: string): Promise<User | null> => {
     setLoading(true);
-    setIsPhaUser(false); // Reset before attempting login
+    setIsPhaUser(false); 
     let emailToUse = identifier;
 
     if (!identifier.includes('@')) {
+      console.log(`AuthContext: Identifier "${identifier}" is not an email. Attempting username lookup.`);
       const usernameLookupResult = await getPhaUserByUsernameAction(identifier);
       if (usernameLookupResult.success && usernameLookupResult.user?.email) {
         emailToUse = usernameLookupResult.user.email;
+        console.log(`AuthContext: Username "${identifier}" resolved to email "${emailToUse}".`);
       } else {
+        console.log(`AuthContext: Username lookup failed for "${identifier}". Error: ${usernameLookupResult.error}`);
         toast({
           title: 'Login Failed',
           description: 'Invalid username or password.',
@@ -120,7 +127,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, emailToUse, password);
       toast({ title: 'Login Successful', description: 'Welcome back!' });
-      // isPhaUser will be determined by onAuthStateChanged hook after login triggers it
       return userCredential.user;
     } catch (error) {
       const authError = error as AuthError;
@@ -140,7 +146,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setLoading(true);
     try {
       await signOut(auth);
-      setIsPhaUser(false); // Reset PHA status on logout
+      setIsPhaUser(false); 
       toast({
         title: 'Logged Out',
         description: 'You have been successfully logged out.',
@@ -182,7 +188,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const value = {
     currentUser,
     loading,
-    isPhaUser, // Expose isPhaUser
+    isPhaUser, 
     signUp,
     logIn,
     logOut,

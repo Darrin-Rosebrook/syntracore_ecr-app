@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { getVendorProfileAction } from '@/actions/vendor-actions';
 
 export function MainHeader() {
-  const { currentUser, logOut, loading: authLoading, isPhaUser } = useAuth(); // Use isPhaUser from context
+  const { currentUser, logOut, loading: authLoading, isPhaUser } = useAuth(); 
   const router = useRouter();
 
   const [isVendorRole, setIsVendorRole] = useState(false);
@@ -19,7 +19,7 @@ export function MainHeader() {
 
   useEffect(() => {
     const determineVendorRole = async () => {
-      if (currentUser && currentUser.uid && !isPhaUser) { // Only check if not a PHA user
+      if (currentUser && currentUser.uid && !isPhaUser) { 
         setIsCheckingVendorRole(true);
         try {
           const profileResult = await getVendorProfileAction(currentUser.uid);
@@ -42,13 +42,14 @@ export function MainHeader() {
         setIsVendorRole(false);
         setIsCheckingVendorRole(false);
     }
-  }, [currentUser, authLoading, isPhaUser]); // Add isPhaUser to dependencies
+  }, [currentUser, authLoading, isPhaUser]); 
 
   const handleLogout = async () => {
     await logOut();
-    router.push('/'); // Redirect to home after logout, then login page if needed
+    router.push('/'); 
   };
 
+  // isHcoUser is true if the user is logged in, not a PHA user, and not a Vendor.
   const isHcoUser = currentUser && !isPhaUser && !isVendorRole;
   const overallLoading = authLoading || (currentUser && !isPhaUser && isCheckingVendorRole);
 
@@ -79,7 +80,8 @@ export function MainHeader() {
                 {currentUser.email}
               </span>
 
-              {isPhaUser && ( // Use isPhaUser from context
+              {/* Admin button is displayed if isPhaUser is true, determined by AuthContext */}
+              {isPhaUser && (
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/admin">
                     <Settings className="mr-2 h-4 w-4" />
@@ -119,7 +121,6 @@ export function MainHeader() {
                   Login
                 </Link>
               </Button>
-              {/* Vendor registration tab is now on the main page for guests */}
             </>
           )}
         </div>
