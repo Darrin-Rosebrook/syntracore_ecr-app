@@ -143,9 +143,7 @@ export function MainHeader() {
                   Login
                 </Link>
               </Button>
-              <Link href="/signup" className={buttonVariants({ variant: "default", size: "sm", className: "bg-primary text-primary-foreground hover:bg-primary/90 hidden sm:inline-flex" })}>
-                PHA Sign Up
-              </Link>
+              {/* PHA Sign Up link removed */}
               <Link href="/vendor-registration" className={buttonVariants({ variant: "outline", size: "sm", className: "hidden sm:inline-flex" })}>
                 Vendor Registration
               </Link>
