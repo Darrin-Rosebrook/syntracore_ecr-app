@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
-import { Button } from "@/components/ui/button"; // Removed buttonVariants as it's not used
+import { Button } from "@/components/ui/button";
 import { LogIn, LogOut, UserCircle, Settings, Building, LayoutDashboard, Loader2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { getVendorProfileAction } from '@/actions/vendor-actions';
@@ -17,20 +17,15 @@ export function MainHeader() {
   const [isVendorRole, setIsVendorRole] = useState(false);
   const [isCheckingVendorRole, setIsCheckingVendorRole] = useState(false);
 
-  // Role determination logic
   const isPhaAdmin = currentUser?.email?.includes('@pha.gov');
 
   useEffect(() => {
     const determineVendorRole = async () => {
-      if (currentUser && currentUser.uid && !isPhaAdmin) { // Only check if not PHA admin
+      if (currentUser && currentUser.uid && !isPhaAdmin) {
         setIsCheckingVendorRole(true);
         try {
           const profileResult = await getVendorProfileAction(currentUser.uid);
-          if (profileResult.success && profileResult.data) {
-            setIsVendorRole(true);
-          } else {
-            setIsVendorRole(false);
-          }
+          setIsVendorRole(profileResult.success && !!profileResult.data);
         } catch (error) {
           console.error("Error checking vendor role:", error);
           setIsVendorRole(false);
@@ -43,8 +38,11 @@ export function MainHeader() {
       }
     };
 
-    if (!authLoading) {
+    if (!authLoading && currentUser) { // Check role only if user is loaded and present
       determineVendorRole();
+    } else if (!authLoading && !currentUser) { // Reset if user logs out
+        setIsVendorRole(false);
+        setIsCheckingVendorRole(false);
     }
   }, [currentUser, authLoading, isPhaAdmin]);
 
@@ -53,8 +51,8 @@ export function MainHeader() {
     router.push('/login');
   };
 
-  const isHcoUser = currentUser && !isPhaAdmin && !isVendorRole && !authLoading && !isCheckingVendorRole;
-  const overallLoading = authLoading || (!!currentUser && !isPhaAdmin && isCheckingVendorRole);
+  const isHcoUser = currentUser && !isPhaAdmin && !isVendorRole;
+  const overallLoading = authLoading || (currentUser && !isPhaAdmin && isCheckingVendorRole);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background shadow-sm">
@@ -83,36 +81,31 @@ export function MainHeader() {
                 {currentUser.email}
               </span>
 
-              {/* Links for specific user roles */}
-              {isPhaAdmin && ( // Show Admin button if PHA admin
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/admin">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Admin
-                    </Link>
-                  </Button>
-                </div>
+              {isPhaAdmin && (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/admin">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Admin
+                  </Link>
+                </Button>
               )}
-              {isVendorRole && !isPhaAdmin && ( // Show Vendor Portal if vendor AND NOT PHA admin
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/vendor-portal">
-                      <Building className="mr-2 h-4 w-4" />
-                      Vendor Portal
-                    </Link>
-                  </Button>
-                </div>
+
+              {!isPhaAdmin && isVendorRole && (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/vendor-portal">
+                    <Building className="mr-2 h-4 w-4" />
+                    Vendor Portal
+                  </Link>
+                </Button>
               )}
-              {isHcoUser && !isPhaAdmin && !isVendorRole && ( // Show Provider Portal if HCO User AND NOT PHA admin or Vendor
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/provider-portal">
-                      <LayoutDashboard className="mr-2 h-4 w-4" />
-                      Provider Portal
-                    </Link>
-                  </Button>
-                </div>
+
+              {!isPhaAdmin && isHcoUser && ( // Show Provider Portal if HCO User AND NOT PHA admin or Vendor
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/provider-portal">
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    Provider Portal
+                  </Link>
+                </Button>
               )}
 
               <Button variant="outline" size="sm" onClick={handleLogout}>
@@ -121,7 +114,6 @@ export function MainHeader() {
               </Button>
             </>
           ) : (
-            // Guest Links (Login Only)
             <>
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/login">
@@ -129,7 +121,6 @@ export function MainHeader() {
                   Login
                 </Link>
               </Button>
-              {/* Vendor Registration button was removed here earlier */}
             </>
           )}
         </div>

@@ -5,12 +5,10 @@ import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from "@/components/dashboard-tab";
 import { HcoRegistrationSplashPage } from "@/components/hco-registration-splash-page";
-// PHA Reviewer Dashboard is not shown to default users or guests in this reverted state
-// import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
-// EHRVendorsTab and HealthSystemsTab are PHA-specific, so not shown by default here
-// import { EhrVendorsTab } from "@/components/ehr-vendors-tab";
-// import { HealthSystemsTab } from "@/components/health-systems-tab";
-import { LayoutDashboard, FilePenLine, Building, Loader2, ArrowRight } from "lucide-react"; // Adjusted icons
+import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
+import { EhrVendorsTab } from "@/components/ehr-vendors-tab";
+import { HealthSystemsTab } from "@/components/health-systems-tab";
+import { LayoutDashboard, FilePenLine, Building, Loader2, ArrowRight, ClipboardList, Network, ListTree } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import Link from 'next/link';
@@ -21,16 +19,26 @@ export default function HomePage() {
   const {
     enrollments,
     customFieldDefinitions,
-    // updateEnrollmentStatus, // Not used directly by non-PHA view
+    updateEnrollmentStatus,
     isLoading
   } = useAppContext();
   const { currentUser } = useAuth();
+  const isPhaAdmin = currentUser?.email?.includes('@pha.gov');
 
-  // Determine tab layout and visible tabs based on user type
-  let tabListCols = "sm:grid-cols-1"; // Default
+  let tabListCols = "sm:grid-cols-1";
   const tabsToRender: { value: string; label: string; icon: React.ElementType; content: React.ReactNode; condition?: boolean }[] = [];
+  let defaultTabValue: string;
 
-  if (!currentUser) { // Guest user
+  if (isPhaAdmin) {
+    tabListCols = "sm:grid-cols-4";
+    tabsToRender.push(
+      { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: <DashboardTab />, condition: true },
+      { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} />, condition: true },
+      { value: "health-systems", label: "Health Systems", icon: Network, content: <HealthSystemsTab />, condition: true },
+      { value: "ehr-vendors", label: "EHR/LIMS Vendors", icon: ListTree, content: <EhrVendorsTab enrollments={enrollments} />, condition: true }
+    );
+    defaultTabValue = "dashboard"; // Default to Project Dashboard for PHA Admins
+  } else if (!currentUser) { // Guest user
     tabListCols = "sm:grid-cols-3";
     tabsToRender.push(
       { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: <DashboardTab />, condition: true },
@@ -42,25 +50,22 @@ export default function HomePage() {
         </Card>
       ), condition: true }
     );
-  } else { // Any logged-in user (generic view before role-specific tailoring)
+    defaultTabValue = "hco-registration";
+  } else { // Any other logged-in user (e.g., Vendor, HCO navigating back to main page)
     tabListCols = "sm:grid-cols-1";
     tabsToRender.push(
       { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: <DashboardTab />, condition: true }
     );
+    defaultTabValue = "dashboard";
   }
   
   const visibleTabs = tabsToRender.filter(tab => tab.condition !== false);
-
-  const getDefaultTab = React.useCallback(() => {
-    if (!currentUser) return "hco-registration"; // Default for guests
-    return "dashboard"; // Default for other logged-in users
-  }, [currentUser]);
   
-  const [activeTab, setActiveTab] = React.useState(getDefaultTab());
+  const [activeTab, setActiveTab] = React.useState(defaultTabValue);
 
   React.useEffect(() => {
-    setActiveTab(getDefaultTab());
-  }, [getDefaultTab]);
+    setActiveTab(defaultTabValue);
+  }, [defaultTabValue, currentUser]); // Added currentUser to re-evaluate defaultTabValue on login/logout
 
 
   if (isLoading && !enrollments.length && !customFieldDefinitions.length) {
