@@ -23,7 +23,7 @@ export default function HcoRegistrationPage() {
   }
 
   return (
-    <ScrollArea className="h-[calc(100vh-4rem)]"> {/* Adjust height to account for header */}
+    <ScrollArea className="h-[calc(100vh-4rem)]"> {/* Adjusted height to ensure full visibility and scrolling */}
       <div className="container mx-auto py-8">
         <div className="mb-6">
             <Button variant="outline" asChild size="sm">
@@ -33,11 +33,10 @@ export default function HcoRegistrationPage() {
               </Link>
             </Button>
         </div>
-        <ProviderEnrollmentForm 
+        <ProviderEnrollmentForm
           customFieldDefinitions={customFieldDefinitions}
         />
       </div>
     </ScrollArea>
   );
 }
-
