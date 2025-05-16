@@ -22,22 +22,21 @@ export default function HomePage() {
     updateEnrollmentStatus,
     isLoading
   } = useAppContext();
-  const { currentUser } = useAuth();
-  const isPhaAdmin = currentUser?.email?.includes('@pha.gov');
+  const { currentUser, isPhaUser } = useAuth(); // Use isPhaUser from context
 
   let tabListCols = "sm:grid-cols-1";
   const tabsToRender: { value: string; label: string; icon: React.ElementType; content: React.ReactNode; condition?: boolean }[] = [];
   let defaultTabValue: string;
 
-  if (isPhaAdmin) {
-    tabListCols = "sm:grid-cols-4";
+  if (isPhaUser) { // Use isPhaUser from context
+    tabListCols = "sm:grid-cols-4"; // Adjusted for 4 tabs
     tabsToRender.push(
       { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: <DashboardTab />, condition: true },
       { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} />, condition: true },
       { value: "health-systems", label: "Health Systems", icon: Network, content: <HealthSystemsTab />, condition: true },
       { value: "ehr-vendors", label: "EHR/LIMS Vendors", icon: ListTree, content: <EhrVendorsTab enrollments={enrollments} />, condition: true }
     );
-    defaultTabValue = "dashboard"; // Default to Project Dashboard for PHA Admins
+    defaultTabValue = "dashboard";
   } else if (!currentUser) { // Guest user
     tabListCols = "sm:grid-cols-3";
     tabsToRender.push(
@@ -64,8 +63,17 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = React.useState(defaultTabValue);
 
   React.useEffect(() => {
-    setActiveTab(defaultTabValue);
-  }, [defaultTabValue, currentUser]); // Added currentUser to re-evaluate defaultTabValue on login/logout
+    // Update defaultTabValue based on the latest currentUser and isPhaUser status
+    let newDefaultTabValue;
+    if (isPhaUser) {
+        newDefaultTabValue = "dashboard"; // Or "pha-reviewer" if preferred
+    } else if (!currentUser) {
+        newDefaultTabValue = "hco-registration";
+    } else {
+        newDefaultTabValue = "dashboard";
+    }
+    setActiveTab(newDefaultTabValue);
+  }, [isPhaUser, currentUser]);
 
 
   if (isLoading && !enrollments.length && !customFieldDefinitions.length) {

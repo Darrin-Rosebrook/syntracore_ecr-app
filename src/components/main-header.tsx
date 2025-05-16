@@ -11,17 +11,15 @@ import { useRouter } from 'next/navigation';
 import { getVendorProfileAction } from '@/actions/vendor-actions';
 
 export function MainHeader() {
-  const { currentUser, logOut, loading: authLoading } = useAuth();
+  const { currentUser, logOut, loading: authLoading, isPhaUser } = useAuth(); // Use isPhaUser from context
   const router = useRouter();
 
   const [isVendorRole, setIsVendorRole] = useState(false);
   const [isCheckingVendorRole, setIsCheckingVendorRole] = useState(false);
 
-  const isPhaAdmin = currentUser?.email?.includes('@pha.gov');
-
   useEffect(() => {
     const determineVendorRole = async () => {
-      if (currentUser && currentUser.uid && !isPhaAdmin) {
+      if (currentUser && currentUser.uid && !isPhaUser) { // Only check if not a PHA user
         setIsCheckingVendorRole(true);
         try {
           const profileResult = await getVendorProfileAction(currentUser.uid);
@@ -38,21 +36,21 @@ export function MainHeader() {
       }
     };
 
-    if (!authLoading && currentUser) { // Check role only if user is loaded and present
+    if (!authLoading && currentUser) {
       determineVendorRole();
-    } else if (!authLoading && !currentUser) { // Reset if user logs out
+    } else if (!authLoading && !currentUser) {
         setIsVendorRole(false);
         setIsCheckingVendorRole(false);
     }
-  }, [currentUser, authLoading, isPhaAdmin]);
+  }, [currentUser, authLoading, isPhaUser]); // Add isPhaUser to dependencies
 
   const handleLogout = async () => {
     await logOut();
-    router.push('/login');
+    router.push('/'); // Redirect to home after logout, then login page if needed
   };
 
-  const isHcoUser = currentUser && !isPhaAdmin && !isVendorRole;
-  const overallLoading = authLoading || (currentUser && !isPhaAdmin && isCheckingVendorRole);
+  const isHcoUser = currentUser && !isPhaUser && !isVendorRole;
+  const overallLoading = authLoading || (currentUser && !isPhaUser && isCheckingVendorRole);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background shadow-sm">
@@ -81,7 +79,7 @@ export function MainHeader() {
                 {currentUser.email}
               </span>
 
-              {isPhaAdmin && (
+              {isPhaUser && ( // Use isPhaUser from context
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/admin">
                     <Settings className="mr-2 h-4 w-4" />
@@ -90,7 +88,7 @@ export function MainHeader() {
                 </Button>
               )}
 
-              {!isPhaAdmin && isVendorRole && (
+              {!isPhaUser && isVendorRole && (
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/vendor-portal">
                     <Building className="mr-2 h-4 w-4" />
@@ -99,7 +97,7 @@ export function MainHeader() {
                 </Button>
               )}
 
-              {!isPhaAdmin && isHcoUser && ( // Show Provider Portal if HCO User AND NOT PHA admin or Vendor
+              {isHcoUser && (
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/provider-portal">
                     <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -121,6 +119,7 @@ export function MainHeader() {
                   Login
                 </Link>
               </Button>
+              {/* Vendor registration tab is now on the main page for guests */}
             </>
           )}
         </div>

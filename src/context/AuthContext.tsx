@@ -8,7 +8,7 @@ import React, {
   useEffect,
   ReactNode,
 } from 'react';
-import { auth } from '@/firebase-config'; 
+import { auth, db } from '@/lib/firebase'; // Ensure db is imported
 import type { User, AuthError } from 'firebase/auth';
 import {
   createUserWithEmailAndPassword,
@@ -19,13 +19,15 @@ import {
 } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { getPhaUserByUsernameAction } from '@/actions/user-actions'; // Import the new action
+import { getPhaUserByUsernameAction } from '@/actions/user-actions';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore'; // Firestore imports
 
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
+  isPhaUser: boolean; // New state for PHA user status
   signUp: (email: string, password: string) => Promise<User | null>;
-  logIn: (identifier: string, password: string) => Promise<User | null>; // Changed email to identifier
+  logIn: (identifier: string, password: string) => Promise<User | null>;
   logOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
 }
@@ -47,23 +49,39 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPhaUser, setIsPhaUser] = useState(false); // Initialize PHA user state
   const [showGlobalLoader, setShowGlobalLoader] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      if (user && user.email) {
+        try {
+          const phaUsersRef = collection(db, 'phaUsers');
+          const q = query(phaUsersRef, where("email", "==", user.email), limit(1));
+          const querySnapshot = await getDocs(q);
+          setIsPhaUser(!querySnapshot.empty);
+        } catch (error) {
+          console.error("Error checking PHA user status:", error);
+          setIsPhaUser(false);
+        }
+      } else {
+        setIsPhaUser(false);
+      }
       setLoading(false);
-      setShowGlobalLoader(false); 
+      setShowGlobalLoader(false);
     });
     return unsubscribe;
   }, []);
 
   const signUp = async (email: string, password: string): Promise<User | null> => {
     setLoading(true);
+    setIsPhaUser(false); // Reset PHA status on new signup, determined on next auth state change
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       toast({ title: 'Sign Up Successful', description: 'Welcome!' });
+      // isPhaUser will be determined by onAuthStateChanged
       return userCredential.user;
     } catch (error) {
       const authError = error as AuthError;
@@ -81,18 +99,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const logIn = async (identifier: string, password: string): Promise<User | null> => {
     setLoading(true);
+    setIsPhaUser(false); // Reset before attempting login
     let emailToUse = identifier;
 
-    // Check if identifier is likely an email
     if (!identifier.includes('@')) {
-      // Assume it's a username, try to fetch email
-      console.log(`Identifier "${identifier}" doesn't look like an email. Attempting username lookup.`);
       const usernameLookupResult = await getPhaUserByUsernameAction(identifier);
       if (usernameLookupResult.success && usernameLookupResult.user?.email) {
         emailToUse = usernameLookupResult.user.email;
-        console.log(`Username "${identifier}" maps to email "${emailToUse}".`);
       } else {
-        console.log(`Failed to find email for username "${identifier}". Error: ${usernameLookupResult.error}`);
         toast({
           title: 'Login Failed',
           description: 'Invalid username or password.',
@@ -106,13 +120,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, emailToUse, password);
       toast({ title: 'Login Successful', description: 'Welcome back!' });
+      // isPhaUser will be determined by onAuthStateChanged hook after login triggers it
       return userCredential.user;
     } catch (error) {
       const authError = error as AuthError;
       console.error('Login error:', authError);
       toast({
         title: 'Login Failed',
-        description: 'Invalid username or password.', // Generic message for security
+        description: 'Invalid username or password.',
         variant: 'destructive',
       });
       return null;
@@ -125,6 +140,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setLoading(true);
     try {
       await signOut(auth);
+      setIsPhaUser(false); // Reset PHA status on logout
       toast({
         title: 'Logged Out',
         description: 'You have been successfully logged out.',
@@ -166,13 +182,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const value = {
     currentUser,
     loading,
+    isPhaUser, // Expose isPhaUser
     signUp,
     logIn,
     logOut,
     resetPassword,
   };
 
-  if (showGlobalLoader && loading) { 
+  if (showGlobalLoader && loading) {
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
