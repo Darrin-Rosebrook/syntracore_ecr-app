@@ -8,7 +8,7 @@ import { HcoRegistrationSplashPage } from "@/components/hco-registration-splash-
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
 import { EhrVendorsTab } from "@/components/ehr-vendors-tab";
 import { HealthSystemsTab } from "@/components/health-systems-tab";
-import { LayoutDashboard, FilePenLine, Building, Loader2, ArrowRight, ClipboardList, Network, ListTree } from "lucide-react";
+import { LayoutDashboard, FilePenLine, Building, Loader2, ArrowRight, ClipboardList, Network, ListTree, BarChart3 } from "lucide-react"; // Added BarChart3
 import { useAppContext } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import Link from 'next/link';
@@ -29,11 +29,18 @@ export default function HomePage() {
   let defaultTabValue: string;
 
   if (isPhaUser) {
-    tabListCols = "sm:grid-cols-3"; // Adjusted for 3 tabs
+    tabListCols = "sm:grid-cols-4"; // Adjusted for 4 tabs
     tabsToRender.push(
       { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} />, condition: true },
       { value: "health-systems", label: "Health Systems", icon: Network, content: <HealthSystemsTab />, condition: true },
-      { value: "ehr-vendors", label: "EHR/LIMS Vendors", icon: ListTree, content: <EhrVendorsTab enrollments={enrollments} />, condition: true }
+      { value: "ehr-vendors", label: "EHR/LIMS Vendors", icon: ListTree, content: <EhrVendorsTab enrollments={enrollments} />, condition: true },
+      { value: "reports", label: "Reports", icon: BarChart3, content: (
+          <Card className="w-full shadow-xl text-center">
+            <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center"><BarChart3 className="mr-3 h-8 w-8 text-primary" />Reports Dashboard</CardTitle><CardDescription className="text-lg text-foreground/80 mt-2">Access and generate various reports related to HCO onboarding and system data.</CardDescription></CardHeader>
+            <CardContent className="space-y-6"><p className="text-md leading-relaxed">This section is under development. Future enhancements will include customizable reports, data visualizations, and export functionalities to provide insights into the eCR onboarding process and related metrics.</p></CardContent>
+          </Card>
+        ), condition: true 
+      }
     );
     defaultTabValue = "pha-reviewer"; 
   } else if (!currentUser) { // Guest user
@@ -70,20 +77,16 @@ export default function HomePage() {
     } else {
         newDefaultTabValue = "dashboard";
     }
-    // Only update activeTab if it's not already set to the newDefaultTabValue
-    // or if the current activeTab is no longer valid for the current user type
     const currentActiveTabIsValid = visibleTabs.some(tab => tab.value === activeTab);
     if (activeTab !== newDefaultTabValue && !currentActiveTabIsValid) {
         setActiveTab(newDefaultTabValue);
     } else if (!currentActiveTabIsValid && visibleTabs.length > 0) {
-        // If current active tab is not valid, set to the first valid tab
         setActiveTab(visibleTabs[0].value);
     } else if (visibleTabs.length === 0 && activeTab !== "") {
-        // If no tabs are visible, clear active tab (edge case)
         setActiveTab("");
     }
 
-  }, [isPhaUser, currentUser, activeTab, visibleTabs]); // Added activeTab and visibleTabs to dependency array
+  }, [isPhaUser, currentUser, activeTab, visibleTabs]);
 
 
   if (isLoading && !enrollments.length && !customFieldDefinitions.length) {
