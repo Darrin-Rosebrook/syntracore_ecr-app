@@ -22,21 +22,20 @@ export default function HomePage() {
     updateEnrollmentStatus,
     isLoading
   } = useAppContext();
-  const { currentUser, isPhaUser } = useAuth(); // Use isPhaUser from context
+  const { currentUser, isPhaUser } = useAuth(); 
 
   let tabListCols = "sm:grid-cols-1";
   const tabsToRender: { value: string; label: string; icon: React.ElementType; content: React.ReactNode; condition?: boolean }[] = [];
   let defaultTabValue: string;
 
   if (isPhaUser) {
-    tabListCols = "sm:grid-cols-4";
+    tabListCols = "sm:grid-cols-3"; // Adjusted for 3 tabs
     tabsToRender.push(
-      { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: <DashboardTab />, condition: true },
       { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} />, condition: true },
       { value: "health-systems", label: "Health Systems", icon: Network, content: <HealthSystemsTab />, condition: true },
       { value: "ehr-vendors", label: "EHR/LIMS Vendors", icon: ListTree, content: <EhrVendorsTab enrollments={enrollments} />, condition: true }
     );
-    defaultTabValue = "pha-reviewer"; // Changed: Default to PHA Reviewer for PHA users
+    defaultTabValue = "pha-reviewer"; 
   } else if (!currentUser) { // Guest user
     tabListCols = "sm:grid-cols-3";
     tabsToRender.push(
@@ -65,14 +64,26 @@ export default function HomePage() {
   React.useEffect(() => {
     let newDefaultTabValue;
     if (isPhaUser) {
-        newDefaultTabValue = "pha-reviewer"; // Ensure default is PHA Reviewer for PHA users
+        newDefaultTabValue = "pha-reviewer"; 
     } else if (!currentUser) {
         newDefaultTabValue = "hco-registration";
     } else {
         newDefaultTabValue = "dashboard";
     }
-    setActiveTab(newDefaultTabValue);
-  }, [isPhaUser, currentUser]);
+    // Only update activeTab if it's not already set to the newDefaultTabValue
+    // or if the current activeTab is no longer valid for the current user type
+    const currentActiveTabIsValid = visibleTabs.some(tab => tab.value === activeTab);
+    if (activeTab !== newDefaultTabValue && !currentActiveTabIsValid) {
+        setActiveTab(newDefaultTabValue);
+    } else if (!currentActiveTabIsValid && visibleTabs.length > 0) {
+        // If current active tab is not valid, set to the first valid tab
+        setActiveTab(visibleTabs[0].value);
+    } else if (visibleTabs.length === 0 && activeTab !== "") {
+        // If no tabs are visible, clear active tab (edge case)
+        setActiveTab("");
+    }
+
+  }, [isPhaUser, currentUser, activeTab, visibleTabs]); // Added activeTab and visibleTabs to dependency array
 
 
   if (isLoading && !enrollments.length && !customFieldDefinitions.length) {
