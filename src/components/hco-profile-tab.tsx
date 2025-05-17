@@ -14,10 +14,10 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isValid } from 'date-fns';
-import { Edit, Save, UserCircle, Building, Settings2, FileText, CalendarDays, Info, Loader2, User, Hash } from 'lucide-react';
-import { EHR_VENDORS } from '@/lib/constants';
+import { Edit, Save, UserCircle, Building, Settings2, FileText, CalendarDays, Info, Loader2, User, Hash, Network } from 'lucide-react'; // Added Network
+import { EHR_VENDORS, OHIO_HEALTH_SYSTEMS } from '@/lib/constants'; // Added OHIO_HEALTH_SYSTEMS
 import { FHIRValidationDisplay } from '@/components/fhir-validation-display';
-import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps'; // Added import
+import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps';
 
 type EditableFieldOnChangeEvent =
   | ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -63,6 +63,10 @@ const EditableField: React.FC<EditableFieldProps> = ({
     if (name === 'ehrVendor' && EHR_VENDORS) {
         const vendor = EHR_VENDORS.find(v => v.value === val);
         return vendor ? vendor.label : String(val);
+    }
+    if (name === 'practiceInfo.healthSystem' && OHIO_HEALTH_SYSTEMS) {
+        const system = OHIO_HEALTH_SYSTEMS.find(hs => hs.value === val);
+        return system ? system.label : String(val);
     }
     return String(val);
   };
@@ -310,6 +314,8 @@ export function HcoProfileTab({
     ? format(parseISO(enrollment.submissionDate), 'PPP p')
     : 'Invalid Date';
 
+  const healthSystemOptions = OHIO_HEALTH_SYSTEMS.map(hs => ({ label: hs.label, value: hs.value }));
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mt-2">
@@ -345,6 +351,16 @@ export function HcoProfileTab({
             <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><Building className="mr-2 h-4 w-4 text-muted-foreground"/>Practice Information</h4>
             <EditableField label="Organization NPI" name="practiceInfo.organizationNPI" value={formData.practiceInfo?.organizationNPI} isEditing={isEditing} onChange={handleInputChange} icon={Hash} />
             <EditableField label="Practice Name" name="practiceInfo.name" value={formData.practiceInfo?.name} isEditing={isEditing} onChange={handleInputChange} />
+            <EditableField
+              label="Health System"
+              name="practiceInfo.healthSystem"
+              value={formData.practiceInfo?.healthSystem}
+              isEditing={isEditing}
+              onChange={handleInputChange}
+              type="select"
+              options={healthSystemOptions}
+              icon={Network}
+            />
             <EditableField label="Address" name="practiceInfo.address" value={formData.practiceInfo?.address} type="textarea" isEditing={isEditing} onChange={handleInputChange} />
             <EditableField label="Phone" name="practiceInfo.phone" value={formData.practiceInfo?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
         </div>
@@ -420,3 +436,4 @@ export function HcoProfileTab({
     </div>
   );
 }
+

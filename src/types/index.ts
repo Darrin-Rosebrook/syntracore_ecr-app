@@ -7,6 +7,7 @@ export interface PracticeInfo {
   name: string;
   address: string;
   phone: string;
+  healthSystem?: string; // Added field for health system affiliation
 }
 
 export interface ContactDetails { // This will represent the primary contact
@@ -207,3 +208,4 @@ export interface VendorProfileData {
   createdAt: string; // ISO string
   lastLogin?: string; // ISO string
 }
+
