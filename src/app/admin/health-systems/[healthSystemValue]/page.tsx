@@ -14,6 +14,7 @@ import { useAppContext } from '@/context/AppContext';
 import type { EnrollmentData } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
+import { Label } from '@/components/ui/label'; // Added import for Label
 
 export default function HealthSystemProfilePage() {
   const router = useRouter();
