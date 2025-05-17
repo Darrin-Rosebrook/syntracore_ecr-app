@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -16,6 +17,7 @@ import { format, parseISO, isValid } from 'date-fns';
 import { Edit, Save, UserCircle, Building, Settings2, FileText, CalendarDays, Info, Loader2, User, Hash } from 'lucide-react';
 import { EHR_VENDORS } from '@/lib/constants';
 import { FHIRValidationDisplay } from '@/components/fhir-validation-display';
+import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps'; // Added import
 
 type EditableFieldOnChangeEvent =
   | ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -402,6 +404,11 @@ export function HcoProfileTab({
             </div>
         </div>
       )}
+
+      {/* Workflow Steps Rendered Here */}
+      <div className="mt-6 border-t pt-6">
+        <HcoOnboardingWorkflowSteps enrollment={enrollment} />
+      </div>
       
       {enrollment.ccdDocumentName && (
          <div className="mt-6 border-t pt-4">

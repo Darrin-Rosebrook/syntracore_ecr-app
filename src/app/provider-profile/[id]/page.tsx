@@ -17,7 +17,7 @@ import { HcoProfileTab } from '@/components/hco-profile-tab';
 import { DocumentsTab } from '@/components/documents-tab';
 import { ContactsTab } from '@/components/contacts-tab';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps'; // Added import
+// Removed import for HcoOnboardingWorkflowSteps as it's now in HcoProfileTab
 
 // Define SectionCard here as it was in the original file, now fixed.
 // This component might be intended for use within the tabs or was part of a previous design.
@@ -116,7 +116,7 @@ export default function ProviderProfilePage() {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Loading provider profile...</p>
+        <p className="ml-4 text-lg text-muted-foreground">Loading HCO profile...</p>
       </div>
     );
   }
@@ -124,7 +124,7 @@ export default function ProviderProfilePage() {
   if (!currentEnrollment && !isContextLoading) { 
     return (
       <div className="container mx-auto py-8 text-center">
-        <h1 className="text-2xl font-bold mb-4">Provider Profile Not Found</h1>
+        <h1 className="text-2xl font-bold mb-4">HCO Profile Not Found</h1>
         <p className="text-muted-foreground mb-6">The profile with ID "{id}" could not be found.</p>
         <Button asChild variant="outline">
           <Link href="/">
@@ -148,11 +148,9 @@ export default function ProviderProfilePage() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
-          <h1 className="text-2xl font-bold text-primary">Provider: {currentEnrollment.practiceInfo.name}</h1>
+          <h1 className="text-2xl font-bold text-primary">HCO: {currentEnrollment.practiceInfo.name}</h1>
           <div>{/* Placeholder for global profile actions if any */}</div>
         </div>
-
-        <HcoOnboardingWorkflowSteps enrollment={currentEnrollment} />
         
         <Tabs defaultValue="hco-profile" className="w-full">
           <TabsList className="grid w-full grid-cols-1 sm:grid-cols-4 h-auto sm:h-12 mb-6 shadow-md">
