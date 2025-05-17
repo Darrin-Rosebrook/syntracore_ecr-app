@@ -61,9 +61,10 @@ export default function SearchResultsPage() {
     fetchData();
   }, [query]);
 
-  const searchResults = useMemo(() : SearchResultItem[] => {
+  const searchResults = useMemo((): SearchResultItem[] => {
     if (!query.trim()) return [];
     const lowerQuery = query.toLowerCase();
+    const queryWithoutSpaces = lowerQuery.replace(/\s+/g, '');
     let results: SearchResultItem[] = [];
 
     // Search HCOs (Enrollments)
@@ -141,7 +142,11 @@ export default function SearchResultsPage() {
 
     // Search Health Systems (Constants)
     OHIO_HEALTH_SYSTEMS.forEach(hs => {
-      if (hs.label.toLowerCase().includes(lowerQuery)) {
+      const labelWithoutSpaces = hs.label.toLowerCase().replace(/\s+/g, '');
+      if (
+        hs.label.toLowerCase().includes(lowerQuery) || // Original check
+        labelWithoutSpaces.includes(queryWithoutSpaces)   // New check without spaces
+      ) {
         results.push({
           id: hs.value,
           name: hs.label,
@@ -254,3 +259,4 @@ export default function SearchResultsPage() {
     </ScrollArea>
   );
 }
+
