@@ -2,23 +2,23 @@
 'use server';
 
 import { db } from '@/lib/firebase';
-import { doc, setDoc, getDoc, serverTimestamp, type Timestamp } from 'firebase/firestore';
-import type { VendorProfileData } from '@/types'; // Updated import
+import { doc, setDoc, getDoc, serverTimestamp, type Timestamp, collection, getDocs, query, orderBy, updateDoc } from 'firebase/firestore'; // Added collection, getDocs, query, orderBy, updateDoc
+import type { VendorProfileData } from '@/types';
 
 // Data parameter now includes representedEhrSystemValue and excludes fields automatically set by server or derived from userId
 export async function createVendorProfileAction(
-  userId: string, 
-  data: { 
-    vendorName: string; 
-    contactName: string; 
-    email: string; 
-    representedEhrSystemValue: string; 
+  userId: string,
+  data: {
+    vendorName: string;
+    contactName: string;
+    email: string;
+    representedEhrSystemValue: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
   console.log(`Attempting to create vendor profile for UID: ${userId}`, data);
   try {
     const vendorRef = doc(db, 'vendors', userId); // Store vendors in a 'vendors' collection
-    
+
     // Construct the full payload including server-generated timestamps
     const profilePayload: VendorProfileData = {
       ...data,
@@ -73,10 +73,8 @@ export async function updateVendorLastLoginAction(userId: string): Promise<{ suc
   console.log(`Attempting to update last login for vendor UID: ${userId}`);
   try {
     const vendorRef = doc(db, 'vendors', userId);
-    await updateDoc(vendorRef, {
-      // @ts-ignore
-      lastLogin: serverTimestamp() 
-    });
+    // @ts-ignore
+    await updateDoc(vendorRef, { lastLogin: serverTimestamp() });
     console.log(`Last login updated successfully for vendor UID: ${userId}`);
     return { success: true };
   } catch (error) {
@@ -88,5 +86,32 @@ export async function updateVendorLastLoginAction(userId: string): Promise<{ suc
     const message = error instanceof Error ? error.message : 'An unknown error occurred while updating vendor last login.';
     console.error("Error in updateVendorLastLoginAction:", message, error);
     return { success: false, error: message };
+  }
+}
+
+export async function getVendorsAction(): Promise<{ success: boolean; vendors?: VendorProfileData[]; error?: string }> {
+  console.log("Attempting to fetch all vendor profiles.");
+  try {
+    const vendorsColRef = collection(db, 'vendors');
+    const q = query(vendorsColRef, orderBy('vendorName'));
+    const querySnapshot = await getDocs(q);
+    const vendorsList = querySnapshot.docs.map(docSnap => {
+      const rawData = docSnap.data();
+      return {
+        userId: rawData.userId,
+        vendorName: rawData.vendorName,
+        contactName: rawData.contactName,
+        email: rawData.email,
+        representedEhrSystemValue: rawData.representedEhrSystemValue,
+        createdAt: (rawData.createdAt as Timestamp)?.toDate ? (rawData.createdAt as Timestamp).toDate().toISOString() : new Date().toISOString(),
+        lastLogin: (rawData.lastLogin as Timestamp)?.toDate ? (rawData.lastLogin as Timestamp).toDate().toISOString() : undefined,
+      } as VendorProfileData;
+    });
+    console.log("Vendor profiles fetched successfully:", vendorsList.length, "vendors found.");
+    return { success: true, vendors: vendorsList };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'An unknown error occurred while fetching vendor profiles.';
+    console.error("Error in getVendorsAction:", message, error);
+    return { success: false, error: message, vendors: [] };
   }
 }

@@ -6,20 +6,23 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogIn, LogOut, UserCircle, Settings, Building, LayoutDashboard, Loader2 } from "lucide-react";
-import { useRouter } from 'next/navigation';
+import { Input } from "@/components/ui/input"; // Added Input
+import { LogIn, LogOut, UserCircle, Settings, Building, LayoutDashboard, Loader2, Search as SearchIcon } from "lucide-react"; // Added SearchIcon
+import { useRouter, useSearchParams } from 'next/navigation'; // Added useSearchParams
 import { getVendorProfileAction } from '@/actions/vendor-actions';
 
 export function MainHeader() {
-  const { currentUser, logOut, loading: authLoading, isPhaUser } = useAuth(); 
+  const { currentUser, logOut, loading: authLoading, isPhaUser } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams(); // Get current search params
 
   const [isVendorRole, setIsVendorRole] = useState(false);
   const [isCheckingVendorRole, setIsCheckingVendorRole] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || ''); // Initialize with q param
 
   useEffect(() => {
     const determineVendorRole = async () => {
-      if (currentUser && currentUser.uid && !isPhaUser) { 
+      if (currentUser && currentUser.uid && !isPhaUser) {
         setIsCheckingVendorRole(true);
         try {
           const profileResult = await getVendorProfileAction(currentUser.uid);
@@ -42,32 +45,59 @@ export function MainHeader() {
         setIsVendorRole(false);
         setIsCheckingVendorRole(false);
     }
-  }, [currentUser, authLoading, isPhaUser]); 
+  }, [currentUser, authLoading, isPhaUser]);
 
   const handleLogout = async () => {
     await logOut();
-    router.push('/'); 
+    router.push('/');
   };
 
-  // isHcoUser is true if the user is logged in, not a PHA user, and not a Vendor.
+  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
+    } else {
+      router.push('/search'); // Navigate to search page even if term is empty, to clear results or show all
+    }
+  };
+  
+  // Update searchTerm if q param changes (e.g., back button)
+  useEffect(() => {
+    setSearchTerm(searchParams.get('q') || '');
+  }, [searchParams]);
+
+
   const isHcoUser = currentUser && !isPhaUser && !isVendorRole;
   const overallLoading = authLoading || (currentUser && !isPhaUser && isCheckingVendorRole);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background shadow-sm">
       <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2 mr-4">
           <Image
             src="/images/OnboardeCR.png"
             alt="Onboard eCR Logo"
             width={150}
-            height={50}
+            height={50} // Adjusted height for 150px width
             priority
             data-ai-hint="company logo"
           />
         </Link>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <form onSubmit={handleSearchSubmit} className="flex-grow max-w-md mx-4">
+          <div className="relative">
+            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search HCOs, users, vendors..."
+              className="w-full rounded-lg bg-muted pl-10 h-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </form>
+
+        <div className="flex items-center gap-1 sm:gap-2 ml-auto">
           {overallLoading ? (
             <Button variant="ghost" size="sm" disabled>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -75,17 +105,16 @@ export function MainHeader() {
             </Button>
           ) : currentUser ? (
             <>
-              <span className="text-sm text-muted-foreground hidden sm:inline-block">
+              <span className="text-sm text-muted-foreground hidden md:inline-block mr-2">
                 <UserCircle className="inline mr-1 h-4 w-4" />
                 {currentUser.email}
               </span>
 
-              {/* Admin button is displayed if isPhaUser is true, determined by AuthContext */}
               {isPhaUser && (
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/admin">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Admin
+                    <Settings className="mr-1 md:mr-2 h-4 w-4" />
+                    <span className="hidden md:inline">Admin</span>
                   </Link>
                 </Button>
               )}
@@ -93,8 +122,8 @@ export function MainHeader() {
               {!isPhaUser && isVendorRole && (
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/vendor-portal">
-                    <Building className="mr-2 h-4 w-4" />
-                    Vendor Portal
+                    <Building className="mr-1 md:mr-2 h-4 w-4" />
+                     <span className="hidden md:inline">Vendor Portal</span>
                   </Link>
                 </Button>
               )}
@@ -102,8 +131,8 @@ export function MainHeader() {
               {isHcoUser && (
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/provider-portal">
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    Provider Portal
+                    <LayoutDashboard className="mr-1 md:mr-2 h-4 w-4" />
+                     <span className="hidden md:inline">Provider Portal</span>
                   </Link>
                 </Button>
               )}
