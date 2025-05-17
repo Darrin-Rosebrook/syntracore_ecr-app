@@ -76,12 +76,6 @@ export default function ProviderPortalPage() {
           HCO Provider Portal
         </h1>
         <div className="flex space-x-2">
-          {/* Temporary Admin Console Button */}
-          <Button variant="outline" asChild>
-            <Link href="/admin">
-              <Settings className="mr-2 h-4 w-4" /> Admin Console (Temp)
-            </Link>
-          </Button>
           <Button variant="outline" onClick={handleLogout}>
             <LogOut className="mr-2 h-4 w-4" />
             Logout
