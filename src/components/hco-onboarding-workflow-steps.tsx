@@ -66,7 +66,7 @@ export function HcoOnboardingWorkflowSteps({ enrollment }: HcoOnboardingWorkflow
       <CardHeader>
         <CardTitle className="flex items-center text-xl font-semibold">
           <WorkflowIcon className="mr-2 h-6 w-6 text-primary" /> 
-          Your eCR Onboarding Progress
+          eCR Onboarding Status
         </CardTitle>
         <CardDescription>
           Current status of your Health Care Organization's eCR onboarding process.
