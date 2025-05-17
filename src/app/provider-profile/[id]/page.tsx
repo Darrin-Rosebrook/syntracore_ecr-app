@@ -4,24 +4,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAppContext } from '@/context/AppContext';
-import type { EnrollmentData, CustomFieldDefinition, ActivityLogEntry } from '@/types';
+import type { EnrollmentData, CustomFieldDefinition, ActivityLogEntry, MessageEntry } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Loader2, Info, UserCircle, FileTextIcon, Users, Activity, Edit, Save, Building, Settings2, FileText, CalendarDays, User, Hash } from 'lucide-react';
+import { ArrowLeft, Loader2, Info, UserCircle, FileTextIcon, Users, Activity, Edit, Save, Building, Settings2, FileText, CalendarDays, User, Hash, MessageSquare, Send } from 'lucide-react'; // Added MessageSquare, Send
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-
-// Import Tab Components
 import { HcoProfileTab } from '@/components/hco-profile-tab';
 import { DocumentsTab } from '@/components/documents-tab';
 import { ContactsTab } from '@/components/contacts-tab';
 import { ScrollArea } from '@/components/ui/scroll-area';
-// Removed import for HcoOnboardingWorkflowSteps as it's now in HcoProfileTab
+import { Textarea } from '@/components/ui/textarea'; // Added Textarea
+import { format, parseISO } from 'date-fns'; // Added format, parseISO
+import { useAuth } from '@/context/AuthContext'; // Import useAuth
 
-// Define SectionCard here as it was in the original file, now fixed.
-// This component might be intended for use within the tabs or was part of a previous design.
-// Ensuring it's syntactically correct.
 const SectionCard: React.FC<{ title: string; icon: React.ElementType; children: React.ReactNode; actions?: React.ReactNode }> = ({ title, icon: Icon, children, actions }) => (
   <Card className="shadow-lg">
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -40,14 +37,14 @@ export default function ProviderProfilePage() {
   const router = useRouter();
   const params = useParams();
   const { id } = params;
-  const { enrollments, customFieldDefinitions, updateEnrollmentData, addActivityLogEntry, isLoading: isContextLoading } = useAppContext();
+  const { enrollments, customFieldDefinitions, updateEnrollmentData, addActivityLogEntry, addMessageToEnrollment, isLoading: isContextLoading } = useAppContext();
   const { toast } = useToast();
+  const { currentUser } = useAuth(); // Get current user for messaging
 
   const [currentEnrollment, setCurrentEnrollment] = useState<EnrollmentData | null>(null);
   const [isEditingHcoProfile, setIsEditingHcoProfile] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Unified formData state for HcoProfileTab
   const [hcoFormData, setHcoFormData] = useState<Record<string, any>>({
     practiceInfo: {},
     contactDetails: {},
@@ -56,7 +53,7 @@ export default function ProviderProfilePage() {
   });
   
   const [newActivityLog, setNewActivityLog] = useState('');
-  const [newCommunication, setNewCommunication] = useState('');
+  const [newMessageContent, setNewMessageContent] = useState(''); // Renamed from newCommunication
 
   const activeEnrollment = useMemo(() => {
     if (typeof id !== 'string') return null;
@@ -73,7 +70,7 @@ export default function ProviderProfilePage() {
         additionalData: { ...(activeEnrollment.additionalData || {}) },
       });
     } else if (id && !isContextLoading && enrollments.length > 0) {
-      setCurrentEnrollment(null); // Explicitly set to null if not found after loading
+      setCurrentEnrollment(null); 
     }
   }, [id, activeEnrollment, isContextLoading, enrollments.length]);
 
@@ -82,7 +79,7 @@ export default function ProviderProfilePage() {
     if (!currentEnrollment || typeof id !== 'string' || Object.keys(hcoFormData).length === 0) return;
     
     setIsSaving(true);
-    const dataToUpdate: Partial<Omit<EnrollmentData, 'id' | 'activityLog' | 'documents' | 'additionalContacts'>> = {
+    const dataToUpdate: Partial<Omit<EnrollmentData, 'id' | 'activityLog' | 'documents' | 'additionalContacts' | 'messages'>> = {
         practiceInfo: hcoFormData.practiceInfo,
         contactDetails: hcoFormData.contactDetails,
         ehrVendor: hcoFormData.ehrVendor,
@@ -92,23 +89,30 @@ export default function ProviderProfilePage() {
     await updateEnrollmentData(id, dataToUpdate);
     setIsEditingHcoProfile(false); 
     setIsSaving(false);
-    // The toast for success/failure is handled in AppContext.updateEnrollmentData
   };
 
   const handleAddActivity = async () => {
-    if (!newActivityLog.trim() || typeof id !== 'string') return;
+    if (!newActivityLog.trim() || typeof id !== 'string' || !currentUser) return;
     setIsSaving(true); 
-    await addActivityLogEntry(id, newActivityLog, 'UserAction', 'PHA Admin');
+    await addActivityLogEntry(id, newActivityLog, 'UserAction', currentUser.displayName || currentUser.email || 'PHA Admin');
     setNewActivityLog('');
     setIsSaving(false);
   };
 
-  const handleSendCommunication = async () => {
-    if (!newCommunication.trim() || typeof id !== 'string' || !currentEnrollment) return;
+  const handleSendMessage = async () => {
+    if (!newMessageContent.trim() || typeof id !== 'string' || !currentEnrollment || !currentUser) {
+      toast({ title: 'Error', description: 'Message content is empty or user not logged in.', variant: 'destructive' });
+      return;
+    }
     setIsSaving(true);
-    await addActivityLogEntry(id, `Message to ${currentEnrollment.contactDetails.name}: ${newCommunication}`, 'Communication', 'PHA Admin');
-    toast({ title: 'Communication Sent (Mock)', description: `Message to ${currentEnrollment.contactDetails.name} logged.` });
-    setNewCommunication('');
+    await addMessageToEnrollment(
+      id, 
+      newMessageContent, 
+      currentUser.uid, 
+      currentUser.displayName || currentUser.email || 'PHA User', // Use current user's name/email
+      'PHA' // Assuming PHA user is sending from this profile page
+    );
+    setNewMessageContent('');
     setIsSaving(false);
   };
 
@@ -163,8 +167,8 @@ export default function ProviderProfilePage() {
             <TabsTrigger value="contacts" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
               <Users className="mr-2 h-5 w-5" /> Contacts
             </TabsTrigger>
-            <TabsTrigger value="activity" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
-              <Activity className="mr-2 h-5 w-5" /> Activity & Comms
+            <TabsTrigger value="communication" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
+              <MessageSquare className="mr-2 h-5 w-5" /> Communication {/* Renamed Tab */}
             </TabsTrigger>
           </TabsList>
 
@@ -187,61 +191,82 @@ export default function ProviderProfilePage() {
           <TabsContent value="contacts">
             <ContactsTab enrollment={currentEnrollment} />
           </TabsContent>
-          <TabsContent value="activity">
+          <TabsContent value="communication"> {/* Renamed Tab Content */}
             <Card className="mt-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center text-xl font-semibold">
-                  <Activity className="mr-2 h-5 w-5 text-primary" /> Activity Log & Communication Center
+                  <MessageSquare className="mr-2 h-5 w-5 text-primary" /> Communication Center
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-6">
+                  {/* Send Message Section */}
                   <div>
-                    <h3 className="font-semibold mb-2">Log New Activity/Note</h3>
-                    <textarea
-                      value={newActivityLog}
-                      onChange={(e) => setNewActivityLog(e.target.value)}
-                      placeholder="Enter activity details or notes..."
-                      className="w-full p-2 border rounded-md min-h-[80px]"
-                      disabled={isSaving}
-                    />
-                    <Button onClick={handleAddActivity} disabled={isSaving || !newActivityLog.trim()} className="mt-2" size="sm">
-                      {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Add Log Entry
-                    </Button>
-                  </div>
-                  <hr/>
-                  <div>
-                     <h3 className="font-semibold mb-2">Send Communication (Mock)</h3>
-                     <textarea
-                        value={newCommunication}
-                        onChange={(e) => setNewCommunication(e.target.value)}
-                        placeholder="Type message to provider (this will be logged)..."
-                        className="w-full p-2 border rounded-md min-h-[80px]"
-                        disabled={isSaving}
+                     <h3 className="font-semibold mb-2">Send Message to Provider</h3>
+                     <Textarea
+                        value={newMessageContent}
+                        onChange={(e) => setNewMessageContent(e.target.value)}
+                        placeholder="Type message to provider..."
+                        className="w-full p-2 border rounded-md min-h-[100px]"
+                        disabled={isSaving || !currentUser}
                      />
-                     <Button onClick={handleSendCommunication} disabled={isSaving || !newCommunication.trim()} className="mt-2" size="sm">
-                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Send Message
+                     <Button onClick={handleSendMessage} disabled={isSaving || !newMessageContent.trim() || !currentUser} className="mt-2" size="sm">
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />} Send Message
                      </Button>
                   </div>
                   <hr/>
-                  <h3 className="font-semibold mb-2">History</h3>
-                  <ScrollArea className="h-[300px] border rounded-md p-3 bg-muted/30">
-                    {(currentEnrollment.activityLog && currentEnrollment.activityLog.length > 0) ? (
-                      <ul className="space-y-3">
-                        {[...currentEnrollment.activityLog].sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map((log, index) => (
-                          <li key={index} className="text-sm p-2 rounded-md bg-background shadow-sm">
-                            <span className="font-medium text-primary">
-                              {new Date(log.timestamp).toLocaleString()} ({log.type})
-                              {log.user && ` - ${log.user}`}:
-                            </span>{' '}
-                            {log.entry}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-muted-foreground">No activity logged yet.</p>
-                    )}
-                  </ScrollArea>
+                  {/* Message History Section */}
+                  <div>
+                    <h3 className="font-semibold mb-2">Message History</h3>
+                    <ScrollArea className="h-[250px] border rounded-md p-3 bg-muted/30">
+                      {(currentEnrollment.messages && currentEnrollment.messages.length > 0) ? (
+                        <ul className="space-y-3">
+                          {[...currentEnrollment.messages].sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((msg) => (
+                            <li key={msg.id} className={`text-sm p-3 rounded-lg shadow-sm ${msg.senderRole === 'PHA' ? 'bg-blue-100 ml-auto max-w-[80%]' : 'bg-green-100 mr-auto max-w-[80%]'}`}>
+                              <div className="font-semibold text-xs text-gray-600 mb-0.5">
+                                {msg.senderName} ({msg.senderRole}) - {format(parseISO(msg.timestamp), 'PPp')}
+                              </div>
+                              <p className="whitespace-pre-wrap">{msg.content}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-muted-foreground text-center py-4">No messages yet.</p>
+                      )}
+                    </ScrollArea>
+                  </div>
+                  <hr/>
+                  {/* Activity Log Section (kept for internal notes) */}
+                  <div>
+                    <h3 className="font-semibold mb-2 flex items-center"><Activity className="mr-2 h-4 w-4 text-muted-foreground"/>Internal Activity Log/Notes</h3>
+                     <Textarea
+                      value={newActivityLog}
+                      onChange={(e) => setNewActivityLog(e.target.value)}
+                      placeholder="Log internal notes or manual activity..."
+                      className="w-full p-2 border rounded-md min-h-[80px]"
+                      disabled={isSaving || !currentUser}
+                    />
+                    <Button onClick={handleAddActivity} disabled={isSaving || !newActivityLog.trim() || !currentUser} className="mt-2" size="sm">
+                      {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Add Log Entry
+                    </Button>
+                    <ScrollArea className="h-[200px] border rounded-md p-3 bg-muted/30 mt-3">
+                      {(currentEnrollment.activityLog && currentEnrollment.activityLog.length > 0) ? (
+                        <ul className="space-y-3">
+                          {[...currentEnrollment.activityLog].sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map((log, index) => (
+                            <li key={index} className="text-sm p-2 rounded-md bg-background shadow-sm">
+                              <span className="font-medium text-primary">
+                                {new Date(log.timestamp).toLocaleString()} ({log.type})
+                                {log.user && ` - ${log.user}`}:
+                              </span>{' '}
+                              {log.entry}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-muted-foreground text-center py-4">No activity logged yet.</p>
+                      )}
+                    </ScrollArea>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -251,3 +276,4 @@ export default function ProviderProfilePage() {
     </ScrollArea>
   );
 }
+

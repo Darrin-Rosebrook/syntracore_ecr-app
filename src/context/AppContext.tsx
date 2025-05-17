@@ -1,10 +1,10 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import type { EnrollmentData, CustomFieldDefinition, ActivityLogEntry, EnrollmentFormData, FHIRValidationResult, DocumentEntry, ContactEntry } from '@/types';
+import type { EnrollmentData, CustomFieldDefinition, ActivityLogEntry, EnrollmentFormData, FHIRValidationResult, DocumentEntry, ContactEntry, MessageEntry } from '@/types'; // Added MessageEntry
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase'; // Assuming Firebase is set up for Firestore
-// TODO: Import Firebase Storage if document uploads are to be handled via Firebase Storage
+import { db } from '@/lib/firebase'; 
 // import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
 import {
@@ -22,6 +22,7 @@ import {
   arrayRemove,
   getDoc,
 } from 'firebase/firestore';
+import { useAuth } from './AuthContext'; // Import useAuth
 
 interface AppContextState {
   enrollments: EnrollmentData[];
@@ -30,25 +31,23 @@ interface AppContextState {
 }
 
 interface AppContextActions {
-  // addEnrollment is handled by server action, but keeping for context structure consistency if needed elsewhere
-  // addEnrollment: (formData: EnrollmentFormData, ccdDocumentContent: string | null, validationResult: FHIRValidationResult) => Promise<boolean>; 
   updateEnrollmentStatus: (id: string, status: EnrollmentData['status'], comments?: string) => Promise<void>;
-  updateEnrollmentData: (enrollmentId: string, updatedFields: Partial<Omit<EnrollmentData, 'id' | 'activityLog' | 'documents' | 'additionalContacts'>>) => Promise<void>;
+  updateEnrollmentData: (enrollmentId: string, updatedFields: Partial<Omit<EnrollmentData, 'id' | 'activityLog' | 'documents' | 'additionalContacts' | 'messages'>>) => Promise<void>;
   addActivityLogEntry: (enrollmentId: string, entryText: string, type: ActivityLogEntry['type'], user?: string) => Promise<void>;
   addCustomField: (fieldDefinition: CustomFieldDefinition) => Promise<void>;
   removeCustomField: (fieldId: string) => Promise<void>;
   removeEnrollment: (enrollmentId: string) => Promise<void>;
   fetchInitialData: () => Promise<void>;
 
-  // Document Management Actions
   addDocumentToEnrollment: (enrollmentId: string, documentFile: File, uploadedBy: string) => Promise<void>;
   deleteDocumentFromEnrollment: (enrollmentId: string, documentId: string) => Promise<void>;
   
-  // Contact Management Actions
   addContactToEnrollment: (enrollmentId: string, contact: Omit<ContactEntry, 'id'>) => Promise<void>;
   updateContactInEnrollment: (enrollmentId: string, contact: ContactEntry) => Promise<void>;
   deleteContactFromEnrollment: (enrollmentId: string, contactId: string) => Promise<void>;
   setPrimaryContactForEnrollment: (enrollmentId: string, newPrimaryContactId: string) => Promise<void>;
+
+  addMessageToEnrollment: (enrollmentId: string, messageContent: string, senderId: string, senderName: string, senderRole: 'PHA' | 'Provider' | 'Vendor' | 'System') => Promise<void>; // New messaging action
 }
 
 type AppContextProps = AppContextState & AppContextActions;
@@ -60,7 +59,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [customFieldDefinitions, setCustomFieldDefinitions] = useState<CustomFieldDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  // const storage = getStorage(db.app); // Initialize storage if using Firebase Storage
+  const { currentUser } = useAuth(); // Get current user for messaging
 
   const fetchInitialData = useCallback(async () => {
     setIsLoading(true);
@@ -87,6 +86,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             uploadDate: (doc.uploadDate as Timestamp)?.toDate ? (doc.uploadDate as Timestamp).toDate().toISOString() : doc.uploadDate,
           })) || [],
           additionalContacts: data.additionalContacts || [],
+          messages: data.messages?.map((msg: any) => ({ // Process messages
+            ...msg,
+            timestamp: (msg.timestamp as Timestamp)?.toDate ? (msg.timestamp as Timestamp).toDate().toISOString() : msg.timestamp,
+          })) || [],
         } as EnrollmentData;
       });
       setEnrollments(enrollmentsData);
@@ -139,7 +142,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         timestamp: new Date().toISOString(),
         entry: `Status changed to ${status}.`,
         type: 'UserAction',
-        user: 'PHA Reviewer',
+        user: currentUser?.displayName || currentUser?.email || 'PHA Reviewer',
       };
       activityLogsToAdd.push(statusChangeEntry);
 
@@ -148,7 +151,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           timestamp: new Date().toISOString(),
           entry: `PHA Reviewer Comment: ${comments}`,
           type: 'PHAComment',
-          user: 'PHA Reviewer',
+          user: currentUser?.displayName || currentUser?.email || 'PHA Reviewer',
         };
         activityLogsToAdd.push(phaCommentEntry);
         
@@ -169,7 +172,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           timestamp: new Date().toISOString(),
           entry: `Denial Reason: ${comments}`,
           type: 'System',
-          user: 'PHA Reviewer',
+          user: currentUser?.displayName || currentUser?.email || 'PHA Reviewer',
         };
         activityLogsToAdd.push(denialReasonEntry);
       }
@@ -208,11 +211,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateEnrollmentData = async (enrollmentId: string, updatedFields: Partial<Omit<EnrollmentData, 'id' | 'activityLog' | 'documents' | 'additionalContacts'>>) => {
+  const updateEnrollmentData = async (enrollmentId: string, updatedFields: Partial<Omit<EnrollmentData, 'id' | 'activityLog' | 'documents' | 'additionalContacts' | 'messages'>>) => {
     const enrollmentDocRef = doc(db, 'enrollments', enrollmentId);
     try {
       await updateDoc(enrollmentDocRef, updatedFields);
-      await addActivityLogEntry(enrollmentId, 'Provider details updated by PHA Admin.', 'UserAction', 'PHA Admin');
+      await addActivityLogEntry(enrollmentId, 'Provider details updated by PHA Admin.', 'UserAction', currentUser?.displayName || currentUser?.email || 'PHA Admin');
       
       setEnrollments(prevEnrollments =>
         prevEnrollments.map(e =>
@@ -263,7 +266,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const enrollmentDocRef = doc(db, 'enrollments', enrollmentId);
     try {
       await deleteDoc(enrollmentDocRef);
-      // TODO: If documents are in Firebase Storage, delete them here as well.
       setEnrollments(prevEnrollments => prevEnrollments.filter(e => e.id !== enrollmentId));
       toast({ title: 'Enrollment Removed', description: `Enrollment ID ${enrollmentId.slice(0,6)}... has been removed.` });
     } catch (error) {
@@ -272,22 +274,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // --- Document Management Stubs ---
   const addDocumentToEnrollment = async (enrollmentId: string, documentFile: File, uploadedBy: string) => {
     console.log("Attempting to add document", documentFile.name, "for enrollment", enrollmentId, "by", uploadedBy);
-    // Placeholder: Implement Firebase Storage upload and Firestore metadata update
-    // Example:
-    // const storageRef = ref(storage, `enrollments/${enrollmentId}/documents/${documentFile.name}`);
-    // await uploadBytes(storageRef, documentFile);
-    // const downloadURL = await getDownloadURL(storageRef);
     const newDocEntry: DocumentEntry = {
-      id: `doc_${Date.now()}_${Math.random().toString(36).substring(2,9)}`, // Temp ID
+      id: `doc_${Date.now()}_${Math.random().toString(36).substring(2,9)}`, 
       name: documentFile.name,
       type: documentFile.type,
       size: documentFile.size,
       uploadDate: new Date().toISOString(),
       uploadedBy: uploadedBy,
-      // url: downloadURL, 
     };
     const enrollmentDocRef = doc(db, "enrollments", enrollmentId);
     try {
@@ -295,7 +290,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         documents: arrayUnion({...newDocEntry, uploadDate: Timestamp.fromDate(new Date(newDocEntry.uploadDate))})
       });
       await addActivityLogEntry(enrollmentId, `Document "${newDocEntry.name}" uploaded.`, 'DocumentChange', uploadedBy);
-      fetchInitialData(); // Re-fetch to update local state correctly
+      fetchInitialData(); 
       toast({title: "Document Uploaded", description: `${newDocEntry.name} added.`});
     } catch (error) {
       console.error("Error adding document:", error);
@@ -305,7 +300,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteDocumentFromEnrollment = async (enrollmentId: string, documentId: string) => {
     console.log("Attempting to delete document", documentId, "for enrollment", enrollmentId);
-    // Placeholder: Implement Firebase Storage delete and Firestore metadata update
     const enrollmentDocRef = doc(db, "enrollments", enrollmentId);
     const currentEnrollment = enrollments.find(e => e.id === enrollmentId);
     const docToDelete = currentEnrollment?.documents?.find(d => d.id === documentId);
@@ -314,20 +308,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         toast({title: "Error", description: "Document not found.", variant: "destructive"});
         return;
     }
-    // const storageRef = ref(storage, `enrollments/${enrollmentId}/documents/${docToDelete.name}`);
-    // await deleteObject(storageRef);
     try {
-      await updateDoc(enrollmentDocRef, {
-        documents: arrayRemove(docToDelete) // This requires the exact object from Firestore or a query.
-                                             // A more robust way is to fetch, filter, and set.
-                                             // For simplicity here, we assume docToDelete is structured correctly.
-                                             // A better Firestore approach:
-                                             // const docSnap = await getDoc(enrollmentDocRef);
-                                             // const currentDocs = docSnap.data()?.documents || [];
-                                             // const updatedDocs = currentDocs.filter(d => d.id !== documentId);
-                                             // await updateDoc(enrollmentDocRef, { documents: updatedDocs });
-      });
-      await addActivityLogEntry(enrollmentId, `Document "${docToDelete.name}" deleted.`, 'DocumentChange', 'PHA Admin');
+      const docSnap = await getDoc(enrollmentDocRef);
+      const currentDocs = docSnap.data()?.documents || [];
+      const updatedDocs = currentDocs.filter((d: DocumentEntry) => d.id !== documentId);
+      await updateDoc(enrollmentDocRef, { documents: updatedDocs });
+      await addActivityLogEntry(enrollmentId, `Document "${docToDelete.name}" deleted.`, 'DocumentChange', currentUser?.displayName || currentUser?.email || 'PHA Admin');
       fetchInitialData();
       toast({title: "Document Deleted", description: `${docToDelete.name} removed.`});
     } catch (error) {
@@ -336,19 +322,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
-  // --- Contact Management Stubs ---
   const addContactToEnrollment = async (enrollmentId: string, contactData: Omit<ContactEntry, 'id'>) => {
     const newContact: ContactEntry = {
         ...contactData,
         id: `contact_${Date.now()}_${Math.random().toString(36).substring(2,9)}`
     };
-    console.log("Adding contact to enrollment", enrollmentId, newContact);
     const enrollmentDocRef = doc(db, "enrollments", enrollmentId);
     try {
         await updateDoc(enrollmentDocRef, {
             additionalContacts: arrayUnion(newContact)
         });
-        await addActivityLogEntry(enrollmentId, `Contact "${newContact.name}" added.`, 'ContactChange', 'PHA Admin');
+        await addActivityLogEntry(enrollmentId, `Contact "${newContact.name}" added.`, 'ContactChange', currentUser?.displayName || currentUser?.email || 'PHA Admin');
         fetchInitialData();
         toast({title: "Contact Added", description: `${newContact.name} added.`});
     } catch (error) {
@@ -358,14 +342,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateContactInEnrollment = async (enrollmentId: string, contact: ContactEntry) => {
-    console.log("Updating contact in enrollment", enrollmentId, contact);
     const enrollmentDocRef = doc(db, "enrollments", enrollmentId);
     try {
         const docSnap = await getDoc(enrollmentDocRef);
         const currentContacts = docSnap.data()?.additionalContacts || [];
-        const updatedContacts = currentContacts.map(c => c.id === contact.id ? contact : c);
+        const updatedContacts = currentContacts.map((c: ContactEntry) => c.id === contact.id ? contact : c);
         await updateDoc(enrollmentDocRef, { additionalContacts: updatedContacts });
-        await addActivityLogEntry(enrollmentId, `Contact "${contact.name}" updated.`, 'ContactChange', 'PHA Admin');
+        await addActivityLogEntry(enrollmentId, `Contact "${contact.name}" updated.`, 'ContactChange', currentUser?.displayName || currentUser?.email || 'PHA Admin');
         fetchInitialData();
         toast({title: "Contact Updated", description: `${contact.name} updated.`});
     } catch (error) {
@@ -375,16 +358,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteContactFromEnrollment = async (enrollmentId: string, contactId: string) => {
-    console.log("Deleting contact from enrollment", enrollmentId, contactId);
      const enrollmentDocRef = doc(db, "enrollments", enrollmentId);
     try {
         const docSnap = await getDoc(enrollmentDocRef);
         const currentContacts = docSnap.data()?.additionalContacts || [];
-        const contactToDelete = currentContacts.find(c => c.id === contactId);
+        const contactToDelete = currentContacts.find((c: ContactEntry) => c.id === contactId);
         if (!contactToDelete) throw new Error("Contact not found for deletion.");
-        const updatedContacts = currentContacts.filter(c => c.id !== contactId);
+        const updatedContacts = currentContacts.filter((c: ContactEntry) => c.id !== contactId);
         await updateDoc(enrollmentDocRef, { additionalContacts: updatedContacts });
-        await addActivityLogEntry(enrollmentId, `Contact "${contactToDelete.name}" deleted.`, 'ContactChange', 'PHA Admin');
+        await addActivityLogEntry(enrollmentId, `Contact "${contactToDelete.name}" deleted.`, 'ContactChange', currentUser?.displayName || currentUser?.email || 'PHA Admin');
         fetchInitialData();
         toast({title: "Contact Deleted", description: `${contactToDelete.name} deleted.`});
     } catch (error) {
@@ -394,7 +376,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const setPrimaryContactForEnrollment = async (enrollmentId: string, newPrimaryContactIdFromAdditional: string) => {
-    console.log("Setting primary contact for enrollment", enrollmentId, "to", newPrimaryContactIdFromAdditional);
     const enrollmentDocRef = doc(db, "enrollments", enrollmentId);
     try {
         const docSnap = await getDoc(enrollmentDocRef);
@@ -407,22 +388,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const newPrimaryContact = additionalContacts.find(c => c.id === newPrimaryContactIdFromAdditional);
         if (!newPrimaryContact) throw new Error("New primary contact not found in additional contacts.");
 
-        // New list of additional contacts: current primary becomes an additional contact (if it has a name),
-        // and the new primary is removed from additional contacts.
         const updatedAdditionalContacts = additionalContacts.filter(c => c.id !== newPrimaryContactIdFromAdditional);
-        if (currentPrimaryContact && currentPrimaryContact.name) { // Ensure there's an actual current primary to move
+        if (currentPrimaryContact && currentPrimaryContact.name) { 
             updatedAdditionalContacts.push({
-                id: `contact_${Date.now()}_${Math.random().toString(36).substring(2,9)}`, // Give it a new ID if it was the original primary
+                id: `contact_${Date.now()}_${Math.random().toString(36).substring(2,9)}`, 
                 name: currentPrimaryContact.name,
                 email: currentPrimaryContact.email,
                 phone: currentPrimaryContact.phone,
-                role: 'Former Primary', // Or some other role
+                role: 'Former Primary', 
                 isAlternative: false,
             });
         }
         
         await updateDoc(enrollmentDocRef, {
-            contactDetails: { // This becomes the new primary
+            contactDetails: { 
                 name: newPrimaryContact.name,
                 email: newPrimaryContact.email,
                 phone: newPrimaryContact.phone,
@@ -430,13 +409,43 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             additionalContacts: updatedAdditionalContacts
         });
 
-        await addActivityLogEntry(enrollmentId, `Primary contact changed to "${newPrimaryContact.name}".`, 'ContactChange', 'PHA Admin');
+        await addActivityLogEntry(enrollmentId, `Primary contact changed to "${newPrimaryContact.name}".`, 'ContactChange', currentUser?.displayName || currentUser?.email || 'PHA Admin');
         fetchInitialData();
         toast({title: "Primary Contact Updated", description: `Primary contact is now ${newPrimaryContact.name}.`});
 
     } catch (error) {
          console.error("Error setting primary contact:", error);
         toast({title: "Update Failed", description: (error as Error).message || "Could not set primary contact.", variant: "destructive"});
+    }
+  };
+
+  const addMessageToEnrollment = async (enrollmentId: string, messageContent: string, senderId: string, senderName: string, senderRole: 'PHA' | 'Provider' | 'Vendor' | 'System') => {
+    const newMessageEntry: MessageEntry = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
+      timestamp: new Date().toISOString(),
+      senderId,
+      senderName,
+      senderRole,
+      content: messageContent,
+    };
+    const enrollmentDocRef = doc(db, 'enrollments', enrollmentId);
+    try {
+      const messageForFirestore = { ...newMessageEntry, timestamp: Timestamp.fromDate(new Date(newMessageEntry.timestamp)) };
+      await updateDoc(enrollmentDocRef, {
+        messages: arrayUnion(messageForFirestore)
+      });
+      
+      setEnrollments(prevEnrollments =>
+        prevEnrollments.map(e =>
+          e.id === enrollmentId
+            ? { ...e, messages: [...(e.messages || []), newMessageEntry] }
+            : e
+        )
+      );
+      toast({ title: 'Message Sent', description: 'Your message has been sent.' });
+    } catch (error) {
+      console.error("Error adding message to Firestore: ", error);
+      toast({ title: 'Error Sending Message', description: 'Could not send message.', variant: 'destructive' });
     }
   };
 
@@ -460,6 +469,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         updateContactInEnrollment,
         deleteContactFromEnrollment,
         setPrimaryContactForEnrollment,
+        addMessageToEnrollment, // Expose new action
       }}
     >
       {children}

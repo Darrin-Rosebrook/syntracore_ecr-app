@@ -5,8 +5,8 @@ import {Geist, Geist_Mono} from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { AppProvider } from '@/context/AppContext';
-import { AuthProvider } from '@/context/AuthContext'; // Added AuthProvider
-import { MainHeader } from '@/components/main-header'; 
+import { AuthProvider } from '@/context/AuthContext';
+import { MainHeader } from '@/components/main-header';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Onboard eCR', // Changed from SyntraHub as it's not part of the logo anymore
+  title: 'Onboard eCR',
   description: 'SyntraHub - Project Management and Enrollment Portal',
 };
 
@@ -31,13 +31,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <AppProvider>
-          <AuthProvider> {/* Added AuthProvider wrapper */}
-            <MainHeader /> 
+        <AuthProvider> {/* AuthProvider should be the outer wrapper */}
+          <AppProvider>  {/* AppProvider is nested within AuthProvider */}
+            <MainHeader />
             {children}
             <Toaster />
-          </AuthProvider>
-        </AppProvider>
+          </AppProvider>
+        </AuthProvider>
       </body>
     </html>
   );

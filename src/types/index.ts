@@ -7,10 +7,10 @@ export interface PracticeInfo {
   name: string;
   address: string;
   phone: string;
-  healthSystem?: string; // Added field for health system affiliation
+  healthSystem?: string; 
 }
 
-export interface ContactDetails { // This will represent the primary contact
+export interface ContactDetails { 
   name: string;
   email: string;
   phone: string;
@@ -42,22 +42,22 @@ export interface CustomFieldDefinition {
 }
 
 export interface ContactEntry {
-  id: string; // Unique ID for the contact
+  id: string; 
   name: string;
   email: string;
   phone: string;
-  role?: string; // e.g., 'Billing Contact', 'Technical Contact'
-  isAlternative?: boolean; // To mark as an alternative contact
+  role?: string; 
+  isAlternative?: boolean; 
 }
 
 export interface EnrollmentFormData {
   practiceInfo: PracticeInfo;
-  contactDetails: ContactDetails; // Primary contact
+  contactDetails: ContactDetails; 
   ehrVendor: string;
   ccdDocumentName?: string;
   consent: boolean;
   additionalData?: Record<string, any>;
-  additionalContacts?: ContactEntry[]; // Added to store contacts from signup
+  additionalContacts?: ContactEntry[]; 
 }
 
 export interface FHIRValidationResult extends ExternalFHIRValidationResult {
@@ -72,15 +72,24 @@ export interface ActivityLogEntry {
 }
 
 export interface DocumentEntry {
-  id: string; // Unique ID for the document
+  id: string; 
   name: string;
-  type: string; // MIME type
-  size: number; // in bytes
-  uploadDate: string; // ISO string
-  uploadedBy: string; // User ID or 'Provider'/'System'
-  url?: string; // URL if stored in Firebase Storage
+  type: string; 
+  size: number; 
+  uploadDate: string; 
+  uploadedBy: string; 
+  url?: string; 
 }
 
+export interface MessageEntry {
+  id: string;
+  timestamp: string; // ISO string
+  senderId: string; // User ID of sender (e.g., Firebase Auth UID)
+  senderName: string; // Display name of sender
+  senderRole: 'PHA' | 'Provider' | 'Vendor' | 'System';
+  content: string;
+  readBy?: { [userId: string]: string }; // userId: ISO timestamp when read
+}
 
 export interface EnrollmentData extends EnrollmentFormData {
   id: string;
@@ -90,63 +99,60 @@ export interface EnrollmentData extends EnrollmentFormData {
   status: 'Pending' | 'Approved' | 'Changes Requested' | 'Denied';
   activityLog?: ActivityLogEntry[];
   documents?: DocumentEntry[]; 
-  // additionalContacts is now part of EnrollmentFormData, inherited here.
+  messages?: MessageEntry[]; // Added for messaging
 }
 
 // Types for PHA User Management
-export type PhaProgram = 'Case Reporting'; // Can be expanded later
-export type PhaRole = 'Admin' | 'User'; // Can be expanded later
+export type PhaProgram = 'Case Reporting'; 
+export type PhaRole = 'Admin' | 'User'; 
 export type PhaUserStatus = 'Active' | 'Inactive';
 
 export interface PhaUser {
-  id: string; // Firebase Auth UID or Firestore doc ID
-  username?: string; // Auto-generated or chosen
+  id: string; 
+  authUid?: string; // Added to store Firebase Auth UID
+  username?: string; 
   name: string;
   email: string;
   phone?: string;
   program: PhaProgram;
   role: PhaRole;
-  status: PhaUserStatus; // New status field
+  status: PhaUserStatus; 
+  createdAt?: string; // ISO string
+  updatedAt?: string; // ISO string
 }
 
 // Type for PHA Jurisdiction Configuration
 export interface PhaJurisdictionConfig {
-  state: string; // e.g., 'OH', 'CA'
-  phaName?: string; // Optional: Official name of the PHA
-  logoUrl?: string; // Optional: URL for custom logo
-  lastUpdated: string; // ISO string
+  state: string; 
+  phaName?: string; 
+  logoUrl?: string; 
+  lastUpdated: string; 
 
-  // Regulatory Information
   stateRegulationsUrl?: string;
   requiredReportingFieldsInfo?: string;
 
-  // Contact Information
   phaContactName?: string;
   phaContactEmail?: string;
   phaContactPhone?: string;
 
-  // Program-Specific Data
   reportableConditionsUrl?: string;
   dataStandardsInfo?: string;
 
-  // Geographic Information
-  autoPopulateCounties?: boolean; // If true, attempt to provide county lists
-  autoPopulateHealthSystems?: boolean; // Already present, kept for clarity
+  autoPopulateCounties?: boolean; 
+  autoPopulateHealthSystems?: boolean; 
 
-  // Branding and Communications
   stateSealUrl?: string;
   legalDisclaimers?: string;
   customWelcomeMessage?: string;
-  emailSignature?: string; // For future use
+  emailSignature?: string; 
 
-  // Third-Party Integrations
   immunizationRegistryUrl?: string;
   hieConnectionInfo?: string;
 }
 
 // Types for Email Template Configuration
 export type EmailEventTrigger = 
-  | 'provider_enrollment_submission' // This value remains, its label will change
+  | 'provider_enrollment_submission' 
   | 'new_user_account_invite'
   | 'enrollment_status_approved'
   | 'enrollment_status_changes_requested'
@@ -154,7 +160,7 @@ export type EmailEventTrigger =
   | 'password_reset_request';
 
 export const EMAIL_EVENT_TRIGGERS: { value: EmailEventTrigger; label: string }[] = [
-  { value: 'provider_enrollment_submission', label: 'HCO Registration Submitted' }, // Label changed
+  { value: 'provider_enrollment_submission', label: 'HCO Registration Submitted' }, 
   { value: 'new_user_account_invite', label: 'New PHA User Account Invite' },
   { value: 'enrollment_status_approved', label: 'Enrollment Approved' },
   { value: 'enrollment_status_changes_requested', label: 'Enrollment Changes Requested' },
@@ -164,13 +170,13 @@ export const EMAIL_EVENT_TRIGGERS: { value: EmailEventTrigger; label: string }[]
 
 
 export interface EmailAttachmentInfo {
-  id: string; // Unique ID for the attachment reference
+  id: string; 
   fileName: string;
   description?: string;
 }
 
 export interface EmailTemplate {
-  id: string; // Firestore document ID
+  id: string; 
   name: string; 
   eventTrigger: EmailEventTrigger;
   subject: string;
