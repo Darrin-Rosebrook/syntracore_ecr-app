@@ -273,7 +273,7 @@ interface HcoProfileTabProps {
   setFormData: React.Dispatch<React.SetStateAction<Record<string, any>>>;
   handleSave: () => Promise<void>;
   isSaving: boolean;
-  currentEnrollment: EnrollmentData | undefined; // To reset form on cancel
+  currentEnrollment: EnrollmentData | undefined; 
 }
 
 export function HcoProfileTab({
@@ -293,7 +293,7 @@ export function HcoProfileTab({
     const keys = name.split('.');
     
     setFormData(prev => {
-      const newState = JSON.parse(JSON.stringify(prev)); // Deep copy
+      const newState = JSON.parse(JSON.stringify(prev)); 
       let currentLevel = newState;
       keys.forEach((key, index) => {
         if (index === keys.length - 1) {
@@ -310,10 +310,7 @@ export function HcoProfileTab({
   };
 
   const sortedCustomFieldDefinitions = [...customFieldDefinitions].sort((a, b) => a.order - b.order);
-  const submissionDate = enrollment.submissionDate && isValid(parseISO(enrollment.submissionDate))
-    ? format(parseISO(enrollment.submissionDate), 'PPP p')
-    : 'Invalid Date';
-
+  
   const healthSystemOptions = OHIO_HEALTH_SYSTEMS.map(hs => ({ label: hs.label, value: hs.value }));
 
   return (
@@ -352,6 +349,8 @@ export function HcoProfileTab({
             <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><Building className="mr-2 h-4 w-4 text-muted-foreground"/>Practice Information</h4>
             <EditableField label="Organization NPI" name="practiceInfo.organizationNPI" value={formData.practiceInfo?.organizationNPI} isEditing={isEditing} onChange={handleInputChange} icon={Hash} />
             <EditableField label="Practice Name" name="practiceInfo.name" value={formData.practiceInfo?.name} isEditing={isEditing} onChange={handleInputChange} />
+            <EditableField label="Address" name="practiceInfo.address" value={formData.practiceInfo?.address} type="textarea" isEditing={isEditing} onChange={handleInputChange} />
+            <EditableField label="Phone" name="practiceInfo.phone" value={formData.practiceInfo?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
             <EditableField
               label="Health System"
               name="practiceInfo.healthSystem"
@@ -362,8 +361,6 @@ export function HcoProfileTab({
               options={healthSystemOptions}
               icon={Network}
             />
-            <EditableField label="Address" name="practiceInfo.address" value={formData.practiceInfo?.address} type="textarea" isEditing={isEditing} onChange={handleInputChange} />
-            <EditableField label="Phone" name="practiceInfo.phone" value={formData.practiceInfo?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
         </div>
 
         {/* Column 2: Contains nested grid for Primary Contact and EHR Info */}
@@ -389,20 +386,7 @@ export function HcoProfileTab({
                       options={EHR_VENDORS}
                       icon={Settings2}
                     />
-                    <div className="mb-3">
-                        <Label className="font-semibold text-foreground/80 flex items-center">
-                            <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground"/>
-                            Submission Date:
-                        </Label>
-                        <p className="text-sm mt-0.5 ml-6">{submissionDate}</p>
-                    </div>
-                     <div className="mb-3">
-                        <Label className="font-semibold text-foreground/80 flex items-center">
-                            <Info className="mr-2 h-4 w-4 text-muted-foreground"/>
-                            Status:
-                        </Label>
-                         <p className="text-sm mt-0.5 ml-6">{enrollment.status}</p>
-                    </div>
+                    {/* Submission Date and Status are now in HcoOnboardingWorkflowSteps */}
                 </div>
             </div>
         </div>
@@ -430,6 +414,7 @@ export function HcoProfileTab({
         </div>
       )}
 
+      {/* Moved HcoOnboardingWorkflowSteps here */}
       <div className="mt-6 border-t pt-6">
         <HcoOnboardingWorkflowSteps enrollment={enrollment} />
       </div>
@@ -444,4 +429,3 @@ export function HcoProfileTab({
     </div>
   );
 }
-
