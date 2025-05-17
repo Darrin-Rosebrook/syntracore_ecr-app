@@ -14,8 +14,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isValid } from 'date-fns';
-import { Edit, Save, UserCircle, Building, Settings2, FileText, CalendarDays, Info, Loader2, User, Hash, Network } from 'lucide-react'; // Added Network
-import { EHR_VENDORS, OHIO_HEALTH_SYSTEMS } from '@/lib/constants'; // Added OHIO_HEALTH_SYSTEMS
+import { Edit, Save, UserCircle, Building, Settings2, FileText, CalendarDays, Info, Loader2, User, Hash, Network } from 'lucide-react';
+import { EHR_VENDORS, OHIO_HEALTH_SYSTEMS } from '@/lib/constants';
 import { FHIRValidationDisplay } from '@/components/fhir-validation-display';
 import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps';
 
@@ -324,7 +324,7 @@ export function HcoProfileTab({
           {isEditing && (
             <Button onClick={() => { 
                 setIsEditing(false); 
-                if(currentEnrollment) { // Reset formData to currentEnrollment state on cancel
+                if(currentEnrollment) { 
                     setFormData({ 
                         practiceInfo: { ...currentEnrollment.practiceInfo }, 
                         contactDetails: { ...currentEnrollment.contactDetails }, 
@@ -347,6 +347,7 @@ export function HcoProfileTab({
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
+        {/* Column 1: Practice Information */}
         <div>
             <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><Building className="mr-2 h-4 w-4 text-muted-foreground"/>Practice Information</h4>
             <EditableField label="Organization NPI" name="practiceInfo.organizationNPI" value={formData.practiceInfo?.organizationNPI} isEditing={isEditing} onChange={handleInputChange} icon={Hash} />
@@ -364,37 +365,45 @@ export function HcoProfileTab({
             <EditableField label="Address" name="practiceInfo.address" value={formData.practiceInfo?.address} type="textarea" isEditing={isEditing} onChange={handleInputChange} />
             <EditableField label="Phone" name="practiceInfo.phone" value={formData.practiceInfo?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
         </div>
+
+        {/* Column 2: Contains nested grid for Primary Contact and EHR Info */}
         <div>
-            <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><User className="mr-2 h-4 w-4 text-muted-foreground"/>Primary Contact Details</h4>
-            <EditableField label="Contact Name" name="contactDetails.name" value={formData.contactDetails?.name} isEditing={isEditing} onChange={handleInputChange} />
-            <EditableField label="Email" name="contactDetails.email" value={formData.contactDetails?.email} type="email" isEditing={isEditing} onChange={handleInputChange} />
-            <EditableField label="Phone" name="contactDetails.phone" value={formData.contactDetails?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
-        </div>
-         <div className="md:col-span-2">
-            <h4 className="text-md font-medium mb-2 mt-3 flex items-center"><Settings2 className="mr-2 h-4 w-4 text-muted-foreground"/>EHR & System Info</h4>
-            <EditableField
-              label="EHR Vendor"
-              name="ehrVendor"
-              value={formData.ehrVendor}
-              isEditing={isEditing}
-              onChange={handleInputChange}
-              type="select"
-              options={EHR_VENDORS}
-              icon={Settings2}
-            />
-            <div className="mb-3">
-                <Label className="font-semibold text-foreground/80 flex items-center">
-                    <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground"/>
-                    Submission Date:
-                </Label>
-                <p className="text-sm mt-0.5 ml-6">{submissionDate}</p>
-            </div>
-             <div className="mb-3">
-                <Label className="font-semibold text-foreground/80 flex items-center">
-                    <Info className="mr-2 h-4 w-4 text-muted-foreground"/>
-                    Status:
-                </Label>
-                 <p className="text-sm mt-0.5 ml-6">{enrollment.status}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                {/* Sub-Column 1 of Right Column: Primary Contact Details */}
+                <div>
+                    <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><User className="mr-2 h-4 w-4 text-muted-foreground"/>Primary Contact Details</h4>
+                    <EditableField label="Contact Name" name="contactDetails.name" value={formData.contactDetails?.name} isEditing={isEditing} onChange={handleInputChange} />
+                    <EditableField label="Email" name="contactDetails.email" value={formData.contactDetails?.email} type="email" isEditing={isEditing} onChange={handleInputChange} />
+                    <EditableField label="Phone" name="contactDetails.phone" value={formData.contactDetails?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
+                </div>
+                {/* Sub-Column 2 of Right Column: EHR & System Info */}
+                <div>
+                    <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><Settings2 className="mr-2 h-4 w-4 text-muted-foreground"/>EHR &amp; System Info</h4>
+                    <EditableField
+                      label="EHR Vendor"
+                      name="ehrVendor"
+                      value={formData.ehrVendor}
+                      isEditing={isEditing}
+                      onChange={handleInputChange}
+                      type="select"
+                      options={EHR_VENDORS}
+                      icon={Settings2}
+                    />
+                    <div className="mb-3">
+                        <Label className="font-semibold text-foreground/80 flex items-center">
+                            <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground"/>
+                            Submission Date:
+                        </Label>
+                        <p className="text-sm mt-0.5 ml-6">{submissionDate}</p>
+                    </div>
+                     <div className="mb-3">
+                        <Label className="font-semibold text-foreground/80 flex items-center">
+                            <Info className="mr-2 h-4 w-4 text-muted-foreground"/>
+                            Status:
+                        </Label>
+                         <p className="text-sm mt-0.5 ml-6">{enrollment.status}</p>
+                    </div>
+                </div>
             </div>
         </div>
       </div>
@@ -421,7 +430,6 @@ export function HcoProfileTab({
         </div>
       )}
 
-      {/* Workflow Steps Rendered Here */}
       <div className="mt-6 border-t pt-6">
         <HcoOnboardingWorkflowSteps enrollment={enrollment} />
       </div>
