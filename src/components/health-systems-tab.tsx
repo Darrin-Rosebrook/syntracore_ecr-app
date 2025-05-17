@@ -1,26 +1,34 @@
 
 "use client";
 
-import React from 'react';
+import React, { useMemo } from 'react'; // Added useMemo
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Network, ChevronRight } from 'lucide-react';
-import { OHIO_HEALTH_SYSTEMS } from '@/lib/constants'; // Import the new constant
+import { OHIO_HEALTH_SYSTEMS } from '@/lib/constants';
+import { useAppContext } from '@/context/AppContext'; // Import AppContext to get enrollments
+import type { EnrollmentData } from '@/types';
 
-interface HealthSystem {
+interface HealthSystemDisplayInfo {
   label: string;
   value: string;
   location: string;
-  hcoCount: number; // Placeholder for now
+  hcoCount: number;
 }
 
 export function HealthSystemsTab() {
-  const healthSystems: HealthSystem[] = OHIO_HEALTH_SYSTEMS;
+  const { enrollments } = useAppContext(); // Get enrollments from context
 
-  // In a real application, hcoCount would be derived from actual HCO affiliations.
-  // For now, it's part of the constant or defaulted to 0.
+  const healthSystemsWithCounts = useMemo(() => {
+    return OHIO_HEALTH_SYSTEMS.map(system => {
+      const count = enrollments.filter(
+        (enrollment: EnrollmentData) => enrollment.practiceInfo.healthSystem === system.value
+      ).length;
+      return { ...system, hcoCount: count }; // Dynamically calculate hcoCount
+    });
+  }, [enrollments]);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -31,11 +39,11 @@ export function HealthSystemsTab() {
             Health Systems (Parent Organizations) - Ohio
           </CardTitle>
           <CardDescription>
-            List of major health systems in Ohio. Click on a system name to view more details (future functionality).
+            List of major health systems in Ohio. Click on a system name to view more details.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {healthSystems.length > 0 ? (
+          {healthSystemsWithCounts.length > 0 ? (
             <ScrollArea className="h-[calc(100vh-20rem)] border rounded-md">
               <Table>
                 <TableHeader className="sticky top-0 bg-background z-10">
@@ -47,10 +55,9 @@ export function HealthSystemsTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {healthSystems.map((system) => (
+                  {healthSystemsWithCounts.map((system: HealthSystemDisplayInfo) => (
                     <TableRow key={system.value} className="hover:bg-muted/50">
                       <TableCell className="font-medium">
-                        {/* Placeholder link, actual profile pages would need to be created */}
                         <Link href={`/admin/health-systems/${system.value}`} className="text-primary hover:underline">
                           {system.label}
                         </Link>
