@@ -13,8 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, BookOpen, PlusCircle, Loader2, List, Edit3, Trash2 } from 'lucide-react';
 import type { ResourceItem, ResourceItemType } from '@/types';
 import { addResourceItemAction, getResourceItemsAction, updateResourceItemAction, deleteResourceItemAction } from '@/actions/resource-actions';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger as AlertDialogTriggerComponent } from "@/components/ui/alert-dialog";
 import { format, parseISO } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
@@ -228,7 +228,7 @@ export default function ManageResourcesPage() {
                       <TableCell className="font-medium">{item.title}</TableCell>
                       <TableCell>{resourceItemTypes.find(rt => rt.value === item.type)?.label || item.type}</TableCell>
                       <TableCell className="max-w-xs truncate" title={item.content}>
-                        {item.type === 'link' ? <a href={item.content} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{item.content}</a> : item.content}
+                        {item.type === 'link' ? <a href={item.content.startsWith('http') ? item.content : `//${item.content}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{item.content}</a> : item.content}
                       </TableCell>
                       <TableCell>{item.lastUpdated ? format(parseISO(item.lastUpdated), 'PPp') : 'N/A'}</TableCell>
                       <TableCell className="text-right space-x-1">
@@ -236,11 +236,11 @@ export default function ManageResourcesPage() {
                           <Edit3 className="h-4 w-4" />
                         </Button>
                         <AlertDialog>
-                          <AlertDialogTrigger asChild>
+                          <AlertDialogTriggerComponent asChild>
                             <Button variant="ghost" size="icon" title="Delete Item" disabled={isSaving}>
                               {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
                             </Button>
-                          </AlertDialogTrigger>
+                          </AlertDialogTriggerComponent>
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
