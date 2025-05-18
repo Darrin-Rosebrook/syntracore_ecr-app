@@ -12,14 +12,13 @@ export async function fetchCliaDataAction(cliaNumber: string): Promise<{ success
   if (!cliaNumber || cliaNumber.trim().length === 0) {
     return { success: false, error: "CLIA number is required." };
   }
-  // Basic CLIA format check (10 characters, typically 2 digits, 1 letter, 7 digits)
-  // This is a loose check; the API will be the ultimate validator.
+
   if (!/^[0-9A-Z]{10}$/i.test(cliaNumber.trim())) {
-     return { success: false, error: "Invalid CLIA number format. Expected 10 alphanumeric characters." };
+    return { success: false, error: "Invalid CLIA number format. Expected 10 alphanumeric characters." };
   }
 
   const encodedCliaNumber = encodeURIComponent(cliaNumber.trim());
-  const url = `https://data.cms.gov/provider-data/api/1/datastore/query/xubh-q36u/0?conditions[0][property]=clia_number&conditions[0][value]=${encodedCliaNumber}&conditions[0][operator]=%3D`;
+  const url = `https://data.cms.gov/resource/xubh-q36u.json?$where=clia='${encodedCliaNumber}'`;
 
   try {
     const response = await fetch(url);
@@ -28,10 +27,10 @@ export async function fetchCliaDataAction(cliaNumber: string): Promise<{ success
       return { success: false, error: `CLIA registry request failed (status: ${response.status}).` };
     }
 
-    const apiResponse: CliaApiResponse = await response.json();
+    const results: CliaApiResult[] = await response.json();
 
-    if (apiResponse.count > 0 && apiResponse.results && apiResponse.results.length > 0) {
-      const labResult: CliaApiResult = apiResponse.results[0];
+    if (results.length > 0) {
+      const labResult = results[0];
       const formattedAddress = [
         labResult.st_adr,
         labResult.city_nme,
@@ -46,6 +45,7 @@ export async function fetchCliaDataAction(cliaNumber: string): Promise<{ success
         phone: labResult.phn_numbr,
         labType: labResult.lab_type_dsc,
       };
+
       return { success: true, data: cliaData };
     } else {
       return { success: false, error: `CLIA number ${cliaNumber} not found.` };
