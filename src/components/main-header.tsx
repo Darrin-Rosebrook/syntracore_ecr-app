@@ -8,13 +8,13 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LogIn, LogOut, UserCircle, Settings, Building, LayoutDashboard, Loader2, Search as SearchIcon } from "lucide-react";
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'; // Added usePathname
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { getVendorProfileAction } from '@/actions/vendor-actions';
 
 export function MainHeader() {
   const { currentUser, logOut, loading: authLoading, isPhaUser } = useAuth();
   const router = useRouter();
-  const pathname = usePathname(); // Get current pathname
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const [isVendorRole, setIsVendorRole] = useState(false);
@@ -22,8 +22,12 @@ export function MainHeader() {
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
 
   // Determine if the search bar should be shown
-  // Hide search on the HCO registration form page and on the main page for guest users (where HCO splash is default)
-  const showSearch = !(pathname === '/hco-registration' || (pathname === '/' && !currentUser));
+  // Hide search on HCO registration form, main page for guests, and login page.
+  const showSearch = !(
+    pathname === '/hco-registration' ||
+    (pathname === '/' && !currentUser) ||
+    pathname === '/login'
+  );
 
   useEffect(() => {
     const determineVendorRole = async () => {
