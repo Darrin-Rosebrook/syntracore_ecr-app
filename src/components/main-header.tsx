@@ -6,19 +6,24 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"; // Added Input
-import { LogIn, LogOut, UserCircle, Settings, Building, LayoutDashboard, Loader2, Search as SearchIcon } from "lucide-react"; // Added SearchIcon
-import { useRouter, useSearchParams } from 'next/navigation'; // Added useSearchParams
+import { Input } from "@/components/ui/input";
+import { LogIn, LogOut, UserCircle, Settings, Building, LayoutDashboard, Loader2, Search as SearchIcon } from "lucide-react";
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'; // Added usePathname
 import { getVendorProfileAction } from '@/actions/vendor-actions';
 
 export function MainHeader() {
   const { currentUser, logOut, loading: authLoading, isPhaUser } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams(); // Get current search params
+  const pathname = usePathname(); // Get current pathname
+  const searchParams = useSearchParams();
 
   const [isVendorRole, setIsVendorRole] = useState(false);
   const [isCheckingVendorRole, setIsCheckingVendorRole] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || ''); // Initialize with q param
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
+
+  // Determine if the search bar should be shown
+  // Hide search on the HCO registration form page and on the main page for guest users (where HCO splash is default)
+  const showSearch = !(pathname === '/hco-registration' || (pathname === '/' && !currentUser));
 
   useEffect(() => {
     const determineVendorRole = async () => {
@@ -57,11 +62,10 @@ export function MainHeader() {
     if (searchTerm.trim()) {
       router.push(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
     } else {
-      router.push('/search'); // Navigate to search page even if term is empty, to clear results or show all
+      router.push('/search');
     }
   };
   
-  // Update searchTerm if q param changes (e.g., back button)
   useEffect(() => {
     setSearchTerm(searchParams.get('q') || '');
   }, [searchParams]);
@@ -78,24 +82,26 @@ export function MainHeader() {
             src="/images/OnboardeCR.png"
             alt="Onboard eCR Logo"
             width={150}
-            height={50} // Adjusted height for 150px width
+            height={50}
             priority
             data-ai-hint="company logo"
           />
         </Link>
 
-        <form onSubmit={handleSearchSubmit} className="flex-grow max-w-md mx-4">
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search HCOs, users, vendors..."
-              className="w-full rounded-lg bg-muted pl-10 h-9"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </form>
+        {showSearch && (
+          <form onSubmit={handleSearchSubmit} className="flex-grow max-w-md mx-4">
+            <div className="relative">
+              <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search HCOs, users, vendors..."
+                className="w-full rounded-lg bg-muted pl-10 h-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </form>
+        )}
 
         <div className="flex items-center gap-1 sm:gap-2 ml-auto">
           {overallLoading ? (
