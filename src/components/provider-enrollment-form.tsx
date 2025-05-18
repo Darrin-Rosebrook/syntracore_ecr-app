@@ -18,12 +18,12 @@ import { EHR_VENDORS, PENDING_ENROLLMENT_DATA_KEY, PENDING_CCD_FILE_CONTENT_KEY,
 import { FileUploader } from "@/components/file-uploader";
 import { useToast } from "@/hooks/use-toast";
 import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData, CliaData } from "@/types";
-import { validateFHIR } from "@/services/fhir-validator"; 
+import { validateFHIR } from "@/services/fhir-validator";
 import { fetchNpiDataAction } from '@/actions/workflow-actions';
-import { fetchCliaDataAction } from '@/actions/clia-actions'; // New CLIA action
+import { fetchCliaDataAction } from '@/actions/clia-actions';
 import { summarizeValidationResults } from "@/ai/flows/summarize-validation-results";
 import { FHIRValidationDisplay } from "./fhir-validation-display";
-import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays, Hash, Search as SearchIcon, ArrowRight, FilePenLine, Beaker } from "lucide-react"; 
+import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays, Hash, Search as SearchIcon, ArrowRight, FilePenLine, Beaker } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isValid } from 'date-fns';
@@ -34,7 +34,7 @@ const practiceInfoSchema = z.object({
     .string()
     .length(10, "Organization NPI must be 10 digits")
     .regex(/^[0-9]{10}$/, "Organization NPI must be a 10-digit number")
-    .optional().or(z.literal('')), // NPI can be optional if CLIA is primary
+    .optional().or(z.literal('')),
   name: z.string().min(1, "HCO/Lab name is required"),
   address: z.string().min(1, "Address is required"),
   phone: z
@@ -47,25 +47,23 @@ const practiceInfoSchema = z.object({
   cliaLabType: z.string().optional(),
 }).refine(data => {
     if (data.isLabOrPerformsLabServices === 'yes' && (!data.cliaNumber || data.cliaNumber.trim() === '')) {
-      return false; // CLIA number is required if it's a lab
+      return false;
     }
     return true;
   }, {
     message: "CLIA number is required if registering a lab or HCO performing lab services.",
-    path: ["cliaNumber"], 
+    path: ["cliaNumber"],
   }).refine(data => {
-    // At least NPI or CLIA must be provided if it's a lab
     if (data.isLabOrPerformsLabServices === 'yes' && (!data.organizationNPI?.trim() && !data.cliaNumber?.trim())) {
       return false;
     }
-    // If not a lab, NPI is required
     if (data.isLabOrPerformsLabServices === 'no' && !data.organizationNPI?.trim()) {
         return false;
     }
     return true;
   }, {
     message: "Either Organization NPI or CLIA Number (if applicable) is required.",
-    path: ["organizationNPI"], // Or a more general path if needed
+    path: ["organizationNPI"],
   });
 
 
@@ -98,7 +96,7 @@ export function ProviderEnrollmentForm({
   customFieldDefinitions
 }: ProviderEnrollmentFormProps) {
   const { toast } = useToast();
-  const router = useRouter(); 
+  const router = useRouter();
   const [ccdFile, setCcdFile] = React.useState<File | null>(null);
   const [ccdFileContent, setCcdFileContent] = React.useState<string | null>(null);
   const [validationResult, setValidationResult] = React.useState<FHIRValidationResult | undefined>(undefined);
@@ -151,13 +149,13 @@ export function ProviderEnrollmentForm({
   const form = useForm<FormSchemaType>({
     resolver: zodResolver(dynamicEnrollmentSchema),
     defaultValues: {
-      practiceInfo: { 
-        organizationNPI: "", 
-        name: "", 
-        address: "", 
-        phone: "", 
-        isLabOrPerformsLabServices: undefined, 
-        cliaNumber: "" 
+      practiceInfo: {
+        organizationNPI: "",
+        name: "",
+        address: "",
+        phone: "",
+        isLabOrPerformsLabServices: undefined,
+        cliaNumber: ""
       },
       contactDetails: { name: "", email: "", phone: "" },
       ehrVendor: "",
@@ -208,23 +206,21 @@ export function ProviderEnrollmentForm({
   const handleFileSelect = async (file: File | null, fileContent: string | null) => {
     setCcdFile(file);
     setCcdFileContent(fileContent);
-    setValidationResult(undefined); 
+    setValidationResult(undefined);
 
     if (file && fileContent) {
       setIsProcessingFile(true);
       let parsedContent: any;
 
       try {
-        // Attempt to parse as JSON first
         parsedContent = JSON.parse(fileContent);
       } catch (jsonError) {
-        // If JSON parsing fails, assume it might be XML or other text format
-        console.warn("File is not valid JSON. Will attempt validation with raw content for XML or other formats.");
-        parsedContent = fileContent; 
+        console.warn("File is not valid JSON. Will attempt validation with raw content for XML or other formats.", jsonError);
+        parsedContent = fileContent;
       }
 
       try {
-        const rawValidationResult = await validateFHIR(parsedContent); 
+        const rawValidationResult = await validateFHIR(parsedContent);
         const aiSummaryResult = await summarizeValidationResults({ validationResults: rawValidationResult });
         setValidationResult({
           ...rawValidationResult,
@@ -237,7 +233,7 @@ export function ProviderEnrollmentForm({
           description: "An error occurred while validating the file or generating a summary.",
           variant: "destructive",
         });
-        setValidationResult({ 
+        setValidationResult({
             isValid: false,
             messages: ["Error during validation or AI summarization.", (validationError as Error).message],
             summary: "File processing failed during validation or summarization."
@@ -260,9 +256,12 @@ export function ProviderEnrollmentForm({
     setCliaLookupLoading(true);
     setCliaLookupError(null);
     setFetchedCliaData(null);
+    console.log("Initiating CLIA lookup for:", cliaToLookup);
     try {
       const result = await fetchCliaDataAction(cliaToLookup);
+      console.log("CLIA Lookup Result:", result);
       if (result.success && result.data) {
+        console.log("Fetched CLIA Data to be set:", result.data);
         setFetchedCliaData(result.data);
         form.setValue('practiceInfo.name', result.data.facilityName || form.getValues('practiceInfo.name'), { shouldValidate: true });
         form.setValue('practiceInfo.address', result.data.address || form.getValues('practiceInfo.address'), { shouldValidate: true });
@@ -277,6 +276,7 @@ export function ProviderEnrollmentForm({
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to retrieve CLIA data.";
       setCliaLookupError(msg);
+      console.error("CLIA Lookup Catch Error:", error);
       toast({ title: "CLIA Lookup Error", description: msg, variant: "destructive" });
     } finally {
       setCliaLookupLoading(false);
@@ -339,7 +339,7 @@ export function ProviderEnrollmentForm({
       setIsProcessingContinue(false);
       return;
     }
-    if (!validationResult) { 
+    if (!validationResult) {
       toast({ title: "File Not Processed or Invalid", description: "Please ensure the file is correctly processed and valid or re-upload if an error occurred.", variant: "destructive" });
       setIsProcessingContinue(false);
       return;
@@ -367,6 +367,7 @@ export function ProviderEnrollmentForm({
   };
 
   const sortedCustomFieldDefinitions = [...customFieldDefinitions].sort((a,b) => a.order - b.order);
+  console.log("ProviderEnrollmentForm rendering. Fetched CLIA Data state:", fetchedCliaData);
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
