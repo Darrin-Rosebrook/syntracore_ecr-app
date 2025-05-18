@@ -5,7 +5,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings, Users, ListChecks, Globe, Mail } from 'lucide-react'; 
+import { Settings, Users, ListChecks, Globe, Mail, BookOpen } from 'lucide-react';
 
 const AdminConsolePage: React.FC = () => {
   return (
@@ -32,7 +32,7 @@ const AdminConsolePage: React.FC = () => {
                       </CardDescription>
                     </div>
                   </CardHeader>
-                  <CardContent></CardContent> 
+                  <CardContent></CardContent>
                 </Card>
               </a>
             </Link>
@@ -48,7 +48,7 @@ const AdminConsolePage: React.FC = () => {
                       </CardDescription>
                     </div>
                   </CardHeader>
-                  <CardContent></CardContent> 
+                  <CardContent></CardContent>
                 </Card>
               </a>
             </Link>
@@ -64,7 +64,7 @@ const AdminConsolePage: React.FC = () => {
                       </CardDescription>
                     </div>
                   </CardHeader>
-                  <CardContent></CardContent> 
+                  <CardContent></CardContent>
                 </Card>
               </a>
             </Link>
@@ -72,7 +72,7 @@ const AdminConsolePage: React.FC = () => {
               <a className="block">
                 <Card className="hover:shadow-lg transition-shadow h-full cursor-pointer">
                   <CardHeader className="flex flex-row items-center space-x-3 pb-2 pt-4">
-                    <Mail className="h-8 w-8 text-accent" /> 
+                    <Mail className="h-8 w-8 text-accent" />
                     <div>
                       <CardTitle className="text-lg">Configure Email Messages</CardTitle>
                       <CardDescription className="text-sm mt-1">
@@ -80,7 +80,23 @@ const AdminConsolePage: React.FC = () => {
                       </CardDescription>
                     </div>
                   </CardHeader>
-                  <CardContent></CardContent> 
+                  <CardContent></CardContent>
+                </Card>
+              </a>
+            </Link>
+            <Link href="/admin/manage-resources" passHref legacyBehavior>
+              <a className="block">
+                <Card className="hover:shadow-lg transition-shadow h-full cursor-pointer">
+                  <CardHeader className="flex flex-row items-center space-x-3 pb-2 pt-4">
+                    <BookOpen className="h-8 w-8 text-accent" />
+                    <div>
+                      <CardTitle className="text-lg">Manage Resources Content</CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Add, edit, or delete content for the "Resources" drawer.
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent></CardContent>
                 </Card>
               </a>
             </Link>

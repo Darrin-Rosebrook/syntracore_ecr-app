@@ -7,14 +7,14 @@ export interface PracticeInfo {
   name: string;
   address: string;
   phone: string;
-  healthSystem?: string; 
+  healthSystem?: string;
   isLabOrPerformsLabServices?: 'yes' | 'no';
   cliaNumber?: string;
-  cliaLabName?: string; 
-  cliaLabType?: string; 
+  cliaLabName?: string;
+  cliaLabType?: string;
 }
 
-export interface ContactDetails { 
+export interface ContactDetails {
   name: string;
   email: string;
   phone: string;
@@ -46,22 +46,22 @@ export interface CustomFieldDefinition {
 }
 
 export interface ContactEntry {
-  id: string; 
+  id: string;
   name: string;
   email: string;
   phone: string;
-  role?: string; 
-  isAlternative?: boolean; 
+  role?: string;
+  isAlternative?: boolean;
 }
 
 export interface EnrollmentFormData {
   practiceInfo: PracticeInfo;
-  contactDetails: ContactDetails; 
+  contactDetails: ContactDetails;
   ehrVendor: string;
   ccdDocumentName?: string;
   consent: boolean;
   additionalData?: Record<string, any>;
-  additionalContacts?: ContactEntry[]; 
+  additionalContacts?: ContactEntry[];
 }
 
 export interface FHIRValidationResult extends ExternalFHIRValidationResult {
@@ -76,13 +76,13 @@ export interface ActivityLogEntry {
 }
 
 export interface DocumentEntry {
-  id: string; 
+  id: string;
   name: string;
-  type: string; 
-  size: number; 
-  uploadDate: string; 
-  uploadedBy: string; 
-  url?: string; 
+  type: string;
+  size: number;
+  uploadDate: string;
+  uploadedBy: string;
+  url?: string;
 }
 
 export interface MessageEntry {
@@ -98,39 +98,39 @@ export interface MessageEntry {
 export interface EnrollmentData extends EnrollmentFormData {
   id: string;
   submissionDate: string;
-  ccdDocumentContent?: string; 
+  ccdDocumentContent?: string;
   validationResult?: FHIRValidationResult;
   status: 'Pending' | 'Approved' | 'Changes Requested' | 'Denied';
   activityLog?: ActivityLogEntry[];
-  documents?: DocumentEntry[]; 
+  documents?: DocumentEntry[];
   messages?: MessageEntry[]; // Added for messaging
 }
 
 // Types for PHA User Management
-export type PhaProgram = 'Case Reporting'; 
-export type PhaRole = 'Admin' | 'User'; 
+export type PhaProgram = 'Case Reporting';
+export type PhaRole = 'Admin' | 'User';
 export type PhaUserStatus = 'Active' | 'Inactive';
 
 export interface PhaUser {
-  id: string; 
+  id: string;
   authUid?: string; // Added to store Firebase Auth UID
-  username?: string; 
+  username?: string;
   name: string;
   email: string;
   phone?: string;
   program: PhaProgram;
   role: PhaRole;
-  status: PhaUserStatus; 
+  status: PhaUserStatus;
   createdAt?: string; // ISO string
   updatedAt?: string; // ISO string
 }
 
 // Type for PHA Jurisdiction Configuration
 export interface PhaJurisdictionConfig {
-  state: string; 
-  phaName?: string; 
-  logoUrl?: string; 
-  lastUpdated: string; 
+  state: string;
+  phaName?: string;
+  logoUrl?: string;
+  lastUpdated: string;
 
   stateRegulationsUrl?: string;
   requiredReportingFieldsInfo?: string;
@@ -142,21 +142,21 @@ export interface PhaJurisdictionConfig {
   reportableConditionsUrl?: string;
   dataStandardsInfo?: string;
 
-  autoPopulateCounties?: boolean; 
-  autoPopulateHealthSystems?: boolean; 
+  autoPopulateCounties?: boolean;
+  autoPopulateHealthSystems?: boolean;
 
   stateSealUrl?: string;
   legalDisclaimers?: string;
   customWelcomeMessage?: string;
-  emailSignature?: string; 
+  emailSignature?: string;
 
   immunizationRegistryUrl?: string;
   hieConnectionInfo?: string;
 }
 
 // Types for Email Template Configuration
-export type EmailEventTrigger = 
-  | 'provider_enrollment_submission' 
+export type EmailEventTrigger =
+  | 'provider_enrollment_submission'
   | 'new_user_account_invite'
   | 'enrollment_status_approved'
   | 'enrollment_status_changes_requested'
@@ -164,7 +164,7 @@ export type EmailEventTrigger =
   | 'password_reset_request';
 
 export const EMAIL_EVENT_TRIGGERS: { value: EmailEventTrigger; label: string }[] = [
-  { value: 'provider_enrollment_submission', label: 'HCO Registration Submitted' }, 
+  { value: 'provider_enrollment_submission', label: 'HCO Registration Submitted' },
   { value: 'new_user_account_invite', label: 'New PHA User Account Invite' },
   { value: 'enrollment_status_approved', label: 'Enrollment Approved' },
   { value: 'enrollment_status_changes_requested', label: 'Enrollment Changes Requested' },
@@ -174,31 +174,31 @@ export const EMAIL_EVENT_TRIGGERS: { value: EmailEventTrigger; label: string }[]
 
 
 export interface EmailAttachmentInfo {
-  id: string; 
+  id: string;
   fileName: string;
   description?: string;
 }
 
 export interface EmailTemplate {
-  id: string; 
-  name: string; 
+  id: string;
+  name: string;
   eventTrigger: EmailEventTrigger;
   subject: string;
-  htmlBody: string; 
-  attachments?: EmailAttachmentInfo[]; 
-  placeholders?: string[]; 
-  lastUpdated: string; 
-  createdAt: string; 
+  htmlBody: string;
+  attachments?: EmailAttachmentInfo[];
+  placeholders?: string[];
+  lastUpdated: string;
+  createdAt: string;
 }
 
 // Onboarding Workflow Types
-export type OnboardingStageStatus = 
-  | 'Not Started' 
-  | 'In Progress' 
-  | 'Complete' 
-  | 'Failed' 
-  | 'Action Required' 
-  | 'Ongoing' 
+export type OnboardingStageStatus =
+  | 'Not Started'
+  | 'In Progress'
+  | 'Complete'
+  | 'Failed'
+  | 'Action Required'
+  | 'Ongoing'
   | 'Not Yet Applicable';
 
 export interface OnboardingStage {
@@ -237,13 +237,11 @@ export interface CliaApiResult {
   phn_numbr?: string;
   lab_type_dsc?: string; // Lab Type Description
   clia_waiver_ind_yn?: 'Y' | 'N'; // CLIA Waiver Indicator
-  // Add other fields as needed from the API response
 }
 
 export interface CliaApiResponse {
   results: CliaApiResult[];
   count: number;
-  // other potential fields like 'message', 'params'
 }
 
 export interface CliaData {
@@ -254,3 +252,15 @@ export interface CliaData {
   labType?: string;
 }
 
+// Resource Item Types
+export type ResourceItemType = 'link' | 'text' | 'document_placeholder';
+
+export interface ResourceItem {
+  id: string;
+  title: string;
+  type: ResourceItemType;
+  content: string; // URL for 'link', text content for 'text', placeholder for 'document'
+  order: number;
+  createdAt: string; // ISO string
+  lastUpdated: string; // ISO string
+}
