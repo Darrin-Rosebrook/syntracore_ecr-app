@@ -8,6 +8,10 @@ export interface PracticeInfo {
   address: string;
   phone: string;
   healthSystem?: string; 
+  isLabOrPerformsLabServices?: 'yes' | 'no';
+  cliaNumber?: string;
+  cliaLabName?: string; 
+  cliaLabType?: string; 
 }
 
 export interface ContactDetails { 
@@ -213,5 +217,40 @@ export interface VendorProfileData {
   representedEhrSystemValue: string; // Value from EHR_VENDORS
   createdAt: string; // ISO string
   lastLogin?: string; // ISO string
+}
+
+// CLIA Data Types
+export interface CliaAddress {
+  st_adr: string;
+  city_nme: string;
+  st_cd: string;
+  zip_cd: string;
+}
+
+export interface CliaApiResult {
+  clia_number: string;
+  fac_nme?: string; // Facility Name
+  st_adr?: string; // Street Address
+  city_nme?: string;
+  st_cd?: string; // State Code
+  zip_cd?: string;
+  phn_numbr?: string;
+  lab_type_dsc?: string; // Lab Type Description
+  clia_waiver_ind_yn?: 'Y' | 'N'; // CLIA Waiver Indicator
+  // Add other fields as needed from the API response
+}
+
+export interface CliaApiResponse {
+  results: CliaApiResult[];
+  count: number;
+  // other potential fields like 'message', 'params'
+}
+
+export interface CliaData {
+  cliaNumber: string;
+  facilityName?: string;
+  address?: string; // Combined address string
+  phone?: string;
+  labType?: string;
 }
 

@@ -33,6 +33,7 @@ export default function HcoRegistrationPage() {
               </Link>
             </Button>
         </div>
+        {/* The ProviderEnrollmentForm itself will render the title "HCO & Lab Registration" */}
         <ProviderEnrollmentForm
           customFieldDefinitions={customFieldDefinitions}
         />
@@ -40,3 +41,4 @@ export default function HcoRegistrationPage() {
     </ScrollArea>
   );
 }
+

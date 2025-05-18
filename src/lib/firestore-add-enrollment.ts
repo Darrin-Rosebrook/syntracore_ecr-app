@@ -12,20 +12,27 @@ export async function addEnrollmentToFirestore(
   validationResult: FHIRValidationResult
 ): Promise<{ success: boolean; id?: string; error?: string }> {
   console.log("addEnrollmentToFirestore server action called.");
-  console.log("Received formData:", JSON.stringify(formData, null, 2));
-  console.log("Received ccdDocumentContent (length):", ccdDocumentContent ? ccdDocumentContent.length : 'null');
-  console.log("Received validationResult:", JSON.stringify(validationResult, null, 2));
-
+  
   try {
     const submissionDate = new Date();
     const logEntry: ActivityLogEntry = {
       timestamp: submissionDate.toISOString(),
-      entry: "HCO Registration application submitted.", // Changed entry text
+      entry: "HCO & Lab Registration application submitted.", // Changed entry text
       type: "System",
     };
 
     const dataToSave = {
-      practiceInfo: formData.practiceInfo,
+      practiceInfo: { // Ensure all potential fields from PracticeInfo are included
+        organizationNPI: formData.practiceInfo.organizationNPI || '',
+        name: formData.practiceInfo.name,
+        address: formData.practiceInfo.address,
+        phone: formData.practiceInfo.phone,
+        healthSystem: formData.practiceInfo.healthSystem || undefined,
+        isLabOrPerformsLabServices: formData.practiceInfo.isLabOrPerformsLabServices || 'no',
+        cliaNumber: formData.practiceInfo.cliaNumber || undefined,
+        cliaLabName: formData.practiceInfo.cliaLabName || undefined,
+        cliaLabType: formData.practiceInfo.cliaLabType || undefined,
+      },
       contactDetails: formData.contactDetails,
       ehrVendor: formData.ehrVendor,
       consent: formData.consent,
