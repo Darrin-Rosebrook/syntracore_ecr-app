@@ -15,6 +15,7 @@ import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ECR_ONBOARDING_STAGES } from '@/lib/constants';
+import { cn } from '@/lib/utils'; // Import cn
 
 // Helper function to determine current phase name
 const getCurrentPhaseName = (enrollmentStatus: EnrollmentData['status']): string => {
@@ -53,7 +54,7 @@ export default function VendorPortalPage() {
     async function fetchProfileAndHcos() {
       if (currentUser && currentUser.uid) {
         setIsLoadingProfile(true);
-        await updateVendorLastLoginAction(currentUser.uid); 
+        await updateVendorLastLoginAction(currentUser.uid);
         const profileResult = await getVendorProfileAction(currentUser.uid);
         if (profileResult.success && profileResult.data) {
           setVendorProfile(profileResult.data);
@@ -63,7 +64,7 @@ export default function VendorPortalPage() {
             );
             setLinkedHcos(filteredHcos);
             if (filteredHcos.length > 0 && !selectedHco) {
-              setSelectedHco(filteredHcos[0]); 
+              setSelectedHco(filteredHcos[0]);
             }
           }
         } else {
@@ -77,11 +78,11 @@ export default function VendorPortalPage() {
     if (!authLoading && currentUser) {
         fetchProfileAndHcos();
     }
-  }, [currentUser, authLoading, enrollments, selectedHco]); // selectedHco removed as a direct dependency for fetching profile and all HCOs
+  }, [currentUser, authLoading, enrollments]);
 
   const handleLogout = async () => {
     await logOut();
-    router.push('/'); 
+    router.push('/');
   };
 
   if (authLoading || isLoadingProfile || (appContextLoading && !vendorProfile)) {
@@ -93,7 +94,7 @@ export default function VendorPortalPage() {
     );
   }
 
-  if (!currentUser) return null; 
+  if (!currentUser) return null;
 
   return (
     <div className="container mx-auto py-8 space-y-6">
@@ -133,9 +134,15 @@ export default function VendorPortalPage() {
                           onClick={() => setSelectedHco(hco)}
                         >
                           <span className="font-semibold block w-full whitespace-normal break-words">{hco.practiceInfo.name}</span>
-                          <span className="text-xs text-muted-foreground">NPI: {hco.practiceInfo.organizationNPI || 'N/A'}</span>
-                          <span className="text-xs text-muted-foreground">Status: {hco.status}</span>
-                          <span className="text-xs text-muted-foreground">Phase: {getCurrentPhaseName(hco.status)}</span>
+                          <span className={cn("text-xs", selectedHco?.id === hco.id ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                            NPI: {hco.practiceInfo.organizationNPI || 'N/A'}
+                          </span>
+                          <span className={cn("text-xs", selectedHco?.id === hco.id ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                            Status: {hco.status}
+                          </span>
+                           <span className={cn("text-xs", selectedHco?.id === hco.id ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                            Phase: {getCurrentPhaseName(hco.status)}
+                          </span>
                         </Button>
                       </li>
                     ))}
@@ -195,8 +202,8 @@ export default function VendorPortalPage() {
             </CardHeader>
             <CardContent>
                 <p className="text-muted-foreground">
-                Your vendor profile information could not be fully loaded. This might be due to a setup issue. 
-                If you have just registered, please try logging out and logging back in. 
+                Your vendor profile information could not be fully loaded. This might be due to a setup issue.
+                If you have just registered, please try logging out and logging back in.
                 If the problem persists, please contact support.
                 </p>
                  <Button onClick={handleLogout} variant="link" className="mt-2">Logout and try again</Button>
