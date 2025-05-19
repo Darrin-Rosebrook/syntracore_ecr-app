@@ -7,10 +7,10 @@ import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogIn, LogOut, UserCircle, Settings, Building, LayoutDashboard, Loader2, Search as SearchIcon, BookOpen } from "lucide-react"; // Added BookOpen
+import { LogIn, LogOut, UserCircle, Settings, Building, LayoutDashboard, Loader2, Search as SearchIcon, BookOpen } from "lucide-react";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { getVendorProfileAction } from '@/actions/vendor-actions';
-import { ResourcesDrawer } from '@/components/resources-drawer'; // Added import
+import { ResourcesDrawer } from '@/components/resources-drawer';
 
 export function MainHeader() {
   const { currentUser, logOut, loading: authLoading, isPhaUser } = useAuth();
@@ -21,11 +21,11 @@ export function MainHeader() {
   const [isVendorRole, setIsVendorRole] = useState(false);
   const [isCheckingVendorRole, setIsCheckingVendorRole] = useState(false);
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
-  const [isResourcesDrawerOpen, setIsResourcesDrawerOpen] = useState(false); // State for drawer
+  const [isResourcesDrawerOpen, setIsResourcesDrawerOpen] = useState(false);
 
   const showSearch = !(
     pathname === '/hco-registration' ||
-    (pathname === '/' && !currentUser) || // Hide on splash page for guests
+    (pathname === '/' && !currentUser) ||
     pathname === '/login'
   );
 
@@ -83,10 +83,10 @@ export function MainHeader() {
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2 mr-4">
           <Image
-            src="/images/OnboardeCR.png" 
+            src="/images/OnboardeCR.png"
             alt="Onboard eCR Logo"
             width={150}
-            height={50} 
+            height={50}
             priority
             data-ai-hint="company logo"
           />
@@ -154,16 +154,15 @@ export function MainHeader() {
             </>
           ) : (
             <>
+              {/* Login button now links to main page where login form is embedded */}
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/login">
+                <Link href="/">
                   <LogIn className="mr-2 h-4 w-4" />
                   Login
                 </Link>
               </Button>
-              {/* Vendor Registration button removed as per previous request, relying on tab */}
             </>
           )}
-          {/* Resources Drawer Trigger - visible to all users */}
           <Button
             variant="ghost"
             size="sm"
@@ -171,8 +170,8 @@ export function MainHeader() {
             className="flex items-center"
             aria-label="Open resources"
           >
-            <BookOpen className="mr-1 h-4 w-4" /> {/* Icon always visible */}
-            <span>Resources</span> {/* Text always visible */}
+            <BookOpen className="mr-1 h-4 w-4" />
+            <span>Resources</span>
           </Button>
         </div>
       </div>
