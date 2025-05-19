@@ -1,233 +1,174 @@
+
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, UserPlusIcon } from 'lucide-react';
+import { Loader2, UserPlusIcon, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { addEnrollmentToFirestore } from '@/lib/firestore-add-enrollment';
-import type { EnrollmentFormData, FHIRValidationResult, ContactEntry } from '@/types';
-import { PENDING_ENROLLMENT_DATA_KEY, PENDING_CCD_FILE_CONTENT_KEY, PENDING_VALIDATION_RESULT_KEY } from '@/lib/constants';
-import { useAppContext } from '@/context/AppContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { EULA_TEXT } from '@/lib/constants';
 
+function SignupForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const registrationType = searchParams.get('type') || 'hco'; // Default to hco if no type
 
-export default function SignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [role, setRole] = useState('');
+  const [phone, setPhone] = useState(''); // Kept for potential future use or if EULA requires a contact phone during signup itself
+  const [role, setRole] = useState('');   // Kept for potential future use
 
   const { signUp, loading: authLoading, currentUser } = useAuth();
-  const { fetchInitialData } = useAppContext();
-  const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false); 
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-
-  const [hasPendingEnrollment, setHasPendingEnrollment] = useState(false);
+  const [showEulaDialog, setShowEulaDialog] = useState(false);
 
   useEffect(() => {
-    const pendingData = localStorage.getItem(PENDING_ENROLLMENT_DATA_KEY);
-    if (pendingData) {
-      setHasPendingEnrollment(true);
-    } else {
-      setHasPendingEnrollment(false);
-      if (currentUser) {
-        router.push('/'); 
+    if (currentUser) {
+      // If user is already logged in, redirect based on type or to dashboard
+      switch (registrationType) {
+        case 'hco': router.push('/hco-registration'); break;
+        case 'vendor': router.push('/vendor-registration'); break;
+        case 'healthsystem': router.push('/health-system-detailed-registration'); break;
+        default: router.push('/');
       }
     }
-  }, [currentUser, router]);
-
-
-  const clearPendingEnrollmentData = () => {
-    localStorage.removeItem(PENDING_ENROLLMENT_DATA_KEY);
-    localStorage.removeItem(PENDING_CCD_FILE_CONTENT_KEY);
-    localStorage.removeItem(PENDING_VALIDATION_RESULT_KEY);
-    setHasPendingEnrollment(false);
-  };
+  }, [currentUser, router, registrationType]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("Submitting signup form..."); 
     if (!name.trim()) {
-      toast({title: "Name Required", description: "Please enter your full name.", variant: "destructive" });
+      toast({ title: "Name Required", description: "Please enter your full name.", variant: "destructive" });
       return;
     }
     if (password !== confirmPassword) {
-      toast({title: "Password Mismatch", description: "Passwords do not match!", variant: "destructive" });
+      toast({ title: "Password Mismatch", description: "Passwords do not match!", variant: "destructive" });
       return;
     }
+    setShowEulaDialog(true); // Show EULA before actual account creation
+  };
+
+  const proceedWithSignup = async () => {
     setIsSubmitting(true);
-    const user = await signUp(email, password);
+    // Pass name to signUp so it can be set on Firebase Auth profile
+    const user = await signUp(email, password, name);
+    setIsSubmitting(false);
 
     if (user) {
-      const pendingEnrollmentDataString = localStorage.getItem(PENDING_ENROLLMENT_DATA_KEY);
-      const pendingCcdFileContent = localStorage.getItem(PENDING_CCD_FILE_CONTENT_KEY);
-      const pendingValidationResultString = localStorage.getItem(PENDING_VALIDATION_RESULT_KEY);
-
-      if (pendingEnrollmentDataString && pendingCcdFileContent !== null && pendingValidationResultString) {
-        try {
-          const enrollmentData: EnrollmentFormData = JSON.parse(pendingEnrollmentDataString);
-          const validationResult: FHIRValidationResult = JSON.parse(pendingValidationResultString);
-          
-          // Integrate signup user's details as a contact
-          const submitterContactName = name;
-          const submitterContactPhone = phone;
-          const submitterContactRole = role.trim() || 'Enrollment Submitter';
-
-          // If primary contact details from original form are minimal/empty, use signup user as primary
-          if (!enrollmentData.contactDetails.name && !enrollmentData.contactDetails.email) {
-            enrollmentData.contactDetails = {
-              name: submitterContactName,
-              email: user.email!, 
-              phone: submitterContactPhone,
-            };
-          } else {
-            // Otherwise, add as an additional contact
-            const newAdditionalContact: ContactEntry = {
-              id: `contact_${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
-              name: submitterContactName,
-              email: user.email!,
-              phone: submitterContactPhone,
-              role: submitterContactRole,
-              isAlternative: false, 
-            };
-            if (!enrollmentData.additionalContacts) {
-                enrollmentData.additionalContacts = [];
-            }
-            enrollmentData.additionalContacts.push(newAdditionalContact);
-          }
-          
-          toast({ title: "Account Created", description: "Now submitting your enrollment..."});
-
-          const submissionResult = await addEnrollmentToFirestore(
-            enrollmentData,
-            pendingCcdFileContent,
-            validationResult
-          );
-
-          if (submissionResult.success && submissionResult.id) {
-            toast({
-              title: "Enrollment Submitted Successfully",
-              description: `Practice "${enrollmentData.practiceInfo.name}" enrollment complete. ID: ${submissionResult.id.slice(0,8)}...`,
-              className: "bg-green-500 text-white",
-            });
-            await fetchInitialData(); 
-            clearPendingEnrollmentData();
-            router.push('/'); 
-          } else {
-            toast({
-              title: "Enrollment Submission Failed",
-              description: submissionResult.error || "Could not submit enrollment after account creation. Please contact support.",
-              variant: "destructive",
-            });
-            router.push('/'); 
-          }
-        } catch (error) {
-          console.error("Error processing or submitting enrollment data:", error);
-          toast({
-            title: "Enrollment Error",
-            description: "An error occurred while processing your enrollment after account creation. Please contact support.",
-            variant: "destructive",
-          });
-          router.push('/');
-        }
-      } else {
-        await fetchInitialData(); // Refresh data in case of regular signup post-login/logout cycle
-        router.push('/');
+      toast({ title: "Account Created", description: "Redirecting to complete your registration..." });
+      // Redirect to specific registration form based on type
+      switch (registrationType) {
+        case 'hco':
+          router.push('/hco-registration');
+          break;
+        case 'vendor':
+          router.push('/vendor-registration');
+          break;
+        case 'healthsystem':
+          router.push('/health-system-detailed-registration');
+          break;
+        default:
+          toast({ title: "Error", description: "Unknown registration type.", variant: "destructive" });
+          router.push('/'); // Fallback
       }
     }
-    setIsSubmitting(false);
+    // Error handling for signUp is within AuthContext and shows a toast
+  };
+
+  const handleEulaAccept = () => {
+    setShowEulaDialog(false);
+    proceedWithSignup();
+  };
+
+  const handleEulaDecline = () => {
+    setShowEulaDialog(false);
+    toast({
+      title: "EULA Agreement Required",
+      description: "You must agree to the EULA to create an account.",
+      variant: "destructive",
+    });
   };
 
   return (
     <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-1 text-center">
-           <div className="flex justify-center mb-2">
+          <div className="flex justify-center mb-2">
             <UserPlusIcon className="h-8 w-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Create an Account</CardTitle>
+          <CardTitle className="text-2xl">Create Your Account</CardTitle>
           <CardDescription>
-            {hasPendingEnrollment 
-              ? "Final step: Create your account to complete the enrollment."
-              : "Enter your details to sign up."
-            }
+            Enter your details to create an account. You will then be directed to complete your
+            {registrationType === 'hco' && ' HCO/Lab Registration.'}
+            {registrationType === 'vendor' && ' Vendor Profile.'}
+            {registrationType === 'healthsystem' && ' Health System Registration.'}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input 
-                id="name" 
-                type="text" 
-                placeholder="Your Full Name" 
+              <Label htmlFor="name">Full Name <span className="text-destructive">*</span></Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Your Full Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                required 
+                required
                 disabled={authLoading || isSubmitting}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="m@example.com" 
+              <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="m@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required 
+                required
                 disabled={authLoading || isSubmitting}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number (Optional)</Label>
-              <Input 
-                id="phone" 
-                type="tel" 
-                placeholder="(XXX) XXX-XXXX" 
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="(XXX) XXX-XXXX"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 disabled={authLoading || isSubmitting}
               />
             </div>
-             <div className="space-y-2">
-              <Label htmlFor="role">Your Role (e.g., Office Manager, Provider - Optional)</Label>
-              <Input 
-                id="role" 
-                type="text" 
-                placeholder="Your role in the practice" 
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                disabled={authLoading || isSubmitting}
-              />
-            </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input 
-                id="password" 
-                type="password" 
+              <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
+              <Input
+                id="password"
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required 
+                required
                 disabled={authLoading || isSubmitting}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input 
-                id="confirmPassword" 
-                type="password" 
+              <Label htmlFor="confirmPassword">Confirm Password <span className="text-destructive">*</span></Label>
+              <Input
+                id="confirmPassword"
+                type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                required 
+                required
                 disabled={authLoading || isSubmitting}
               />
             </div>
@@ -235,22 +176,54 @@ export default function SignupPage() {
           <CardFooter className="flex flex-col space-y-3">
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={authLoading || isSubmitting}>
               {(authLoading || isSubmitting) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {hasPendingEnrollment ? "Create Account & Submit Enrollment" : "Sign Up"}
+              Proceed to EULA & Create Account
             </Button>
-             <p className="text-center text-sm text-muted-foreground">
+            <p className="text-center text-sm text-muted-foreground">
               Already have an account?{' '}
-              <Link href="/login" className="font-semibold text-primary hover:underline" onClick={clearPendingEnrollmentData}>
+              <Link href="/login" className="font-semibold text-primary hover:underline">
                 Login
               </Link>
             </p>
-            {hasPendingEnrollment && (
-                <p className="text-center text-xs text-muted-foreground">
-                    Changed your mind? <Link href="/" className="font-semibold text-primary hover:underline" onClick={clearPendingEnrollmentData}>Cancel enrollment and go to dashboard</Link>.
-                </p>
-            )}
           </CardFooter>
         </form>
       </Card>
+
+      <Dialog open={showEulaDialog} onOpenChange={setShowEulaDialog}>
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <ShieldCheck className="mr-2 h-6 w-6 text-primary" />
+              End-User License Agreement (EULA)
+            </DialogTitle>
+            <DialogDescription>
+              Please read and agree to the terms before creating your account.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-grow border rounded-md my-4">
+            <div className="p-4 whitespace-pre-wrap text-sm">
+              {EULA_TEXT.replace("[Insert Date]", new Date().toLocaleDateString()).replace("[Insert State]", "Ohio").replace("[Insert County and State]", "Franklin County, Ohio")}
+            </div>
+          </ScrollArea>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={handleEulaDecline} disabled={isSubmitting}>
+              Decline
+            </Button>
+            <Button type="button" onClick={handleEulaAccept} disabled={isSubmitting} className="bg-accent text-accent-foreground hover:bg-accent/90">
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              I Agree & Create Account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+// Wrap with Suspense because useSearchParams() needs it for SSR compatibility
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-[calc(100vh-4rem)] items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+      <SignupForm />
+    </Suspense>
   );
 }

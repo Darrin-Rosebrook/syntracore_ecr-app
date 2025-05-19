@@ -9,20 +9,25 @@ import type { EnrollmentFormData, FHIRValidationResult, ActivityLogEntry } from 
 export async function addEnrollmentToFirestore(
   formData: EnrollmentFormData,
   ccdDocumentContent: string | null,
-  validationResult: FHIRValidationResult
+  validationResult: FHIRValidationResult,
+  userId: string, // Added userId
+  userEmail: string // Added userEmail
 ): Promise<{ success: boolean; id?: string; error?: string }> {
-  console.log("addEnrollmentToFirestore server action called.");
+  console.log("addEnrollmentToFirestore server action called by user:", userId);
   
   try {
     const submissionDate = new Date();
     const logEntry: ActivityLogEntry = {
       timestamp: submissionDate.toISOString(),
-      entry: "HCO & Lab Registration application submitted.", // Changed entry text
+      entry: `HCO & Lab Registration submitted by ${userEmail}.`,
       type: "System",
+      user: userId, // Log which user submitted
     };
 
     const dataToSave = {
-      practiceInfo: { // Ensure all potential fields from PracticeInfo are included
+      userId: userId, // Store the UID of the user submitting
+      userEmail: userEmail, // Store the email of the user submitting
+      practiceInfo: {
         organizationNPI: formData.practiceInfo.organizationNPI || '',
         name: formData.practiceInfo.name,
         address: formData.practiceInfo.address,
@@ -67,4 +72,3 @@ export async function addEnrollmentToFirestore(
     return { success: false, error: `Failed to save enrollment to Firestore: ${error.message || "Unknown Firestore error."}` };
   }
 }
-

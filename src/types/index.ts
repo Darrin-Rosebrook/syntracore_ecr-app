@@ -1,5 +1,4 @@
 
-
 import type { FHIRValidationResult as ExternalFHIRValidationResult } from '@/services/fhir-validator';
 
 export interface PracticeInfo {
@@ -55,6 +54,8 @@ export interface ContactEntry {
 }
 
 export interface EnrollmentFormData {
+  userId?: string; // Added to associate with Firebase Auth User UID
+  userEmail?: string; // Added to store email of submitter
   practiceInfo: PracticeInfo;
   contactDetails: ContactDetails;
   ehrVendor: string;
@@ -103,7 +104,7 @@ export interface EnrollmentData extends EnrollmentFormData {
   status: 'Pending' | 'Approved' | 'Changes Requested' | 'Denied';
   activityLog?: ActivityLogEntry[];
   documents?: DocumentEntry[];
-  messages?: MessageEntry[]; // Added for messaging
+  messages?: MessageEntry[]; 
 }
 
 // Types for PHA User Management
@@ -113,7 +114,7 @@ export type PhaUserStatus = 'Active' | 'Inactive';
 
 export interface PhaUser {
   id: string;
-  authUid?: string; // Added to store Firebase Auth UID
+  authUid?: string; 
   username?: string;
   name: string;
   email: string;
@@ -213,8 +214,8 @@ export interface VendorProfileData {
   userId: string; // Firebase Auth UID
   vendorName: string;
   contactName: string;
-  email: string; // Should match auth email
-  representedEhrSystemValue: string; // Value from EHR_VENDORS
+  email: string; 
+  representedEhrSystemValue: string; 
   createdAt: string; // ISO string
   lastLogin?: string; // ISO string
 }
@@ -229,25 +230,25 @@ export interface CliaAddress {
 
 export interface CliaApiResult {
   clia_number: string;
-  fac_nme?: string; // Facility Name
-  st_adr?: string; // Street Address
+  fac_nme?: string; 
+  st_adr?: string; 
   city_nme?: string;
-  st_cd?: string; // State Code
+  st_cd?: string; 
   zip_cd?: string;
   phn_numbr?: string;
-  lab_type_dsc?: string; // Lab Type Description
-  clia_waiver_ind_yn?: 'Y' | 'N'; // CLIA Waiver Indicator
+  lab_type_dsc?: string; 
+  clia_waiver_ind_yn?: 'Y' | 'N'; 
 }
 
-export interface CliaApiResponse {
+export interface CliaApiResponse { // This might not be used if querying Firestore directly
   results: CliaApiResult[];
   count: number;
 }
 
-export interface CliaData {
+export interface CliaData { // This is the shape of data action expects from Firestore OR formats into
   cliaNumber: string;
   facilityName?: string;
-  address?: string; // Combined address string
+  address?: string; 
   phone?: string;
   labType?: string;
 }
@@ -259,7 +260,7 @@ export interface ResourceItem {
   id: string;
   title: string;
   type: ResourceItemType;
-  content: string; // URL for 'link', text content for 'text', placeholder for 'document'
+  content: string; 
   order: number;
   createdAt: string; // ISO string
   lastUpdated: string; // ISO string

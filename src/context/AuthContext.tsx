@@ -8,7 +8,7 @@ import React, {
   useEffect,
   ReactNode,
 } from 'react';
-import { auth, db } from '@/lib/firebase'; // Ensure db is imported
+import { auth, db } from '@/lib/firebase'; 
 import type { User, AuthError } from 'firebase/auth';
 import {
   createUserWithEmailAndPassword,
@@ -16,17 +16,18 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  updateProfile, // Import updateProfile
 } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { getPhaUserByUsernameAction } from '@/actions/user-actions';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore'; // Firestore imports
+import { collection, query, where, getDocs, limit } from 'firebase/firestore'; 
 
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
-  isPhaUser: boolean; // New state for PHA user status
-  signUp: (email: string, password: string) => Promise<User | null>;
+  isPhaUser: boolean; 
+  signUp: (email: string, password: string, displayName?: string) => Promise<User | null>; // Added displayName
   logIn: (identifier: string, password: string) => Promise<User | null>;
   logOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -49,7 +50,7 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isPhaUser, setIsPhaUser] = useState(false); // Initialize PHA user state
+  const [isPhaUser, setIsPhaUser] = useState(false); 
   const [showGlobalLoader, setShowGlobalLoader] = useState(true);
   const { toast } = useToast();
 
@@ -80,11 +81,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return unsubscribe;
   }, []);
 
-  const signUp = async (email: string, password: string): Promise<User | null> => {
+  const signUp = async (email: string, password: string, displayName?: string): Promise<User | null> => {
     setLoading(true);
     setIsPhaUser(false); 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      if (displayName && userCredential.user) {
+        await updateProfile(userCredential.user, { displayName });
+        // Note: currentUser might not update immediately here due to onAuthStateChanged listener.
+        // If immediate displayName access is needed post-signup, re-fetch or update local state.
+      }
       toast({ title: 'Sign Up Successful', description: 'Welcome!' });
       return userCredential.user;
     } catch (error) {
@@ -127,6 +133,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, emailToUse, password);
       toast({ title: 'Login Successful', description: 'Welcome back!' });
+      // isPhaUser will be set by onAuthStateChanged listener
       return userCredential.user;
     } catch (error) {
       const authError = error as AuthError;
@@ -195,7 +202,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     resetPassword,
   };
 
-  if (showGlobalLoader && loading) {
+  if (showGlobalLoader) { 
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />

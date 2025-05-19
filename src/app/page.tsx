@@ -4,7 +4,8 @@
 import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from "@/components/dashboard-tab";
-import { HcoRegistrationSplashPage } from "@/components/hco-registration-splash-page";
+// HcoRegistrationSplashPage is no longer the direct entry for HCOs, link goes to signup
+// import { HcoRegistrationSplashPage } from "@/components/hco-registration-splash-page";
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
 import { EhrVendorsTab } from "@/components/ehr-vendors-tab";
 import { HealthSystemsTab } from "@/components/health-systems-tab";
@@ -29,7 +30,7 @@ export default function HomePage() {
   let defaultTabValue: string;
 
   if (isPhaUser) {
-    tabListCols = "sm:grid-cols-4"; // Adjusted for 4 tabs
+    tabListCols = "sm:grid-cols-3"; // PHA users: PHA Reviewer, Health Systems, EHR/LIMS Vendors, Reports
     tabsToRender.push(
       { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} />, condition: true },
       { value: "health-systems", label: "Health Systems", icon: Network, content: <HealthSystemsTab />, condition: true },
@@ -44,25 +45,67 @@ export default function HomePage() {
     );
     defaultTabValue = "pha-reviewer";
   } else if (!currentUser) { // Guest user
-    tabListCols = "sm:grid-cols-4"; // Adjusted for new "Health System Registration" tab
+    tabListCols = "sm:grid-cols-3"; // Adjusted for new "Health System Registration" tab
     tabsToRender.push(
-      { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: <DashboardTab />, condition: true },
-      { value: "hco-registration", label: "HCO Registration", icon: FilePenLine, content: <HcoRegistrationSplashPage />, condition: true },
+      // HCO Registration now links to signup with type=hco
+      { value: "hco-registration", label: "HCO Registration", icon: FilePenLine, content: (
+        <Card className="w-full max-w-2xl mx-auto shadow-xl text-center">
+          <CardHeader>
+            <div className="mx-auto mb-6">
+              <Image 
+                src="/images/OnboardeCR.png"
+                alt="Onboard eCR Logo" 
+                width={200} 
+                height={67}
+                priority 
+                data-ai-hint="logo health"
+              />
+            </div>
+            <CardTitle className="text-3xl font-bold flex items-center justify-center">
+              <FilePenLine className="mr-3 h-8 w-8 text-primary" />
+              Register Intent for eCR
+            </CardTitle>
+            <CardDescription className="text-lg text-foreground/80 mt-2">
+              For Health Care Organizations & Laboratories
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <p className="text-md leading-relaxed">
+              This portal facilitates the process for Health Care Organizations (HCOs) and Laboratories to register their intent to participate in Electronic Case Reporting (eCR). 
+              Registering is the first step towards streamlined, automated public health reporting.
+            </p>
+            <Button asChild size="lg" className="mt-6 bg-accent text-accent-foreground hover:bg-accent/90">
+              <Link href="/signup?type=hco">
+                Start HCO Registration <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ), condition: true },
+      // Vendor Registration now links to signup with type=vendor
       { value: "vendor-registration", label: "EHR/LIMS Vendor Registration", icon: Building, content: (
         <Card className="w-full max-w-2xl mx-auto shadow-xl text-center">
           <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center"><Building className="mr-3 h-8 w-8 text-primary" />EHR/LIMS Vendor Registration</CardTitle><CardDescription className="text-lg text-foreground/80 mt-2">For Electronic Health Record (EHR) or Laboratory Information Management System (LIMS) vendors.</CardDescription></CardHeader>
-          <CardContent className="space-y-6"><p className="text-md leading-relaxed">If you represent an EHR or LIMS vendor, create an account to access the Vendor Portal. The portal will allow you to view the onboarding status of your client Health Care Organizations and access tools to assist them through the eCR onboarding process.</p><Button asChild size="lg" className="mt-6 bg-accent text-accent-foreground hover:bg-accent/90"><Link href="/vendor-registration">Proceed to Vendor Registration <ArrowRight className="ml-2 h-5 w-5" /></Link></Button></CardContent>
+          <CardContent className="space-y-6"><p className="text-md leading-relaxed">If you represent an EHR or LIMS vendor, create an account to access the Vendor Portal. The portal will allow you to view the onboarding status of your client Health Care Organizations and access tools to assist them through the eCR onboarding process.</p>
+          <Button asChild size="lg" className="mt-6 bg-accent text-accent-foreground hover:bg-accent/90">
+            <Link href="/signup?type=vendor">
+              Start Vendor Registration <ArrowRight className="ml-2 h-5 w-5" />
+            </Link>
+          </Button>
+          </CardContent>
         </Card>
       ), condition: true },
-      { value: "health-system-registration", label: "Health System Registration", icon: Share2, content: ( // Using Share2 for Health System representation
+      // Health System Registration now links to signup with type=healthsystem
+      { value: "health-system-registration", label: "Health System Registration", icon: Share2, content: (
         <Card className="w-full max-w-2xl mx-auto shadow-xl text-center">
           <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center"><Share2 className="mr-3 h-8 w-8 text-primary" />Health System Registration</CardTitle><CardDescription className="text-lg text-foreground/80 mt-2">For Parent Health Systems or Large Networks.</CardDescription></CardHeader>
           <CardContent className="space-y-6">
-            <p className="text-md leading-relaxed">If you represent a parent health system or a large healthcare network, this section will allow you to register your system. Registering your health system can help streamline the onboarding process for affiliated HCOs and provide centralized oversight capabilities.</p>
-            <p className="text-sm text-muted-foreground">(This feature is currently under development. Please check back later for registration options.)</p>
-            {/* <Button asChild size="lg" className="mt-6 bg-accent text-accent-foreground hover:bg-accent/90" disabled>
-              Proceed to Health System Registration <ArrowRight className="ml-2 h-5 w-5" />
-            </Button> */}
+            <p className="text-md leading-relaxed">If you represent a parent health system or a large healthcare network, create an account to begin the registration process for your system. This can help streamline onboarding for affiliated HCOs and provide centralized oversight.</p>
+            <Button asChild size="lg" className="mt-6 bg-accent text-accent-foreground hover:bg-accent/90">
+               <Link href="/signup?type=healthsystem">
+                Start Health System Registration <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       ), condition: true }
@@ -87,15 +130,17 @@ export default function HomePage() {
     } else if (!currentUser) {
         newDefaultTabValue = "hco-registration";
     } else {
-        newDefaultTabValue = "dashboard";
+        newDefaultTabValue = "dashboard"; // For logged-in non-PHA users, like vendor or HCO redirecting here
     }
+    
     const currentActiveTabIsValid = visibleTabs.some(tab => tab.value === activeTab);
+    
     if (activeTab !== newDefaultTabValue && !currentActiveTabIsValid) {
         setActiveTab(newDefaultTabValue);
     } else if (!currentActiveTabIsValid && visibleTabs.length > 0) {
         setActiveTab(visibleTabs[0].value);
-    } else if (visibleTabs.length === 0 && activeTab !== "") {
-        setActiveTab("");
+    } else if (visibleTabs.length === 0 && activeTab !== "" && !isPhaUser) { // Avoid clearing for PHA if they have tabs
+        setActiveTab(""); 
     }
 
   }, [isPhaUser, currentUser, activeTab, visibleTabs]);
@@ -128,13 +173,19 @@ export default function HomePage() {
                 {tab.content}
               </TabsContent>
             ))}
+            {visibleTabs.length === 0 && !isPhaUser && (
+                 <Card className="w-full shadow-xl text-center">
+                    <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center">Welcome</CardTitle></CardHeader>
+                    <CardContent><p className="text-md leading-relaxed">Your portal will be available after completing your profile or if you are an administrator.</p></CardContent>
+                </Card>
+            )}
           </Tabs>
         </div>
       </main>
       <footer className="py-6 md:px-8 md:py-0 border-t">
         <div className="container flex flex-col items-center justify-between gap-4 md:h-20 md:flex-row">
           <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
-            Built by SyntraHub. &copy; {new Date().getFullYear()} All rights reserved.
+            Built by SyntraCore. &copy; {new Date().getFullYear()} All rights reserved.
           </p>
         </div>
       </footer>
