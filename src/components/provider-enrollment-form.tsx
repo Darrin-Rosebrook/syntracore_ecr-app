@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData, CliaData } from "@/types";
 import { validateFHIR } from "@/services/fhir-validator";
 import { fetchNpiDataAction } from '@/actions/workflow-actions';
-import { fetchCliaDataFromFirestoreAction } from '@/actions/clia-actions';
+import { fetchCliaDataAction } from '@/actions/clia-actions'; // Corrected import name
 import { summarizeValidationResults } from "@/ai/flows/summarize-validation-results";
 import { FHIRValidationDisplay } from "./fhir-validation-display";
 import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays, Hash, Search as SearchIcon, ArrowRight, FilePenLine, Beaker } from "lucide-react";
@@ -268,7 +268,7 @@ export function ProviderEnrollmentForm({
     console.log(`[ProviderEnrollmentForm] Initiating CLIA lookup for: ${cliaToLookup}`);
 
     try {
-      const result = await fetchCliaDataFromFirestoreAction(cliaToLookup);
+      const result = await fetchCliaDataAction(cliaToLookup); // Using corrected action name
       console.log("[ProviderEnrollmentForm] CLIA Lookup Result:", result);
 
       if (result.success && result.data) {
@@ -304,9 +304,6 @@ export function ProviderEnrollmentForm({
   const handleClearCliaData = () => {
     setFetchedCliaData(null);
     setCliaLookupError(null);
-    // Optionally clear CLIA-derived fields if desired, or leave them for user to edit
-    // form.setValue('practiceInfo.cliaLabName', '', { shouldValidate: true });
-    // form.setValue('practiceInfo.cliaLabType', '', { shouldValidate: true });
     toast({ title: 'CLIA Data Cleared', description: 'CLIA lookup information has been cleared from view.' });
   };
 
@@ -610,4 +607,3 @@ export function ProviderEnrollmentForm({
     </Card>
   );
 }
-
