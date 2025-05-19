@@ -1,93 +1,69 @@
-
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { EnrollmentData } from '@/types';
-import { EHR_VENDORS } from '@/lib/constants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ListTree, ChevronRight, Trash2 } from 'lucide-react'; 
-import { Button } from '@/components/ui/button';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { ListTree, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
+import { fetchChplDevelopersAction } from '@/actions/chpl-api-actions';
+import type { ChplDeveloper } from '@/types/chpl';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
 
-interface EhrVendorsTabProps {
-  enrollments: EnrollmentData[];
-}
-
-interface VendorStat {
-  label: string;
-  value: string;
-  type: string;
-  count: number;
-}
-
-export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
-  const [displayedVendors, setDisplayedVendors] = useState(EHR_VENDORS);
+export function EhrVendorsTab() {
+  const [developers, setDevelopers] = useState<ChplDeveloper[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const vendorStats = useMemo(() => {
-    const counts: Record<string, number> = {};
-    enrollments.forEach(enrollment => {
-      if (enrollment.ehrVendor) {
-        counts[enrollment.ehrVendor] = (counts[enrollment.ehrVendor] || 0) + 1;
-      }
-    });
-
-    const stats: VendorStat[] = displayedVendors.map(vendorConst => ({ // Use displayedVendors
-      label: vendorConst.label,
-      value: vendorConst.value,
-      type: vendorConst.type,
-      count: counts[vendorConst.value] || 0,
-    }));
-
-    // This part handles vendors found in enrollment data but not in the (potentially filtered) displayedVendors constant list
-    // For instance, if a vendor was present in enrollments but somehow not in the initial EHR_VENDORS or a filtered list.
-    // This is less likely if displayedVendors starts as EHR_VENDORS and is only filtered down.
-    Object.keys(counts).forEach(dataVendorValue => {
-      if (!stats.some(s => s.value === dataVendorValue)) {
-        const originalVendorConstant = EHR_VENDORS.find(v => v.value === dataVendorValue);
-        stats.push({
-          label: originalVendorConstant ? originalVendorConstant.label : dataVendorValue, 
-          value: dataVendorValue,
-          type: originalVendorConstant ? originalVendorConstant.type : "Unknown",
-          count: counts[dataVendorValue],
+  useEffect(() => {
+    async function loadDevelopers() {
+      setIsLoading(true);
+      setError(null);
+      const result = await fetchChplDevelopersAction();
+      if (result.success && result.developers) {
+        // Filter for developers with "Active" status
+        const activeDevelopers = result.developers.filter(dev => dev.status?.name.toLowerCase() === 'active');
+        setDevelopers(activeDevelopers.sort((a, b) => a.name.localeCompare(b.name)));
+      } else {
+        setError(result.error || "Failed to load EHR/LIMS vendors.");
+        toast({
+          title: "Error Loading Vendors",
+          description: result.error || "Could not fetch vendors from CHPL.",
+          variant: "destructive",
         });
       }
-    });
-    
-    return stats
-        .sort((a, b) => {
-            if (b.count === a.count) {
-                return a.label.localeCompare(b.label);
-            }
-            return b.count - a.count;
-        });
+      setIsLoading(false);
+    }
+    loadDevelopers();
+  }, [toast]);
 
-  }, [enrollments, displayedVendors]);
-
-  const handleRemoveVendor = (vendorValueToRemove: string) => {
-    const vendorToRemove = displayedVendors.find(v => v.value === vendorValueToRemove);
-    setDisplayedVendors(prevVendors =>
-      prevVendors.filter(vendor => vendor.value !== vendorValueToRemove)
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center p-10">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading EHR/LIMS Vendors from CHPL...</span>
+      </div>
     );
-    toast({ 
-      title: "Vendor Removed", 
-      description: `Vendor "${vendorToRemove?.label || vendorValueToRemove}" has been removed from the list for the current session.` 
-    });
-  };
+  }
+
+  if (error) {
+    return (
+      <Card className="shadow-xl m-4 md:m-6">
+        <CardHeader>
+          <CardTitle className="text-2xl font-semibold flex items-center text-destructive">
+            <AlertCircle className="mr-3 h-7 w-7" />
+            Error Loading Vendors
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">{error}</p>
+          <p className="text-muted-foreground mt-2">Please ensure the CHPL API key is correctly configured in your .env file and the CHPL API service is available.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -95,67 +71,37 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
         <CardHeader>
           <CardTitle className="text-2xl font-semibold flex items-center">
             <ListTree className="mr-3 h-7 w-7 text-primary" />
-            EHR/LIMS Vendor Distribution
+            EHR/LIMS Vendor (Companies) from CHPL
           </CardTitle>
           <CardDescription>
-            Overview of Electronic Health Record (EHR) and Laboratory Information Management System (LIMS) vendors. Click on a vendor name to view more details.
+            List of active Health IT developers sourced from the ONC CHPL. Click on a vendor name to view more details and their certified products.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {vendorStats.length > 0 ? (
+          {developers.length > 0 ? (
             <ScrollArea className="h-[calc(100vh-20rem)] border rounded-md">
               <Table>
                 <TableHeader className="sticky top-0 bg-background z-10">
                   <TableRow>
-                    <TableHead className="w-[45%]">EHR/LIMS Vendor</TableHead>
-                    <TableHead className="w-[20%]">Vendor Type</TableHead>
-                    <TableHead className="text-right w-[20%]">HCO Count</TableHead>
-                    <TableHead className="text-right w-[15%]">Actions</TableHead>
+                    <TableHead className="w-[70%]">Developer Name</TableHead>
+                    <TableHead className="w-[20%]">CHPL ID</TableHead>
+                    <TableHead className="text-right w-[10%]">Details</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {vendorStats.map((stat) => (
-                    <TableRow key={stat.value} className="hover:bg-muted/50">
+                  {developers.map((dev) => (
+                    <TableRow key={dev.developerId} className="hover:bg-muted/50">
                       <TableCell className="font-medium">
-                        <Link href={`/admin/ehr-vendors/${stat.value}`} className="text-primary hover:underline">
-                          {stat.label}
+                        <Link href={`/admin/ehr-vendors/${dev.developerId}`} className="text-primary hover:underline">
+                          {dev.name}
                         </Link>
+                        {dev.status && dev.status.name.toLowerCase() !== 'active' && (
+                            <Badge variant="outline" className="ml-2 text-xs">{dev.status.name}</Badge>
+                        )}
                       </TableCell>
-                      <TableCell>{stat.type}</TableCell>
-                      <TableCell className="text-right">{stat.count}</TableCell>
-                      <TableCell className="text-right flex justify-end items-center space-x-1">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled={stat.count > 0}
-                              title={stat.count > 0 ? "Cannot remove: Vendor is linked to HCOs" : "Remove vendor"}
-                            >
-                              <Trash2 className={`h-4 w-4 ${stat.count > 0 ? 'text-muted-foreground opacity-50 cursor-not-allowed' : 'text-destructive hover:text-destructive/80'}`} />
-                            </Button>
-                          </AlertDialogTrigger>
-                          {stat.count === 0 && (
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action will remove "{stat.label}" from the list on this page. This vendor is not linked to any HCOs. This change is for the current session only and cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleRemoveVendor(stat.value)}
-                                  className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                                >
-                                  Remove
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          )}
-                        </AlertDialog>
-                        <Link href={`/admin/ehr-vendors/${stat.value}`} passHref legacyBehavior>
+                      <TableCell>{dev.developerCode} ({dev.developerId})</TableCell>
+                      <TableCell className="text-right">
+                        <Link href={`/admin/ehr-vendors/${dev.developerId}`} passHref legacyBehavior>
                           <Button variant="ghost" size="icon" title="View Vendor Details" asChild>
                             <a><ChevronRight className="h-5 w-5 text-muted-foreground hover:text-primary" /></a>
                           </Button>
@@ -168,7 +114,7 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
             </ScrollArea>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No EHR/LIMS vendor data available or all vendors have been removed from view.
+              No active EHR/LIMS vendors found from CHPL or failed to load data.
             </p>
           )}
         </CardContent>
@@ -176,4 +122,3 @@ export function EhrVendorsTab({ enrollments }: EhrVendorsTabProps) {
     </div>
   );
 }
-
