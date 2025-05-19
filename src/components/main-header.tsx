@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from "next/link";
-import Image from "next/image";
+import Image from "next/image"; // Correct import
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +71,7 @@ export function MainHeader() {
   };
   
   useEffect(() => {
+    // Update search term in header if URL changes (e.g. browser back/forward)
     setSearchTerm(searchParams.get('q') || '');
   }, [searchParams]);
 
@@ -83,10 +84,10 @@ export function MainHeader() {
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2 mr-4">
           <Image
-            src="/images/SyntraCore_Logo.png"
+            src="/images/SyntraCore_Logo.png" // Path relative to public folder
             alt="SyntraCore Logo"
-            width={150}
-            height={50}
+            width={150} // Adjust as needed
+            height={50}  // Adjust as needed
             priority
             data-ai-hint="company logo"
           />

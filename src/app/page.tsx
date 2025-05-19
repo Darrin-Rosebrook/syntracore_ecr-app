@@ -2,7 +2,7 @@
 "use client";
 
 import React from "react";
-import Image from 'next/image';
+import Image from 'next/image'; // Correct import
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
 import { EhrVendorsTab } from "@/components/ehr-vendors-tab";
@@ -21,7 +21,7 @@ export default function HomePage() {
     updateEnrollmentStatus,
     isLoading: isContextLoading
   } = useAppContext();
-  const { currentUser, isPhaUser, loading: authLoading } = useAuth();
+  const { currentUser, isPhaUser, loading: authLoading } = useAuth(); // isPhaUser from AuthContext
 
   const [activeTab, setActiveTab] = React.useState(""); 
 
@@ -30,16 +30,19 @@ export default function HomePage() {
 
     let newDefaultTabValue = "";
     if (isPhaUser) {
-      newDefaultTabValue = "pha-reviewer";
+      newDefaultTabValue = "pha-reviewer"; // Default for PHA user
     } else if (currentUser) { 
-      newDefaultTabValue = "dashboard";
+      newDefaultTabValue = "dashboard"; // Default for other logged-in users
     } else {
       newDefaultTabValue = "hco-registration"; // Default for guests
     }
     
-    setActiveTab(newDefaultTabValue);
+    // Only update activeTab if it's different or not set yet to avoid unnecessary re-renders
+    if (activeTab !== newDefaultTabValue) {
+      setActiveTab(newDefaultTabValue);
+    }
 
-  }, [isPhaUser, currentUser, authLoading]);
+  }, [isPhaUser, currentUser, authLoading, activeTab]);
 
 
   if (isContextLoading || authLoading) {
@@ -60,13 +63,13 @@ export default function HomePage() {
             <div className="space-y-6">
               <div className="text-center lg:text-left mb-8">
                 <Image
-                  src="/images/SyntraCore_Logo.png"
+                  src="/images/SyntraCore_Logo.png" // Path relative to public folder
                   alt="SyntraCore Logo"
-                  width={250}
-                  height={84}
+                  width={250} // Adjust as needed
+                  height={84} // Adjust as needed
                   priority
+                  data-ai-hint="company logo"
                   className="mx-auto lg:mx-0"
-                  data-ai-hint="logo health"
                 />
                 <h1 className="text-3xl font-bold tracking-tight text-primary mt-4">Welcome to Onboard eCR</h1>
                 <p className="text-muted-foreground mt-2 text-lg">
@@ -124,7 +127,7 @@ export default function HomePage() {
   const tabsToRender: { value: string; label: string; icon: React.ElementType; content: React.ReactNode; condition?: boolean }[] = [];
 
   if (isPhaUser) {
-    tabListCols = "sm:grid-cols-3"; // For PHA: Reviewer, Health Systems, Vendors
+    tabListCols = "sm:grid-cols-4"; // Adjusted for 4 tabs
     tabsToRender.push(
       { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isContextLoading} />, condition: true },
       { value: "health-systems", label: "Health Systems", icon: Network, content: <HealthSystemsTab />, condition: true },
@@ -134,10 +137,10 @@ export default function HomePage() {
           <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center"><BarChart3 className="mr-3 h-8 w-8 text-primary" />Reports Dashboard</CardTitle><CardDescription className="text-lg text-foreground/80 mt-2">Access and generate various reports related to HCO onboarding and system data.</CardDescription></CardHeader>
           <CardContent className="space-y-6"><p className="text-md leading-relaxed">This section is under development. Future enhancements will include customizable reports, data visualizations, and export functionalities to provide insights into the eCR onboarding process and related metrics.</p></CardContent>
         </Card>
-      ), condition: true} // Reports tab added for PHA user
+      ), condition: true}
     );
   } else if (currentUser) { 
-    tabListCols = "sm:grid-cols-1"; // For logged-in non-PHA users (Vendors, HCOs after login but before portal)
+    tabListCols = "sm:grid-cols-1"; 
     tabsToRender.push(
       { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: (
           <Card className="w-full shadow-xl text-center">
@@ -150,7 +153,7 @@ export default function HomePage() {
       ), condition: true }
     );
   }
-  // Note: The guest view (unauthenticated) is now handled by the `if (!currentUser)` block further up and doesn't use tabs.
+  
 
   const visibleTabs = tabsToRender.filter(tab => tab.condition !== false);
 
