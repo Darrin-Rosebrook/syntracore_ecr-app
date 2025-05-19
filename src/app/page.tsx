@@ -2,6 +2,7 @@
 "use client";
 
 import React from "react";
+import Image from 'next/image'; // Added this import
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from "@/components/dashboard-tab";
 // HcoRegistrationSplashPage is no longer the direct entry for HCOs, link goes to signup
@@ -30,7 +31,7 @@ export default function HomePage() {
   let defaultTabValue: string;
 
   if (isPhaUser) {
-    tabListCols = "sm:grid-cols-3"; // PHA users: PHA Reviewer, Health Systems, EHR/LIMS Vendors, Reports
+    tabListCols = "sm:grid-cols-4"; // PHA users: PHA Reviewer, Health Systems, EHR/LIMS Vendors, Reports
     tabsToRender.push(
       { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} />, condition: true },
       { value: "health-systems", label: "Health Systems", icon: Network, content: <HealthSystemsTab />, condition: true },
@@ -72,11 +73,11 @@ export default function HomePage() {
           <CardContent className="space-y-6">
             <p className="text-md leading-relaxed">
               This portal facilitates the process for Health Care Organizations (HCOs) and Laboratories to register their intent to participate in Electronic Case Reporting (eCR). 
-              Registering is the first step towards streamlined, automated public health reporting.
+              Registering is the first step towards streamlined, automated public health reporting. Click below to create an account and begin.
             </p>
             <Button asChild size="lg" className="mt-6 bg-accent text-accent-foreground hover:bg-accent/90">
               <Link href="/signup?type=hco">
-                Start HCO Registration <ArrowRight className="ml-2 h-5 w-5" />
+                Start HCO & Lab Registration <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
           </CardContent>
@@ -160,6 +161,7 @@ export default function HomePage() {
       <main className="flex-1">
         <div className="container mx-auto py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            {visibleTabs.length > 0 && (
             <TabsList className={`grid w-full grid-cols-1 ${tabListCols} h-auto sm:h-12 mb-6 shadow-md`}>
               {visibleTabs.map(tab => (
                 <TabsTrigger key={tab.value} value={tab.value} className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
@@ -168,12 +170,13 @@ export default function HomePage() {
                 </TabsTrigger>
               ))}
             </TabsList>
+            )}
             {visibleTabs.map(tab => (
               <TabsContent key={tab.value} value={tab.value} className="transition-opacity duration-300 data-[state=active]:animate-fadeIn">
                 {tab.content}
               </TabsContent>
             ))}
-            {visibleTabs.length === 0 && !isPhaUser && (
+            {visibleTabs.length === 0 && !isPhaUser && ( // Only show this "Welcome" if not PHA and no tabs
                  <Card className="w-full shadow-xl text-center">
                     <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center">Welcome</CardTitle></CardHeader>
                     <CardContent><p className="text-md leading-relaxed">Your portal will be available after completing your profile or if you are an administrator.</p></CardContent>
