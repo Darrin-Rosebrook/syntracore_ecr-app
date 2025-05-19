@@ -4,7 +4,6 @@
 import React from "react";
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DashboardTab } from "@/components/dashboard-tab";
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
 import { EhrVendorsTab } from "@/components/ehr-vendors-tab";
 import { HealthSystemsTab } from "@/components/health-systems-tab";
@@ -19,9 +18,8 @@ import { LoginForm } from "@/components/login-form";
 export default function HomePage() {
   const {
     enrollments,
-    customFieldDefinitions,
     updateEnrollmentStatus,
-    isLoading
+    isLoading: isContextLoading
   } = useAppContext();
   const { currentUser, isPhaUser, loading: authLoading } = useAuth();
 
@@ -35,6 +33,8 @@ export default function HomePage() {
       newDefaultTabValue = "pha-reviewer";
     } else if (currentUser) { 
       newDefaultTabValue = "dashboard";
+    } else {
+      newDefaultTabValue = "hco-registration"; // Default for guests
     }
     
     setActiveTab(newDefaultTabValue);
@@ -42,7 +42,7 @@ export default function HomePage() {
   }, [isPhaUser, currentUser, authLoading]);
 
 
-  if (isLoading || authLoading) {
+  if (isContextLoading || authLoading) {
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -60,7 +60,7 @@ export default function HomePage() {
             <div className="space-y-6">
               <div className="text-center lg:text-left mb-8">
                 <Image
-                  src="/images/SyntraCore_Logo_ 2025-05-06 112552.png"
+                  src="/images/SyntraCore_Logo.png"
                   alt="SyntraCore Logo"
                   width={250}
                   height={84}
@@ -81,7 +81,7 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <Button asChild size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground justify-start">
-                    <Link href="/signup?type=hco">
+                     <Link href="/signup?type=hco">
                       <FilePenLine className="mr-3 h-5 w-5" /> HCO & Lab Registration <ArrowRight className="ml-auto h-5 w-5" />
                     </Link>
                   </Button>
@@ -124,25 +124,33 @@ export default function HomePage() {
   const tabsToRender: { value: string; label: string; icon: React.ElementType; content: React.ReactNode; condition?: boolean }[] = [];
 
   if (isPhaUser) {
-    tabListCols = "sm:grid-cols-4"; 
+    tabListCols = "sm:grid-cols-3"; // For PHA: Reviewer, Health Systems, Vendors
     tabsToRender.push(
-      { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} />, condition: true },
+      { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isContextLoading} />, condition: true },
       { value: "health-systems", label: "Health Systems", icon: Network, content: <HealthSystemsTab />, condition: true },
       { value: "ehr-vendors", label: "EHR/LIMS Vendors", icon: ListTree, content: <EhrVendorsTab enrollments={enrollments} />, condition: true },
       { value: "reports", label: "Reports", icon: BarChart3, content: (
-          <Card className="w-full shadow-xl text-center">
-            <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center"><BarChart3 className="mr-3 h-8 w-8 text-primary" />Reports Dashboard</CardTitle><CardDescription className="text-lg text-foreground/80 mt-2">Access and generate various reports related to HCO onboarding and system data.</CardDescription></CardHeader>
-            <CardContent className="space-y-6"><p className="text-md leading-relaxed">This section is under development. Future enhancements will include customizable reports, data visualizations, and export functionalities to provide insights into the eCR onboarding process and related metrics.</p></CardContent>
-          </Card>
-        ), condition: true
-      }
+        <Card className="w-full shadow-xl text-center">
+          <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center"><BarChart3 className="mr-3 h-8 w-8 text-primary" />Reports Dashboard</CardTitle><CardDescription className="text-lg text-foreground/80 mt-2">Access and generate various reports related to HCO onboarding and system data.</CardDescription></CardHeader>
+          <CardContent className="space-y-6"><p className="text-md leading-relaxed">This section is under development. Future enhancements will include customizable reports, data visualizations, and export functionalities to provide insights into the eCR onboarding process and related metrics.</p></CardContent>
+        </Card>
+      ), condition: true} // Reports tab added for PHA user
     );
   } else if (currentUser) { 
-    tabListCols = "sm:grid-cols-1";
+    tabListCols = "sm:grid-cols-1"; // For logged-in non-PHA users (Vendors, HCOs after login but before portal)
     tabsToRender.push(
-      { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: <DashboardTab />, condition: true }
+      { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: (
+          <Card className="w-full shadow-xl text-center">
+            <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center"><LayoutDashboard className="mr-3 h-8 w-8 text-primary" />Welcome to Your Dashboard</CardTitle><CardDescription className="text-lg text-foreground/80 mt-2">Your personalized portal will be accessible via the links in the header.</CardDescription></CardHeader>
+            <CardContent className="space-y-6">
+                <p className="text-md leading-relaxed">Please use the "Provider Portal" or "Vendor Portal" links in the header to access your specific dashboard and tools.</p>
+                <p className="text-md leading-relaxed">The "Project Dashboard" tab content previously here has been integrated into the main landing page for guests or is specific to PHA users.</p>
+            </CardContent>
+          </Card>
+      ), condition: true }
     );
   }
+  // Note: The guest view (unauthenticated) is now handled by the `if (!currentUser)` block further up and doesn't use tabs.
 
   const visibleTabs = tabsToRender.filter(tab => tab.condition !== false);
 
@@ -152,7 +160,7 @@ export default function HomePage() {
         <div className="container mx-auto py-6">
           {activeTab && visibleTabs.length > 0 ? (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className={`grid w-full grid-cols-1 ${tabListCols} h-auto sm:h-12 mb-6 shadow-md`}>
+              <TabsList className={`grid w-full ${tabListCols} h-auto sm:h-12 mb-6 shadow-md`}>
                 {visibleTabs.map(tab => (
                   <TabsTrigger key={tab.value} value={tab.value} className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200">
                     <tab.icon className="mr-2 h-5 w-5" />
