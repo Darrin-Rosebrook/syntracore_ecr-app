@@ -2,7 +2,7 @@
 "use client";
 
 import React from "react";
-import Image from 'next/image';
+import Image from 'next/image'; // Correct import
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
 import { EhrVendorsTab } from "@/components/ehr-vendors-tab";
@@ -34,7 +34,7 @@ export default function HomePage() {
     } else if (currentUser) { 
       newDefaultTabValue = "dashboard";
     } else {
-      newDefaultTabValue = "hco-registration"; // Default for guests, but now this will be handled by the new layout
+      newDefaultTabValue = "hco-registration"; // Default for guests
     }
     
     if (activeTab !== newDefaultTabValue && newDefaultTabValue) {
@@ -62,10 +62,10 @@ export default function HomePage() {
             <div className="space-y-6">
               <div className="text-center lg:text-left mb-8">
                 <Image
-                  src="/images/SyntraCore_Logo.png"
+                  src="/images/SyntraCore_Logo.png" // Correct path
                   alt="SyntraCore Logo"
-                  width={250}
-                  height={84} 
+                  width={250} // Larger logo for main page
+                  height={84} // Adjusted height
                   priority
                   data-ai-hint="company logo"
                   className="mx-auto lg:mx-0"
@@ -124,7 +124,7 @@ export default function HomePage() {
   const tabsToRender: { value: string; label: string; icon: React.ElementType; content: React.ReactNode; condition?: boolean }[] = [];
 
   if (isPhaUser) {
-    tabListCols = "sm:grid-cols-3"; // PHA users see 3 tabs
+    tabListCols = "sm:grid-cols-3"; // PHA users see 3 main tabs + reports
     tabsToRender.push(
       { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isContextLoading} />, condition: true },
       { value: "health-systems", label: "Health Systems", icon: Network, content: <HealthSystemsTab />, condition: true },

@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from "next/link";
-import Image from "next/image"; // Correct import
+import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,10 +83,10 @@ export function MainHeader() {
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2 mr-4">
           <Image
-            src="/images/SyntraCore_Logo.png"
+            src="/images/SyntraCore_Logo.png" // Correct path
             alt="SyntraCore Logo"
-            width={150}
-            height={50}
+            width={150} // Adjusted for header size
+            height={50} // Adjusted for header size
             priority
             data-ai-hint="company logo"
           />
