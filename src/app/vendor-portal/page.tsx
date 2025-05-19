@@ -7,7 +7,7 @@ import { useAppContext } from '@/context/AppContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { LayoutDashboard, LogOut, Loader2, Building, Users, ExternalLink, Workflow, List } from 'lucide-react';
+import { LayoutDashboard, LogOut, Loader2, Building, Users, ExternalLink, Workflow, List, Lock } from 'lucide-react';
 import Link from 'next/link';
 import type { VendorProfileData, EnrollmentData } from '@/types';
 import { getVendorProfileAction, updateVendorLastLoginAction } from '@/actions/vendor-actions';
@@ -15,7 +15,7 @@ import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ECR_ONBOARDING_STAGES } from '@/lib/constants';
-import { cn } from '@/lib/utils'; // Import cn
+import { cn } from '@/lib/utils';
 
 // Helper function to determine current phase name
 const getCurrentPhaseName = (enrollmentStatus: EnrollmentData['status']): string => {
@@ -78,7 +78,7 @@ export default function VendorPortalPage() {
     if (!authLoading && currentUser) {
         fetchProfileAndHcos();
     }
-  }, [currentUser, authLoading, enrollments]);
+  }, [currentUser, authLoading, enrollments, selectedHco]); // Added selectedHco to dependencies to avoid re-selecting
 
   const handleLogout = async () => {
     await logOut();
@@ -95,6 +95,9 @@ export default function VendorPortalPage() {
   }
 
   if (!currentUser) return null;
+
+  // DEBUG: Log linkedHcos before rendering the list
+  console.log("[VendorPortalPage] Rendering HCO list. Linked HCOs count:", linkedHcos.length, "Data:", linkedHcos);
 
   return (
     <div className="container mx-auto py-8 space-y-6">
@@ -124,7 +127,7 @@ export default function VendorPortalPage() {
                 Client HCOs ({linkedHcos.length})
               </h3>
               {linkedHcos.length > 0 ? (
-                <ScrollArea className="h-[400px] border rounded-md p-2 bg-muted/20">
+                <ScrollArea className="h-[450px] border rounded-md p-2 bg-muted/20"> {/* Slightly increased height for debugging */}
                   <ul className="space-y-2">
                     {linkedHcos.map((hco) => (
                       <li key={hco.id}>
