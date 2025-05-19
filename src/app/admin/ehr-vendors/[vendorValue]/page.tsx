@@ -6,14 +6,14 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from '@/components/ui/scroll-area'; // Added import
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Loader2, ListTree, Users, FileTextIcon, Building, Package, AlertCircle } from 'lucide-react';
 import { EhrVendorProfileDetailsTab } from '@/components/ehr-vendor-profile-details-tab';
 import { EhrVendorHcosTab } from '@/components/ehr-vendor-hcos-tab';
 import { EhrVendorDocumentsTab } from '@/components/ehr-vendor-documents-tab';
 import { EhrVendorContactsTab } from '@/components/ehr-vendor-contacts-tab';
 import { EhrVendorProductsTab } from '@/components/ehr-vendor-products-tab';
-import { fetchChplDevelopersAction } from '@/actions/chpl-api-actions'; // To fetch specific developer details if needed
+import { fetchChplDevelopersAction } from '@/actions/chpl-api-actions';
 import type { ChplDeveloper } from '@/types/chpl';
 import { useAppContext } from '@/context/AppContext';
 import type { EnrollmentData } from '@/types';
@@ -22,7 +22,6 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 export default function EhrVendorProfilePage() {
   const router = useRouter();
   const params = useParams();
-  const { vendorValue } = params; // This will be the CHPL Developer ID
   const { enrollments, isLoading: isContextLoading } = useAppContext();
 
   const [developer, setDeveloper] = useState<ChplDeveloper | null>(null);
@@ -30,30 +29,28 @@ export default function EhrVendorProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [hcosUsingThisDeveloper, setHcosUsingThisDeveloper] = useState<EnrollmentData[]>([]);
 
+  // Debugging: Log params and vendorValue
+  console.log("[EhrVendorProfilePage] Raw params from useParams:", params);
+  const vendorValue = params?.vendorValue as string | undefined; // Explicitly type vendorValue
+  console.log("[EhrVendorProfilePage] Extracted vendorValue:", vendorValue);
 
   const developerId = Number(vendorValue);
+  console.log("[EhrVendorProfilePage] Parsed developerId (Number(vendorValue)):", developerId);
+  console.log("[EhrVendorProfilePage] isNaN(developerId):", isNaN(developerId));
+
 
   useEffect(() => {
     async function loadDeveloperDetails() {
-      if (isNaN(developerId)) {
-        setError("Invalid Developer ID.");
+      console.log("[EhrVendorProfilePage] Inside loadDeveloperDetails. developerId:", developerId);
+      if (!vendorValue || isNaN(developerId)) { // Check vendorValue directly as well
+        setError("Invalid Developer ID in URL.");
+        console.error("[EhrVendorProfilePage] Error: Invalid Developer ID. vendorValue:", vendorValue, "developerId:", developerId);
         setIsLoadingDeveloper(false);
         return;
       }
       setIsLoadingDeveloper(true);
       setError(null);
-      // Fetch all developers and find the one with the matching ID
-      // This is not ideal if we have a direct /developers/{id} endpoint,
-      // but CHPL API might require fetching all then filtering, or using a search.
-      // For now, let's assume we might need to refetch or find from a broader list if not passed.
-      // A better approach would be a getDeveloperByIdAction(developerId).
-      // For simplicity here, we'll rely on name from CHPL listing, product tab fetches products.
-      // We can enhance this later to fetch specific developer details if the API supports it easily.
-      // For now, we'll assume the name is passed or can be derived.
-      // The `EhrVendorProfileDetailsTab` might need updating if we fetch full dev details here.
-
-      // Let's simulate fetching the specific developer name if we don't have it
-      // This is inefficient, a direct GET /developers/{id} would be better.
+      
       const result = await fetchChplDevelopersAction();
       if (result.success && result.developers) {
         const foundDev = result.developers.find(d => d.developerId === developerId);
@@ -61,44 +58,25 @@ export default function EhrVendorProfilePage() {
           setDeveloper(foundDev);
         } else {
           setError(`Developer with ID ${developerId} not found.`);
+          console.warn(`[EhrVendorProfilePage] Developer with ID ${developerId} not found in fetched list.`);
         }
       } else {
         setError(result.error || `Failed to load developer details for ID ${developerId}.`);
+        console.error(`[EhrVendorProfilePage] Failed to load developer details. Error: ${result.error}`);
       }
       setIsLoadingDeveloper(false);
     }
 
     loadDeveloperDetails();
-  }, [developerId]);
+  }, [developerId, vendorValue]); // Add vendorValue to dependency array
 
   useEffect(() => {
-    // Link HCOs based on the CHPL developer name matching enrollment.ehrVendor (label)
-    // This is an approximation and might not be perfect.
-    // A more robust solution would involve mapping or storing CHPL ID in enrollments.
     if (developer && enrollments.length > 0) {
-      const filteredHcos = enrollments.filter(e => {
-        // This requires EHR_VENDORS constant to have a label that matches CHPL developer name
-        // Or a better mapping system.
-        // For this iteration, let's assume e.ehrVendor matches a value in our old static EHR_VENDORS constant for now.
-        // This is a known limitation of not migrating enrollment.ehrVendor to CHPL IDs.
-        // If e.ehrVendor *was* a CHPL ID, we'd compare e.ehrVendor to developer.developerId
-        // For demonstration, if `enrollment.ehrVendor` was the CHPL developer NAME:
-        return e.ehrVendor === developer.name; // Highly fragile if names don't match exactly
-      });
-      // For now, we'll pass all enrollments to EhrVendorHcosTab and let it filter
-      // This part needs more thought on robustly linking CHPL developers to existing enrollments
-      // For this iteration, the Product tab is the main focus for CHPL ID.
-      // Let's pass an empty array to HcosTab if no robust linking is in place.
-      // A better approach for HCOs tab: If `enrollment.ehrVendor` could store CHPL Developer ID,
-      // then `enrollments.filter(e => e.ehrVendor === developerId.toString())`
-      // For now, let's assume the `EhrVendorHcosTab` will need to deal with `enrollments` and try to find matches.
-      // Or, we leave it empty if direct linking is not feasible without data migration.
-      // The prompt focuses on populating Product tab. Let's keep HCOs as is.
-      // The `EhrVendorHcosTab` still expects EnrollmentData with the old `ehrVendor` string.
-      // It's hard to reconcile without changing `EnrollmentData.ehrVendor` to be the CHPL ID.
-      // For now, I'll pass an empty array to avoid incorrect linking.
-      // The user can enhance linking later.
-      setHcosUsingThisDeveloper([]); // Placeholder for now
+      // For demonstration, if `enrollment.ehrVendor` was the CHPL developer NAME:
+      // const filteredHcos = enrollments.filter(e => e.ehrVendor === developer.name);
+      // setHcosUsingThisDeveloper(filteredHcos);
+      // For now, keeping it simple as linking is complex without proper ID mapping in enrollments
+      setHcosUsingThisDeveloper([]);
     }
   }, [developer, enrollments]);
 
@@ -135,7 +113,22 @@ export default function EhrVendorProfilePage() {
     );
   }
   
-  if (!developer) return null; // Should be handled by error state
+  if (!developer) {
+    // This state can occur if there was an error but developer wasn't set, or if still loading initially.
+    // The error state above should catch most issues, but this is a fallback.
+    return (
+        <div className="container mx-auto py-8 text-center">
+             <p className="text-lg text-muted-foreground">Developer profile could not be loaded.</p>
+              <Button asChild variant="outline" className="mt-4">
+                <Link href="/admin/ehr-vendors">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to EHR/LIMS Vendors List
+                </Link>
+              </Button>
+        </div>
+    );
+  }
+
 
   return (
     <ScrollArea className="h-[calc(100vh-4rem)]">
@@ -152,7 +145,7 @@ export default function EhrVendorProfilePage() {
           <div>{/* Placeholder for global profile actions */}</div>
         </div>
 
-        <Tabs defaultValue="products" className="w-full"> {/* Default to products tab */}
+        <Tabs defaultValue="products" className="w-full">
           <TabsList className="grid w-full grid-cols-1 sm:grid-cols-5 h-auto sm:h-12 mb-6 shadow-md">
             <TabsTrigger value="profile" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
               <ListTree className="mr-2 h-5 w-5" /> Profile
@@ -172,16 +165,10 @@ export default function EhrVendorProfilePage() {
           </TabsList>
 
           <TabsContent value="profile">
-            {/* Pass the CHPL developer ID as vendorValue and the fetched name as vendorLabel */}
             <EhrVendorProfileDetailsTab vendorValue={developerId.toString()} vendorLabel={developer.name} />
           </TabsContent>
           <TabsContent value="hcos">
-             {/* This tab needs a more robust way to link CHPL developers to enrollments.
-                 Currently, it might not show correct HCOs if enrollments use old vendor string IDs.
-                 Passing all enrollments and letting HcosTab filter or display based on its own logic.
-                 This is an area for future improvement to map enrollments to CHPL developer IDs.
-              */}
-            <EhrVendorHcosTab hcos={enrollments} isLoading={isContextLoading} />
+            <EhrVendorHcosTab hcos={hcosUsingThisDeveloper} isLoading={isContextLoading} />
           </TabsContent>
           <TabsContent value="documents">
             <EhrVendorDocumentsTab vendorValue={developerId.toString()} />
