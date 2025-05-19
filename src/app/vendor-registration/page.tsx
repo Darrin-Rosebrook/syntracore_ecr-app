@@ -10,34 +10,54 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Building, UserPlus } from 'lucide-react';
+import { Loader2, Building, UserPlus, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { createVendorProfileAction } from '@/actions/vendor-actions';
+import { createVendorProfileAction, getVendorProfileAction, updateVendorProfileAction } from '@/actions/vendor-actions';
 import { EHR_VENDORS } from '@/lib/constants';
+import type { VendorProfileData } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function VendorRegistrationPage() {
   const [vendorName, setVendorName] = useState('');
   const [contactName, setContactName] = useState('');
-  // Email is now from currentUser
   const [representedEhrSystemValue, setRepresentedEhrSystemValue] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [existingProfile, setExistingProfile] = useState<VendorProfileData | null>(null);
 
   const { loading: authLoading, currentUser } = useAuth();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      // If not loading and no user, redirect to login/signup, they shouldn't be here directly
-      // unless they just signed up and were redirected.
-      toast({ title: "Authentication Required", description: "Please create an account or log in first.", variant: "destructive"});
-      router.push('/signup?type=vendor'); // Or just /login
-    } else if (currentUser && !contactName) {
-      // Pre-fill contact name from user's display name if available
-      setContactName(currentUser.displayName || '');
+    async function fetchProfile() {
+      if (currentUser && currentUser.uid) {
+        setIsLoadingProfile(true);
+        const result = await getVendorProfileAction(currentUser.uid);
+        if (result.success && result.data) {
+          setExistingProfile(result.data);
+          setVendorName(result.data.vendorName);
+          setContactName(result.data.contactName);
+          setRepresentedEhrSystemValue(result.data.representedEhrSystemValue);
+          setIsEditing(true);
+        } else {
+          // No existing profile, or error fetching. Treat as new registration.
+          // Pre-fill contact name from auth if available and not editing.
+          if (currentUser.displayName && !contactName) {
+            setContactName(currentUser.displayName);
+          }
+        }
+        setIsLoadingProfile(false);
+      } else if (!authLoading) {
+         // If no currentUser and auth is not loading, means user needs to log in/sign up
+        toast({ title: "Authentication Required", description: "Please create an account or log in first.", variant: "destructive"});
+        router.push('/signup?type=vendor');
+        setIsLoadingProfile(false);
+      }
     }
-  }, [currentUser, authLoading, router, toast, contactName]);
+    fetchProfile();
+  }, [currentUser, authLoading, router, toast]); // Removed contactName from deps to avoid loop
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -59,28 +79,45 @@ export default function VendorRegistrationPage() {
     }
     setIsSubmitting(true);
     
-    const profileData = { 
-        vendorName: vendorName.trim(), 
-        contactName: contactName.trim(), 
-        email: currentUser.email, // Use email from authenticated user
-        representedEhrSystemValue 
-    };
-    const profileResult = await createVendorProfileAction(currentUser.uid, profileData);
-    
-    if (profileResult.success) {
-      toast({ title: "Vendor Profile Created", description: "Redirecting to vendor portal..." });
-      router.push('/vendor-portal');
+    let result;
+    if (isEditing && existingProfile) {
+      const updateData: Partial<Pick<VendorProfileData, 'vendorName' | 'contactName' | 'representedEhrSystemValue'>> = {};
+      if (vendorName.trim() !== existingProfile.vendorName) updateData.vendorName = vendorName.trim();
+      if (contactName.trim() !== existingProfile.contactName) updateData.contactName = contactName.trim();
+      if (representedEhrSystemValue !== existingProfile.representedEhrSystemValue) updateData.representedEhrSystemValue = representedEhrSystemValue;
+
+      if (Object.keys(updateData).length > 0) {
+        result = await updateVendorProfileAction(currentUser.uid, updateData);
+      } else {
+        toast({ title: "No Changes Detected", description: "Profile information is the same." });
+        setIsSubmitting(false);
+        router.push('/vendor-portal'); // Or stay on page
+        return;
+      }
     } else {
-      toast({ title: "Profile Creation Failed", description: profileResult.error || "Could not save vendor profile details.", variant: "destructive" });
+      const profileData = { 
+          vendorName: vendorName.trim(), 
+          contactName: contactName.trim(), 
+          email: currentUser.email,
+          representedEhrSystemValue 
+      };
+      result = await createVendorProfileAction(currentUser.uid, profileData);
+    }
+    
+    if (result && result.success) {
+      toast({ title: isEditing ? "Profile Updated" : "Vendor Profile Created", description: isEditing ? "Your profile has been updated." : "Redirecting to vendor portal..." });
+      router.push('/vendor-portal');
+    } else if (result) {
+      toast({ title: isEditing ? "Update Failed" : "Profile Creation Failed", description: result.error || "Could not save vendor profile details.", variant: "destructive" });
     }
     setIsSubmitting(false);
   };
 
-  if (authLoading) {
+  if (authLoading || isLoadingProfile) {
     return <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   
-  if (!currentUser) {
+  if (!currentUser && !authLoading && !isLoadingProfile) { // Added !isLoadingProfile
      return (
         <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-4">
             <Alert variant="destructive" className="max-w-md">
@@ -101,11 +138,12 @@ export default function VendorRegistrationPage() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-2">
-            <Building className="h-8 w-8 text-primary" />
+            {isEditing ? <Edit className="h-8 w-8 text-primary" /> : <Building className="h-8 w-8 text-primary" />}
           </div>
-          <CardTitle className="text-2xl">Complete Vendor Profile</CardTitle>
+          <CardTitle className="text-2xl">{isEditing ? "Edit Vendor Profile" : "Complete Vendor Profile"}</CardTitle>
           <CardDescription>
-            Provide your company details to access the Vendor Portal. Your email: {currentUser.email}
+            {isEditing ? "Update your company details." : "Provide your company details to access the Vendor Portal."} 
+            Your email: {currentUser?.email}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -158,17 +196,16 @@ export default function VendorRegistrationPage() {
           <CardFooter className="flex flex-col space-y-3">
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Complete Profile & Enter Portal
+              {isEditing ? "Update Profile" : "Complete Profile & Enter Portal"}
             </Button>
-             <p className="text-center text-sm text-muted-foreground">
-              Not a vendor?{' '}
-              <Link href="/" className="font-semibold text-primary hover:underline">
-                Go to Homepage
-              </Link>
-            </p>
+             <Button variant="outline" type="button" onClick={() => router.push(isEditing ? '/vendor-portal' : '/')} disabled={isSubmitting}>
+                Cancel
+            </Button>
           </CardFooter>
         </form>
       </Card>
     </div>
   );
 }
+
+    

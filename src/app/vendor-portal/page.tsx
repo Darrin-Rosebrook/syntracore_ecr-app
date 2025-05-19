@@ -7,7 +7,7 @@ import { useAppContext } from '@/context/AppContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { LayoutDashboard, LogOut, Loader2, Building, Users, ExternalLink, Workflow, List, Lock, Search as SearchIcon } from 'lucide-react';
+import { LayoutDashboard, LogOut, Loader2, Building, Users, ExternalLink, Workflow, List, Lock, Search as SearchIcon, Edit } from 'lucide-react';
 import Link from 'next/link';
 import type { VendorProfileData, EnrollmentData } from '@/types';
 import { getVendorProfileAction, updateVendorLastLoginAction } from '@/actions/vendor-actions';
@@ -16,8 +16,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ECR_ONBOARDING_STAGES, OHIO_HEALTH_SYSTEMS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input'; // Added Input for search
-import { Label } from '@/components/ui/label'; // Added Label for search
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 // Helper function to determine current phase name
 const getCurrentPhaseName = (enrollmentStatus: EnrollmentData['status']): string => {
@@ -45,7 +45,7 @@ export default function VendorPortalPage() {
   const [linkedHcos, setLinkedHcos] = useState<EnrollmentData[]>([]);
   const [selectedHco, setSelectedHco] = useState<EnrollmentData | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const [hcoSearchTerm, setHcoSearchTerm] = useState(''); // State for vendor-specific search
+  const [hcoSearchTerm, setHcoSearchTerm] = useState('');
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -102,12 +102,6 @@ export default function VendorPortalPage() {
     });
   }, [linkedHcos, hcoSearchTerm]);
 
-
-  const handleLogout = async () => {
-    await logOut();
-    router.push('/');
-  };
-
   if (authLoading || isLoadingProfile || (appContextLoading && !vendorProfile)) {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-background">
@@ -119,8 +113,6 @@ export default function VendorPortalPage() {
 
   if (!currentUser) return null;
 
-  console.log("[VendorPortalPage] Rendering HCO list. Filtered Linked HCOs count:", filteredLinkedHcos.length, "Data:", filteredLinkedHcos);
-
   return (
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex items-center justify-between mb-6">
@@ -128,19 +120,24 @@ export default function VendorPortalPage() {
           <Building className="mr-3 h-8 w-8 text-primary" />
           EHR/LIMS Vendor Portal
         </h1>
-        <Button variant="outline" onClick={handleLogout}>
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout
-        </Button>
+        {/* Removed redundant Logout button from here. MainHeader handles logout */}
       </div>
 
       {vendorProfile ? (
         <Card className="shadow-xl">
-          <CardHeader>
-            <CardTitle className="text-2xl font-semibold">Welcome, {vendorProfile.contactName} from {vendorProfile.vendorName}!</CardTitle>
-            <CardDescription>
-              You are representing: {vendorProfile.representedEhrSystemValue}. Below are the HCOs using your system.
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+                <CardTitle className="text-2xl font-semibold">Welcome, {vendorProfile.contactName} from {vendorProfile.vendorName}!</CardTitle>
+                <CardDescription>
+                You are representing: {vendorProfile.representedEhrSystemValue}. Below are the HCOs using your system.
+                </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/vendor-registration">
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Profile
+              </Link>
+            </Button>
           </CardHeader>
           <CardContent className="grid md:grid-cols-3 gap-6">
             <div className="md:col-span-1 space-y-3">
@@ -221,7 +218,7 @@ export default function VendorPortalPage() {
                     Choose an HCO from the list on the left to view their onboarding workflow.
                   </p>
                 </div>
-              ) : !hcoSearchTerm ? ( // Only show this if there's no search term and no HCOs
+              ) : !hcoSearchTerm ? (
                 <div className="flex flex-col items-center justify-center h-full text-center p-10 border-2 border-dashed border-muted rounded-lg bg-muted/30">
                   <Users className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold text-muted-foreground">No Client HCOs</h3>
@@ -229,7 +226,7 @@ export default function VendorPortalPage() {
                     There are no Health Care Organizations currently linked to your vendor profile.
                   </p>
                 </div>
-              ) : null /* If search term yields no results, the specific Alert above handles it */ }
+              ) : null }
             </div>
           </CardContent>
         </Card>
@@ -241,18 +238,15 @@ export default function VendorPortalPage() {
             <CardContent>
                 <p className="text-muted-foreground">
                 Your vendor profile information could not be fully loaded. This might be due to a setup issue.
-                If you have just registered, please try logging out and logging back in.
+                If you have just registered, please try logging out and logging back in via the main header.
                 If the problem persists, please contact support.
                 </p>
-                 <Button onClick={handleLogout} variant="link" className="mt-2">Logout and try again</Button>
             </CardContent>
          </Card>
       )}
-      <div className="text-center mt-4">
-        <Button variant="link" asChild>
-          <Link href="/"> Back to SyntraCore Homepage</Link>
-        </Button>
-      </div>
+      {/* Removed redundant "Back to SyntraCore Homepage" button - main header has home link */}
     </div>
   );
 }
+
+    

@@ -19,15 +19,14 @@ export async function createVendorProfileAction(
   try {
     const vendorRef = doc(db, 'vendors', userId); // Store vendors in a 'vendors' collection
 
-    // Construct the full payload including server-generated timestamps and EULA acceptance
     const profilePayload: VendorProfileData = {
       ...data,
-      userId: userId, // Storing userId also within the document for easier querying if needed
-      // @ts-ignore // Firestore will convert this to a Timestamp
+      userId: userId,
+      // @ts-ignore
       createdAt: serverTimestamp(),
-      eulaAccepted: true, // EULA accepted at profile creation
+      eulaAccepted: true,
       eulaAcceptedTimestamp: new Date().toISOString(),
-      // lastLogin will be updated separately
+      // lastLogin and lastUpdatedAt will be updated separately
     };
     await setDoc(vendorRef, profilePayload);
     console.log(`Vendor profile created successfully for UID: ${userId}`);
@@ -39,6 +38,32 @@ export async function createVendorProfileAction(
   }
 }
 
+export async function updateVendorProfileAction(
+  userId: string,
+  data: Partial<Pick<VendorProfileData, 'vendorName' | 'contactName' | 'representedEhrSystemValue'>>
+): Promise<{ success: boolean; error?: string }> {
+  console.log(`Attempting to update vendor profile for UID: ${userId}`, data);
+  if (Object.keys(data).length === 0) {
+    return { success: true }; // No actual data to update
+  }
+  try {
+    const vendorRef = doc(db, 'vendors', userId);
+    const updatePayload = {
+      ...data,
+      // @ts-ignore
+      lastUpdatedAt: serverTimestamp(),
+    };
+    await updateDoc(vendorRef, updatePayload);
+    console.log(`Vendor profile updated successfully for UID: ${userId}`);
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'An unknown error occurred while updating vendor profile.';
+    console.error("Error in updateVendorProfileAction:", message, error);
+    return { success: false, error: message };
+  }
+}
+
+
 export async function getVendorProfileAction(userId: string): Promise<{ success: boolean; data?: VendorProfileData; error?: string }> {
   console.log(`Attempting to fetch vendor profile for UID: ${userId}`);
   try {
@@ -47,7 +72,6 @@ export async function getVendorProfileAction(userId: string): Promise<{ success:
 
     if (docSnap.exists()) {
       const rawData = docSnap.data();
-      // Convert Firestore Timestamps to ISO strings
       const profileData: VendorProfileData = {
         userId: rawData.userId,
         vendorName: rawData.vendorName,
@@ -58,6 +82,7 @@ export async function getVendorProfileAction(userId: string): Promise<{ success:
         lastLogin: (rawData.lastLogin as Timestamp)?.toDate ? (rawData.lastLogin as Timestamp).toDate().toISOString() : undefined,
         eulaAccepted: rawData.eulaAccepted || false,
         eulaAcceptedTimestamp: rawData.eulaAcceptedTimestamp,
+        lastUpdatedAt: (rawData.lastUpdatedAt as Timestamp)?.toDate ? (rawData.lastUpdatedAt as Timestamp).toDate().toISOString() : undefined,
       };
       console.log(`Vendor profile fetched successfully for UID: ${userId}`, profileData);
       return { success: true, data: profileData };
@@ -72,7 +97,6 @@ export async function getVendorProfileAction(userId: string): Promise<{ success:
   }
 }
 
-// Action to update lastLogin for a vendor (call this after successful login)
 export async function updateVendorLastLoginAction(userId: string): Promise<{ success: boolean; error?: string }> {
   console.log(`Attempting to update last login for vendor UID: ${userId}`);
   try {
@@ -82,7 +106,6 @@ export async function updateVendorLastLoginAction(userId: string): Promise<{ suc
     console.log(`Last login updated successfully for vendor UID: ${userId}`);
     return { success: true };
   } catch (error) {
-    // If the document doesn't exist, setDoc with merge might be an option, or just log
     if ((error as any).code === 'not-found') {
         console.warn(`Vendor profile not found for UID ${userId} when trying to update last login. This might happen if profile creation is pending or failed.`);
         return { success: false, error: "Vendor profile not found to update last login." };
@@ -111,6 +134,7 @@ export async function getVendorsAction(): Promise<{ success: boolean; vendors?: 
         lastLogin: (rawData.lastLogin as Timestamp)?.toDate ? (rawData.lastLogin as Timestamp).toDate().toISOString() : undefined,
         eulaAccepted: rawData.eulaAccepted || false,
         eulaAcceptedTimestamp: rawData.eulaAcceptedTimestamp,
+        lastUpdatedAt: (rawData.lastUpdatedAt as Timestamp)?.toDate ? (rawData.lastUpdatedAt as Timestamp).toDate().toISOString() : undefined,
       } as VendorProfileData;
     });
     console.log("Vendor profiles fetched successfully:", vendorsList.length, "vendors found.");
@@ -121,3 +145,5 @@ export async function getVendorsAction(): Promise<{ success: boolean; vendors?: 
     return { success: false, error: message, vendors: [] };
   }
 }
+
+    

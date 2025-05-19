@@ -54,8 +54,8 @@ export interface ContactEntry {
 }
 
 export interface EnrollmentFormData {
-  userId?: string; // Added to associate with Firebase Auth User UID
-  userEmail?: string; // Added to store email of submitter
+  userId?: string;
+  userEmail?: string;
   practiceInfo: PracticeInfo;
   contactDetails: ContactDetails;
   ehrVendor: string;
@@ -220,6 +220,7 @@ export interface VendorProfileData {
   lastLogin?: string; // ISO string
   eulaAccepted?: boolean;
   eulaAcceptedTimestamp?: string; // ISO string
+  lastUpdatedAt?: string; // ISO string
 }
 
 // CLIA Data Types
@@ -242,12 +243,12 @@ export interface CliaApiResult {
   clia_waiver_ind_yn?: 'Y' | 'N';
 }
 
-export interface CliaApiResponse { // This might not be used if querying Firestore directly
+export interface CliaApiResponse {
   results: CliaApiResult[];
   count: number;
 }
 
-export interface CliaData { // This is the shape of data action expects from Firestore OR formats into
+export interface CliaData {
   cliaNumber: string;
   facilityName?: string;
   address?: string;
@@ -267,3 +268,5 @@ export interface ResourceItem {
   createdAt: string; // ISO string
   lastUpdated: string; // ISO string
 }
+
+    
