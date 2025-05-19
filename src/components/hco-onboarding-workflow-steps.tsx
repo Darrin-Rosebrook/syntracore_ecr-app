@@ -72,7 +72,8 @@ const getStageStatus = (stageId: number, enrollmentStatus: EnrollmentData['statu
       return 'Not Yet Applicable';
     case 8: // Ongoing Monitoring & Support
       if (enrollmentStatus === 'Approved') {
-          return 'Not Yet Applicable';
+          // This stage becomes relevant after production approval, so could be 'Not Started' or 'Ongoing' later
+          return 'Not Yet Applicable'; 
       }
       return 'Not Yet Applicable';
     default: // Stages 5 (EHR/LIMS Confirmation), 6 (Data Exchange Testing), 7 (Production Approval)
@@ -81,14 +82,35 @@ const getStageStatus = (stageId: number, enrollmentStatus: EnrollmentData['statu
   }
 };
 
+const getCurrentPhaseName = (enrollmentStatus: EnrollmentData['status']): string => {
+  switch (enrollmentStatus) {
+    case 'Pending':
+      return ECR_ONBOARDING_STAGES.find(s => s.id === 3)?.name || 'PHA Review'; // PHA Review (Stage 3)
+    case 'Changes Requested':
+      return ECR_ONBOARDING_STAGES.find(s => s.id === 3)?.name || 'PHA Review'; // PHA Review (Stage 3)
+    case 'Approved':
+      // Assuming after PHA approval, the next significant phase is eCR Readiness Validation
+      return ECR_ONBOARDING_STAGES.find(s => s.id === 4)?.name || 'eCR Readiness Validation'; // Stage 4
+    case 'Denied':
+      return ECR_ONBOARDING_STAGES.find(s => s.id === 3)?.name || 'PHA Review'; // Denied at PHA Review (Stage 3)
+    default:
+      // For initial stages or if status is somehow undefined.
+      const initialStage = ECR_ONBOARDING_STAGES.find(s => s.id === 1);
+      return initialStage?.name || 'Initial Stage';
+  }
+};
+
+
 export function HcoOnboardingWorkflowSteps({ enrollment }: HcoOnboardingWorkflowStepsProps) {
   const submissionDate = enrollment.submissionDate && isValid(parseISO(enrollment.submissionDate))
     ? format(parseISO(enrollment.submissionDate), 'PPP p')
     : 'N/A';
+  
+  const currentPhaseName = getCurrentPhaseName(enrollment.status);
 
   return (
-    <Accordion type="single" collapsible className="w-full shadow-lg border rounded-md mb-6">
-      <AccordionItem value="onboarding-status">
+    <Accordion type="single" collapsible className="w-full shadow-lg border rounded-md mb-6" defaultValue="onboarding-status-item">
+      <AccordionItem value="onboarding-status-item">
         <AccordionTrigger className="px-6 py-4 hover:no-underline">
           <div className="flex justify-between items-center w-full">
             <div className="flex flex-col text-left">
@@ -112,6 +134,11 @@ export function HcoOnboardingWorkflowSteps({ enrollment }: HcoOnboardingWorkflow
                 <Badge variant={getEnrollmentStatusBadgeVariant(enrollment.status)} className={`ml-1 ${getEnrollmentStatusBadgeClass(enrollment.status)}`}>
                     {enrollment.status}
                 </Badge>
+              </div>
+              <div className="flex items-center justify-end">
+                <WorkflowIcon className="mr-1.5 h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-muted-foreground">Current Phase:</span>
+                <span className="ml-1 font-semibold">{currentPhaseName}</span>
               </div>
             </div>
           </div>
@@ -154,3 +181,4 @@ export function HcoOnboardingWorkflowSteps({ enrollment }: HcoOnboardingWorkflow
     </Accordion>
   );
 }
+
