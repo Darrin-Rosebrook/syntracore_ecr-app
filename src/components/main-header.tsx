@@ -83,8 +83,8 @@ export function MainHeader() {
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2 mr-4">
           <Image
-            src="/images/OnboardeCR.png"
-            alt="Onboard eCR Logo"
+            src="/images/SyntraCore_Logo_ 2025-05-06 112552.png"
+            alt="SyntraCore Logo"
             width={150}
             height={50}
             priority
@@ -154,7 +154,6 @@ export function MainHeader() {
             </>
           ) : (
             <>
-              {/* Login button now links to main page where login form is embedded */}
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/">
                   <LogIn className="mr-2 h-4 w-4" />

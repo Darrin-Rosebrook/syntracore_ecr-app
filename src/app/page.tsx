@@ -14,7 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LoginForm } from "@/components/login-form"; // Import the new LoginForm
+import { LoginForm } from "@/components/login-form"; 
 
 export default function HomePage() {
   const {
@@ -25,19 +25,18 @@ export default function HomePage() {
   } = useAppContext();
   const { currentUser, isPhaUser, loading: authLoading } = useAuth();
 
-  const [activeTab, setActiveTab] = React.useState(""); // Will be set in useEffect
+  const [activeTab, setActiveTab] = React.useState(""); 
 
-  // Determine default tab and tabs to render based on user state
   React.useEffect(() => {
-    if (authLoading) return; // Wait for auth state to be determined
+    if (authLoading) return; 
 
     let newDefaultTabValue = "";
     if (isPhaUser) {
       newDefaultTabValue = "pha-reviewer";
-    } else if (currentUser) { // Any other logged-in user (Vendor, HCO)
+    } else if (currentUser) { 
       newDefaultTabValue = "dashboard";
     }
-    // For guest users, there are no tabs, so activeTab remains empty or isn't used for tabs.
+    
     setActiveTab(newDefaultTabValue);
 
   }, [isPhaUser, currentUser, authLoading]);
@@ -52,18 +51,17 @@ export default function HomePage() {
     );
   }
 
-  // Guest View: Registration Options on Left, Login Form on Right
   if (!currentUser) {
     return (
       <main className="flex-1">
         <div className="container mx-auto py-8 lg:py-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
-            {/* Left Column: Registration Options */}
+            
             <div className="space-y-6">
               <div className="text-center lg:text-left mb-8">
                 <Image
-                  src="/images/OnboardeCR.png"
-                  alt="Onboard eCR Logo"
+                  src="/images/SyntraCore_Logo_ 2025-05-06 112552.png"
+                  alt="SyntraCore Logo"
                   width={250}
                   height={84}
                   priority
@@ -104,7 +102,7 @@ export default function HomePage() {
               </p>
             </div>
 
-            {/* Right Column: Login Form */}
+            
             <div>
               <LoginForm />
             </div>
@@ -121,12 +119,12 @@ export default function HomePage() {
     );
   }
 
-  // Logged-in User View (PHA, Vendor, HCO)
+  
   let tabListCols = "sm:grid-cols-1";
   const tabsToRender: { value: string; label: string; icon: React.ElementType; content: React.ReactNode; condition?: boolean }[] = [];
 
   if (isPhaUser) {
-    tabListCols = "sm:grid-cols-3"; // PHA Reviewer, Health Systems, EHR/LIMS Vendors
+    tabListCols = "sm:grid-cols-4"; 
     tabsToRender.push(
       { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isLoading} />, condition: true },
       { value: "health-systems", label: "Health Systems", icon: Network, content: <HealthSystemsTab />, condition: true },
@@ -139,7 +137,7 @@ export default function HomePage() {
         ), condition: true
       }
     );
-  } else if (currentUser) { // Any other logged-in user (e.g., Vendor, HCO navigating back to main page)
+  } else if (currentUser) { 
     tabListCols = "sm:grid-cols-1";
     tabsToRender.push(
       { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: <DashboardTab />, condition: true }
@@ -168,7 +166,7 @@ export default function HomePage() {
                 </TabsContent>
               ))}
             </Tabs>
-          ) : currentUser && visibleTabs.length === 0 ? ( // Logged in but no specific role tabs yet
+          ) : currentUser && visibleTabs.length === 0 ? ( 
              <Card className="w-full shadow-xl text-center">
                 <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center">Welcome</CardTitle></CardHeader>
                 <CardContent><p className="text-md leading-relaxed">Your portal will be available after completing your profile or if you are an administrator.</p></CardContent>
