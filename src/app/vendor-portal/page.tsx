@@ -14,6 +14,24 @@ import { getVendorProfileAction, updateVendorLastLoginAction } from '@/actions/v
 import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ECR_ONBOARDING_STAGES } from '@/lib/constants'; // Added import
+
+// Helper function to determine current phase name
+const getCurrentPhaseName = (enrollmentStatus: EnrollmentData['status']): string => {
+  switch (enrollmentStatus) {
+    case 'Pending':
+      return ECR_ONBOARDING_STAGES.find(s => s.id === 3)?.name || 'PHA Review';
+    case 'Changes Requested':
+      return ECR_ONBOARDING_STAGES.find(s => s.id === 3)?.name || 'PHA Review';
+    case 'Approved':
+      return ECR_ONBOARDING_STAGES.find(s => s.id === 4)?.name || 'eCR Readiness Validation';
+    case 'Denied':
+      return ECR_ONBOARDING_STAGES.find(s => s.id === 3)?.name || 'PHA Review';
+    default:
+      const initialStage = ECR_ONBOARDING_STAGES.find(s => s.id === 1);
+      return initialStage?.name || 'Initial Stage';
+  }
+};
 
 export default function VendorPortalPage() {
   const { currentUser, loading: authLoading, logOut } = useAuth();
@@ -112,14 +130,13 @@ export default function VendorPortalPage() {
                       <li key={hco.id}>
                         <Button
                           variant={selectedHco?.id === hco.id ? "default" : "outline"}
-                          className="w-full justify-start text-left h-auto py-2 leading-snug"
+                          className="w-full justify-start text-left h-auto py-2 px-3 leading-snug flex flex-col items-start"
                           onClick={() => setSelectedHco(hco)}
                         >
-                          <div className="flex flex-col">
-                            <span className="font-semibold">{hco.practiceInfo.name}</span>
-                            <span className="text-xs text-muted-foreground">NPI: {hco.practiceInfo.organizationNPI || 'N/A'}</span>
-                            <span className="text-xs text-muted-foreground">Status: {hco.status}</span>
-                          </div>
+                          <span className="font-semibold block w-full whitespace-normal break-words">{hco.practiceInfo.name}</span>
+                          <span className="text-xs text-muted-foreground">NPI: {hco.practiceInfo.organizationNPI || 'N/A'}</span>
+                          <span className="text-xs text-muted-foreground">Status: {hco.status}</span>
+                          <span className="text-xs text-muted-foreground">Phase: {getCurrentPhaseName(hco.status)}</span>
                         </Button>
                       </li>
                     ))}
