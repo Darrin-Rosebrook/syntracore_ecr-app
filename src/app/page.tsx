@@ -8,7 +8,7 @@ import { HcoRegistrationSplashPage } from "@/components/hco-registration-splash-
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
 import { EhrVendorsTab } from "@/components/ehr-vendors-tab";
 import { HealthSystemsTab } from "@/components/health-systems-tab";
-import { LayoutDashboard, FilePenLine, Building, Loader2, ArrowRight, ClipboardList, Network, ListTree, BarChart3 } from "lucide-react"; // Added BarChart3
+import { LayoutDashboard, FilePenLine, Building, Loader2, ArrowRight, ClipboardList, Network, ListTree, BarChart3, Share2 } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import Link from 'next/link';
@@ -39,12 +39,12 @@ export default function HomePage() {
             <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center"><BarChart3 className="mr-3 h-8 w-8 text-primary" />Reports Dashboard</CardTitle><CardDescription className="text-lg text-foreground/80 mt-2">Access and generate various reports related to HCO onboarding and system data.</CardDescription></CardHeader>
             <CardContent className="space-y-6"><p className="text-md leading-relaxed">This section is under development. Future enhancements will include customizable reports, data visualizations, and export functionalities to provide insights into the eCR onboarding process and related metrics.</p></CardContent>
           </Card>
-        ), condition: true 
+        ), condition: true
       }
     );
-    defaultTabValue = "pha-reviewer"; 
+    defaultTabValue = "pha-reviewer";
   } else if (!currentUser) { // Guest user
-    tabListCols = "sm:grid-cols-3";
+    tabListCols = "sm:grid-cols-4"; // Adjusted for new "Health System Registration" tab
     tabsToRender.push(
       { value: "dashboard", label: "Project Dashboard", icon: LayoutDashboard, content: <DashboardTab />, condition: true },
       { value: "hco-registration", label: "HCO Registration", icon: FilePenLine, content: <HcoRegistrationSplashPage />, condition: true },
@@ -52,6 +52,18 @@ export default function HomePage() {
         <Card className="w-full max-w-2xl mx-auto shadow-xl text-center">
           <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center"><Building className="mr-3 h-8 w-8 text-primary" />EHR/LIMS Vendor Registration</CardTitle><CardDescription className="text-lg text-foreground/80 mt-2">For Electronic Health Record (EHR) or Laboratory Information Management System (LIMS) vendors.</CardDescription></CardHeader>
           <CardContent className="space-y-6"><p className="text-md leading-relaxed">If you represent an EHR or LIMS vendor, create an account to access the Vendor Portal. The portal will allow you to view the onboarding status of your client Health Care Organizations and access tools to assist them through the eCR onboarding process.</p><Button asChild size="lg" className="mt-6 bg-accent text-accent-foreground hover:bg-accent/90"><Link href="/vendor-registration">Proceed to Vendor Registration <ArrowRight className="ml-2 h-5 w-5" /></Link></Button></CardContent>
+        </Card>
+      ), condition: true },
+      { value: "health-system-registration", label: "Health System Registration", icon: Share2, content: ( // Using Share2 for Health System representation
+        <Card className="w-full max-w-2xl mx-auto shadow-xl text-center">
+          <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center"><Share2 className="mr-3 h-8 w-8 text-primary" />Health System Registration</CardTitle><CardDescription className="text-lg text-foreground/80 mt-2">For Parent Health Systems or Large Networks.</CardDescription></CardHeader>
+          <CardContent className="space-y-6">
+            <p className="text-md leading-relaxed">If you represent a parent health system or a large healthcare network, this section will allow you to register your system. Registering your health system can help streamline the onboarding process for affiliated HCOs and provide centralized oversight capabilities.</p>
+            <p className="text-sm text-muted-foreground">(This feature is currently under development. Please check back later for registration options.)</p>
+            {/* <Button asChild size="lg" className="mt-6 bg-accent text-accent-foreground hover:bg-accent/90" disabled>
+              Proceed to Health System Registration <ArrowRight className="ml-2 h-5 w-5" />
+            </Button> */}
+          </CardContent>
         </Card>
       ), condition: true }
     );
@@ -63,15 +75,15 @@ export default function HomePage() {
     );
     defaultTabValue = "dashboard";
   }
-  
+
   const visibleTabs = tabsToRender.filter(tab => tab.condition !== false);
-  
+
   const [activeTab, setActiveTab] = React.useState(defaultTabValue);
 
   React.useEffect(() => {
     let newDefaultTabValue;
     if (isPhaUser) {
-        newDefaultTabValue = "pha-reviewer"; 
+        newDefaultTabValue = "pha-reviewer";
     } else if (!currentUser) {
         newDefaultTabValue = "hco-registration";
     } else {
