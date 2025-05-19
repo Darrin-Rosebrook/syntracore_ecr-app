@@ -18,7 +18,7 @@ import { Edit, Save, UserCircle, Building, Settings2, FileText, CalendarDays, In
 import { EHR_VENDORS, OHIO_HEALTH_SYSTEMS } from '@/lib/constants';
 import { FHIRValidationDisplay } from '@/components/fhir-validation-display';
 import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Added Card components
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 type EditableFieldOnChangeEvent =
   | ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -351,7 +351,8 @@ export function HcoProfileTab({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
             {/* Column 1: Practice Information */}
             <div>
-                <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><Building className="mr-2 h-4 w-4 text-muted-foreground"/>Practice Information</h4>
+              <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><Building className="mr-2 h-4 w-4 text-muted-foreground"/>Practice Information</h4>
+              <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
                 <EditableField label="Organization NPI" name="practiceInfo.organizationNPI" value={formData.practiceInfo?.organizationNPI} isEditing={isEditing} onChange={handleInputChange} icon={Hash} />
                 <EditableField label="Practice Name" name="practiceInfo.name" value={formData.practiceInfo?.name} isEditing={isEditing} onChange={handleInputChange} />
                 <EditableField label="Address" name="practiceInfo.address" value={formData.practiceInfo?.address} type="textarea" isEditing={isEditing} onChange={handleInputChange} />
@@ -366,40 +367,45 @@ export function HcoProfileTab({
                   options={healthSystemOptions}
                   icon={Network}
                 />
+              </div>
             </div>
 
             {/* Column 2: Contains nested grid for Primary Contact and EHR Info */}
             <div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-                    {/* Sub-Column 1 of Right Column: Primary Contact Details */}
-                    <div>
-                        <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><User className="mr-2 h-4 w-4 text-muted-foreground"/>Primary Contact Details</h4>
-                        <EditableField label="Contact Name" name="contactDetails.name" value={formData.contactDetails?.name} isEditing={isEditing} onChange={handleInputChange} />
-                        <EditableField label="Email" name="contactDetails.email" value={formData.contactDetails?.email} type="email" isEditing={isEditing} onChange={handleInputChange} />
-                        <EditableField label="Phone" name="contactDetails.phone" value={formData.contactDetails?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
-                    </div>
-                    {/* Sub-Column 2 of Right Column: EHR & System Info */}
-                    <div>
-                        <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><Settings2 className="mr-2 h-4 w-4 text-muted-foreground"/>EHR &amp; System Info</h4>
-                        <EditableField
-                          label="EHR Vendor"
-                          name="ehrVendor"
-                          value={formData.ehrVendor}
-                          isEditing={isEditing}
-                          onChange={handleInputChange}
-                          type="select"
-                          options={EHR_VENDORS}
-                          icon={Settings2}
-                        />
-                    </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                {/* Sub-Column 1 of Right Column: Primary Contact Details */}
+                <div>
+                  <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><User className="mr-2 h-4 w-4 text-muted-foreground"/>Primary Contact Details</h4>
+                  <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
+                    <EditableField label="Contact Name" name="contactDetails.name" value={formData.contactDetails?.name} isEditing={isEditing} onChange={handleInputChange} />
+                    <EditableField label="Email" name="contactDetails.email" value={formData.contactDetails?.email} type="email" isEditing={isEditing} onChange={handleInputChange} />
+                    <EditableField label="Phone" name="contactDetails.phone" value={formData.contactDetails?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
+                  </div>
                 </div>
+                {/* Sub-Column 2 of Right Column: EHR & System Info */}
+                <div>
+                  <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><Settings2 className="mr-2 h-4 w-4 text-muted-foreground"/>EHR &amp; System Info</h4>
+                  <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
+                    <EditableField
+                      label="EHR Vendor"
+                      name="ehrVendor"
+                      value={formData.ehrVendor}
+                      isEditing={isEditing}
+                      onChange={handleInputChange}
+                      type="select"
+                      options={EHR_VENDORS}
+                      icon={Settings2}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
           {sortedCustomFieldDefinitions.length > 0 && (
             <div className="md:col-span-2 mt-4 pt-4 border-t">
                 <h4 className="text-md font-medium mb-3 flex items-center"><Info className="mr-2 h-4 w-4 text-muted-foreground"/>Additional Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0 p-4 border rounded-md bg-muted/30 shadow-sm">
                 {sortedCustomFieldDefinitions.map(fieldDef => (
                   <EditableField
                     key={fieldDef.id}
@@ -420,16 +426,24 @@ export function HcoProfileTab({
         </CardContent>
       </Card>
 
-      <div className="mt-6 pt-0"> {/* Adjusted pt-0 as accordion has its own padding */}
+      <div className="mt-6 pt-0"> 
         <HcoOnboardingWorkflowSteps enrollment={enrollment} />
       </div>
 
       {enrollment.ccdDocumentName && (
-         <div className="mt-6 border-t pt-4">
-             <h4 className="text-md font-medium mb-2 flex items-center"><FileText className="mr-2 h-4 w-4 text-muted-foreground"/>FHIR/CCD Document</h4>
-             <p className="mb-2 ml-6"><strong>Document Name:</strong> {enrollment.ccdDocumentName}</p>
-            {enrollment.validationResult && <FHIRValidationDisplay result={enrollment.validationResult} />}
-         </div>
+         <Card className="mt-6 shadow-lg">
+            <CardHeader>
+                <CardTitle className="flex items-center text-xl font-semibold">
+                    <FileText className="mr-2 h-5 w-5 text-primary"/>FHIR/CCD Document
+                </CardTitle>
+                 <CardDescription>
+                    <strong>Document Name:</strong> {enrollment.ccdDocumentName}
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                {enrollment.validationResult && <FHIRValidationDisplay result={enrollment.validationResult} />}
+            </CardContent>
+         </Card>
       )}
     </div>
   );
