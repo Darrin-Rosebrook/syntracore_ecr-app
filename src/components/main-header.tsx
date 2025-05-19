@@ -26,7 +26,8 @@ export function MainHeader() {
   const showSearch = !(
     pathname === '/hco-registration' ||
     (pathname === '/' && !currentUser) ||
-    pathname === '/login'
+    pathname === '/login' ||
+    pathname === '/vendor-portal' // Hide global search on vendor portal
   );
 
   useEffect(() => {
@@ -83,10 +84,10 @@ export function MainHeader() {
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2 mr-4">
           <Image
-            src="/images/SyntraCore_Logo.png" // Correct path
+            src="/images/SyntraCore_Logo.png"
             alt="SyntraCore Logo"
-            width={150} // Adjusted for header size
-            height={50} // Adjusted for header size
+            width={150}
+            height={50}
             priority
             data-ai-hint="company logo"
           />

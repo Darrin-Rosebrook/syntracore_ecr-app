@@ -1,21 +1,23 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useAppContext } from '@/context/AppContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { LayoutDashboard, LogOut, Loader2, Building, Users, ExternalLink, Workflow, List, Lock } from 'lucide-react';
+import { LayoutDashboard, LogOut, Loader2, Building, Users, ExternalLink, Workflow, List, Lock, Search as SearchIcon } from 'lucide-react';
 import Link from 'next/link';
 import type { VendorProfileData, EnrollmentData } from '@/types';
 import { getVendorProfileAction, updateVendorLastLoginAction } from '@/actions/vendor-actions';
 import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ECR_ONBOARDING_STAGES } from '@/lib/constants';
+import { ECR_ONBOARDING_STAGES, OHIO_HEALTH_SYSTEMS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input'; // Added Input for search
+import { Label } from '@/components/ui/label'; // Added Label for search
 
 // Helper function to determine current phase name
 const getCurrentPhaseName = (enrollmentStatus: EnrollmentData['status']): string => {
@@ -43,6 +45,7 @@ export default function VendorPortalPage() {
   const [linkedHcos, setLinkedHcos] = useState<EnrollmentData[]>([]);
   const [selectedHco, setSelectedHco] = useState<EnrollmentData | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [hcoSearchTerm, setHcoSearchTerm] = useState(''); // State for vendor-specific search
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -78,7 +81,27 @@ export default function VendorPortalPage() {
     if (!authLoading && currentUser) {
         fetchProfileAndHcos();
     }
-  }, [currentUser, authLoading, enrollments, selectedHco]); // Added selectedHco to dependencies to avoid re-selecting
+  }, [currentUser, authLoading, enrollments, selectedHco]);
+
+  const filteredLinkedHcos = useMemo(() => {
+    if (!hcoSearchTerm.trim()) {
+      return linkedHcos;
+    }
+    const lowerSearchTerm = hcoSearchTerm.toLowerCase();
+    return linkedHcos.filter(hco => {
+      const nameMatch = hco.practiceInfo.name.toLowerCase().includes(lowerSearchTerm);
+      const npiMatch = hco.practiceInfo.organizationNPI?.toLowerCase().includes(lowerSearchTerm);
+      let healthSystemMatch = false;
+      if (hco.practiceInfo.healthSystem) {
+        const healthSystemLabel = OHIO_HEALTH_SYSTEMS.find(hs => hs.value === hco.practiceInfo.healthSystem)?.label;
+        if (healthSystemLabel) {
+          healthSystemMatch = healthSystemLabel.toLowerCase().includes(lowerSearchTerm);
+        }
+      }
+      return nameMatch || npiMatch || healthSystemMatch;
+    });
+  }, [linkedHcos, hcoSearchTerm]);
+
 
   const handleLogout = async () => {
     await logOut();
@@ -96,8 +119,7 @@ export default function VendorPortalPage() {
 
   if (!currentUser) return null;
 
-  // DEBUG: Log linkedHcos before rendering the list
-  console.log("[VendorPortalPage] Rendering HCO list. Linked HCOs count:", linkedHcos.length, "Data:", linkedHcos);
+  console.log("[VendorPortalPage] Rendering HCO list. Filtered Linked HCOs count:", filteredLinkedHcos.length, "Data:", filteredLinkedHcos);
 
   return (
     <div className="container mx-auto py-8 space-y-6">
@@ -124,12 +146,25 @@ export default function VendorPortalPage() {
             <div className="md:col-span-1 space-y-3">
               <h3 className="text-xl font-semibold flex items-center mb-2">
                 <List className="mr-2 h-5 w-5 text-primary" />
-                Client HCOs ({linkedHcos.length})
+                Client HCOs ({filteredLinkedHcos.length})
               </h3>
-              {linkedHcos.length > 0 ? (
-                <ScrollArea className="h-[450px] border rounded-md p-2 bg-muted/20"> {/* Slightly increased height for debugging */}
+              <div className="relative mb-2">
+                 <Label htmlFor="hcoSearch" className="sr-only">Search Client HCOs</Label>
+                 <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                 <Input
+                    id="hcoSearch"
+                    type="search"
+                    placeholder="Search by HCO name, NPI, or Health System..."
+                    value={hcoSearchTerm}
+                    onChange={(e) => setHcoSearchTerm(e.target.value)}
+                    className="pl-9 h-9"
+                 />
+              </div>
+
+              {filteredLinkedHcos.length > 0 ? (
+                <ScrollArea className="h-[450px] border rounded-md p-2 bg-muted/20">
                   <ul className="space-y-2">
-                    {linkedHcos.map((hco) => (
+                    {filteredLinkedHcos.map((hco) => (
                       <li key={hco.id}>
                         <Button
                           variant={selectedHco?.id === hco.id ? "default" : "outline"}
@@ -154,9 +189,9 @@ export default function VendorPortalPage() {
               ) : (
                  <Alert>
                     <Users className="h-4 w-4" />
-                    <AlertTitle>No Linked HCOs Found</AlertTitle>
+                    <AlertTitle>{hcoSearchTerm ? "No Matching HCOs" : "No Linked HCOs Found"}</AlertTitle>
                     <AlertDescription>
-                    Currently, there are no HCOs registered with your EHR/LIMS: {vendorProfile.representedEhrSystemValue}.
+                    {hcoSearchTerm ? "No client HCOs match your search criteria." : `Currently, there are no HCOs registered with your EHR/LIMS: ${vendorProfile.representedEhrSystemValue}.`}
                     </AlertDescription>
                 </Alert>
               )}
@@ -178,7 +213,7 @@ export default function VendorPortalPage() {
                   </div>
                   <HcoOnboardingWorkflowSteps enrollment={selectedHco} isVendorView={true} />
                 </div>
-              ) : linkedHcos.length > 0 ? (
+              ) : filteredLinkedHcos.length > 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center p-10 border-2 border-dashed border-muted rounded-lg bg-muted/30">
                   <List className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold text-muted-foreground">Select an HCO</h3>
@@ -186,7 +221,7 @@ export default function VendorPortalPage() {
                     Choose an HCO from the list on the left to view their onboarding workflow.
                   </p>
                 </div>
-              ) : (
+              ) : !hcoSearchTerm ? ( // Only show this if there's no search term and no HCOs
                 <div className="flex flex-col items-center justify-center h-full text-center p-10 border-2 border-dashed border-muted rounded-lg bg-muted/30">
                   <Users className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold text-muted-foreground">No Client HCOs</h3>
@@ -194,7 +229,7 @@ export default function VendorPortalPage() {
                     There are no Health Care Organizations currently linked to your vendor profile.
                   </p>
                 </div>
-              )}
+              ) : null /* If search term yields no results, the specific Alert above handles it */ }
             </div>
           </CardContent>
         </Card>
