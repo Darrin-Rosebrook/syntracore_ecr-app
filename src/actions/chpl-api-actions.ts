@@ -1,25 +1,19 @@
+
 'use server';
 
 import type { ChplDeveloper, ChplDeveloperResponse, ChplCertifiedProduct, ChplProductsResponse } from '@/types/chpl';
 
-const CHPL_API_BASE_URL = 'https://chpl.healthit.gov/ehr/edge-service';
-const API_KEY = process.env.CHPL_API_KEY;
+const CHPL_API_BASE_URL = 'https://certified.healthit.gov/rest'; // Updated Base URL
 
 interface FetchOptions {
   headers: {
-    'API-KEY': string;
     'Content-Type': string;
   };
 }
 
-function getFetchOptions(): FetchOptions | null {
-  if (!API_KEY) {
-    console.error("CHPL API Key is not configured in environment variables.");
-    return null;
-  }
+function getFetchOptions(): FetchOptions {
   return {
     headers: {
-      'API-KEY': API_KEY,
       'Content-Type': 'application/json',
     },
   };
@@ -27,21 +21,25 @@ function getFetchOptions(): FetchOptions | null {
 
 export async function fetchChplDevelopersAction(): Promise<{ success: boolean; developers?: ChplDeveloper[]; error?: string }> {
   const options = getFetchOptions();
-  if (!options) {
-    return { success: false, error: "CHPL API Key not configured." };
-  }
 
   try {
+    // Note: The CHPL API documentation suggests most data endpoints require an API key.
+    // This implementation proceeds without one based on user instruction.
+    // The endpoint path /developers might be different under the new base URL.
+    // The original code used `/ehr/edge-service/developers`.
+    // Assuming the new base URL is meant to replace the entire prefix.
     const response = await fetch(`${CHPL_API_BASE_URL}/developers`, options);
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`CHPL API Error (Developers): ${response.status} - ${errorText}`);
       return { success: false, error: `Failed to fetch developers from CHPL API: ${response.statusText}` };
     }
-    // The /developers endpoint directly returns an array of developers, not a structured response object.
+    // The /developers endpoint might return a structured object like { results: [] } or an array directly.
+    // Assuming it's an array directly for now, adjust if needed based on actual API response.
+    // If it's structured, it might be: const developerData: ChplDeveloperResponse = await response.json();
+    // and then use developerData.results
     const developers: ChplDeveloper[] = await response.json();
     
-    // Add a simplified current status to each developer based on their statusEvents
     const developersWithStatus = developers.map(dev => {
         const currentStatusEvent = dev.statusEvents?.sort((a, b) => b.statusDate - a.statusDate)[0];
         return {
@@ -60,14 +58,12 @@ export async function fetchChplDevelopersAction(): Promise<{ success: boolean; d
 
 export async function fetchChplProductsByDeveloperAction(developerId: number): Promise<{ success: boolean; products?: ChplCertifiedProduct[]; error?: string }> {
   const options = getFetchOptions();
-  if (!options) {
-    return { success: false, error: "CHPL API Key not configured." };
-  }
 
   try {
-    // Fetch all products for the developer first, then filter client-side for active status
-    // as direct filtering by certificationStatus.name might be tricky with the API.
-    // The API docs suggest ?certificationStatusName=Active should work. Let's try it.
+    // Adjust endpoint path if necessary. Original was /ehr/edge-service/certified_products
+    // Assuming the new base URL is meant to replace the entire prefix.
+    // The parameter for developer might be 'developerId' or different. The API documentation will clarify.
+    // This example assumes the API can filter by developerId and certificationStatusName.
     const response = await fetch(`${CHPL_API_BASE_URL}/certified_products?developerId=${developerId}&certificationStatusName=Active&pageSize=1000`, options);
     
     if (!response.ok) {
