@@ -10,10 +10,13 @@ export async function addEnrollmentToFirestore(
   formData: EnrollmentFormData,
   ccdDocumentContent: string | null,
   validationResult: FHIRValidationResult,
-  userId: string, // Added userId
-  userEmail: string // Added userEmail
+  userId: string, 
+  userEmail: string 
 ): Promise<{ success: boolean; id?: string; error?: string }> {
-  console.log("addEnrollmentToFirestore server action called by user:", userId);
+  console.log("[firestore-add-enrollment] addEnrollmentToFirestore server action called by user:", userId, "with email:", userEmail);
+  console.log("[firestore-add-enrollment] Received formData:", JSON.stringify(formData, null, 2));
+  console.log("[firestore-add-enrollment] Received ccdDocumentName:", formData.ccdDocumentName);
+  console.log("[firestore-add-enrollment] Received validationResult:", JSON.stringify(validationResult, null, 2));
   
   try {
     const submissionDate = new Date();
@@ -21,12 +24,12 @@ export async function addEnrollmentToFirestore(
       timestamp: submissionDate.toISOString(),
       entry: `HCO & Lab Registration submitted by ${userEmail}.`,
       type: "System",
-      user: userId, // Log which user submitted
+      user: userId,
     };
 
     const dataToSave = {
-      userId: userId, // Store the UID of the user submitting
-      userEmail: userEmail, // Store the email of the user submitting
+      userId: userId, 
+      userEmail: userEmail, 
       practiceInfo: {
         organizationNPI: formData.practiceInfo.organizationNPI || '',
         name: formData.practiceInfo.name,
@@ -48,10 +51,11 @@ export async function addEnrollmentToFirestore(
       additionalData: formData.additionalData || {},
       ccdDocumentName: formData.ccdDocumentName,
       ccdDocumentContent: ccdDocumentContent, 
-      additionalContacts: formData.additionalContacts || [], 
+      additionalContacts: formData.additionalContacts || [],
+      messages: [], // Initialize with empty messages array
     };
 
-    console.log("Data prepared for Firestore:", JSON.stringify(dataToSave, (key, value) => {
+    console.log("[firestore-add-enrollment] Data prepared for Firestore:", JSON.stringify(dataToSave, (key, value) => {
       if (key === 'ccdDocumentContent' && typeof value === 'string' && value.length > 100) {
         return `${value.substring(0,100)}... (truncated for log)`;
       }
@@ -59,10 +63,10 @@ export async function addEnrollmentToFirestore(
     }, 2));
 
     const docRef = await addDoc(collection(db, "enrollments"), dataToSave);
-    console.log("✅ Document successfully written to Firestore with ID: ", docRef.id);
+    console.log("[firestore-add-enrollment] ✅ Document successfully written to Firestore with ID: ", docRef.id);
     return { success: true, id: docRef.id };
   } catch (error: any) {
-    console.error("❌ Firestore enrollment write failed in addEnrollmentToFirestore:", error);
+    console.error("❌ [firestore-add-enrollment] Firestore enrollment write failed:", error);
     console.error("Error name:", error.name);
     console.error("Error message:", error.message);
     if (error.code) {
@@ -72,3 +76,4 @@ export async function addEnrollmentToFirestore(
     return { success: false, error: `Failed to save enrollment to Firestore: ${error.message || "Unknown Firestore error."}` };
   }
 }
+
