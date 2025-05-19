@@ -104,7 +104,7 @@ export interface EnrollmentData extends EnrollmentFormData {
   status: 'Pending' | 'Approved' | 'Changes Requested' | 'Denied';
   activityLog?: ActivityLogEntry[];
   documents?: DocumentEntry[];
-  messages?: MessageEntry[]; 
+  messages?: MessageEntry[];
 }
 
 // Types for PHA User Management
@@ -114,7 +114,7 @@ export type PhaUserStatus = 'Active' | 'Inactive';
 
 export interface PhaUser {
   id: string;
-  authUid?: string; 
+  authUid?: string;
   username?: string;
   name: string;
   email: string;
@@ -214,10 +214,12 @@ export interface VendorProfileData {
   userId: string; // Firebase Auth UID
   vendorName: string;
   contactName: string;
-  email: string; 
-  representedEhrSystemValue: string; 
+  email: string;
+  representedEhrSystemValue: string;
   createdAt: string; // ISO string
   lastLogin?: string; // ISO string
+  eulaAccepted?: boolean;
+  eulaAcceptedTimestamp?: string; // ISO string
 }
 
 // CLIA Data Types
@@ -230,14 +232,14 @@ export interface CliaAddress {
 
 export interface CliaApiResult {
   clia_number: string;
-  fac_nme?: string; 
-  st_adr?: string; 
+  fac_nme?: string;
+  st_adr?: string;
   city_nme?: string;
-  st_cd?: string; 
+  st_cd?: string;
   zip_cd?: string;
   phn_numbr?: string;
-  lab_type_dsc?: string; 
-  clia_waiver_ind_yn?: 'Y' | 'N'; 
+  lab_type_dsc?: string;
+  clia_waiver_ind_yn?: 'Y' | 'N';
 }
 
 export interface CliaApiResponse { // This might not be used if querying Firestore directly
@@ -248,7 +250,7 @@ export interface CliaApiResponse { // This might not be used if querying Firesto
 export interface CliaData { // This is the shape of data action expects from Firestore OR formats into
   cliaNumber: string;
   facilityName?: string;
-  address?: string; 
+  address?: string;
   phone?: string;
   labType?: string;
 }
@@ -260,7 +262,7 @@ export interface ResourceItem {
   id: string;
   title: string;
   type: ResourceItemType;
-  content: string; 
+  content: string;
   order: number;
   createdAt: string; // ISO string
   lastUpdated: string; // ISO string

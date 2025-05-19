@@ -2,7 +2,7 @@
 'use server';
 
 import { db } from '@/lib/firebase';
-import { doc, setDoc, getDoc, serverTimestamp, type Timestamp, collection, getDocs, query, orderBy, updateDoc } from 'firebase/firestore'; // Added collection, getDocs, query, orderBy, updateDoc
+import { doc, setDoc, getDoc, serverTimestamp, type Timestamp, collection, getDocs, query, orderBy, updateDoc } from 'firebase/firestore';
 import type { VendorProfileData } from '@/types';
 
 // Data parameter now includes representedEhrSystemValue and excludes fields automatically set by server or derived from userId
@@ -19,12 +19,14 @@ export async function createVendorProfileAction(
   try {
     const vendorRef = doc(db, 'vendors', userId); // Store vendors in a 'vendors' collection
 
-    // Construct the full payload including server-generated timestamps
+    // Construct the full payload including server-generated timestamps and EULA acceptance
     const profilePayload: VendorProfileData = {
       ...data,
       userId: userId, // Storing userId also within the document for easier querying if needed
       // @ts-ignore // Firestore will convert this to a Timestamp
       createdAt: serverTimestamp(),
+      eulaAccepted: true, // EULA accepted at profile creation
+      eulaAcceptedTimestamp: new Date().toISOString(),
       // lastLogin will be updated separately
     };
     await setDoc(vendorRef, profilePayload);
@@ -54,6 +56,8 @@ export async function getVendorProfileAction(userId: string): Promise<{ success:
         representedEhrSystemValue: rawData.representedEhrSystemValue,
         createdAt: (rawData.createdAt as Timestamp)?.toDate ? (rawData.createdAt as Timestamp).toDate().toISOString() : new Date().toISOString(),
         lastLogin: (rawData.lastLogin as Timestamp)?.toDate ? (rawData.lastLogin as Timestamp).toDate().toISOString() : undefined,
+        eulaAccepted: rawData.eulaAccepted || false,
+        eulaAcceptedTimestamp: rawData.eulaAcceptedTimestamp,
       };
       console.log(`Vendor profile fetched successfully for UID: ${userId}`, profileData);
       return { success: true, data: profileData };
@@ -105,6 +109,8 @@ export async function getVendorsAction(): Promise<{ success: boolean; vendors?: 
         representedEhrSystemValue: rawData.representedEhrSystemValue,
         createdAt: (rawData.createdAt as Timestamp)?.toDate ? (rawData.createdAt as Timestamp).toDate().toISOString() : new Date().toISOString(),
         lastLogin: (rawData.lastLogin as Timestamp)?.toDate ? (rawData.lastLogin as Timestamp).toDate().toISOString() : undefined,
+        eulaAccepted: rawData.eulaAccepted || false,
+        eulaAcceptedTimestamp: rawData.eulaAcceptedTimestamp,
       } as VendorProfileData;
     });
     console.log("Vendor profiles fetched successfully:", vendorsList.length, "vendors found.");
