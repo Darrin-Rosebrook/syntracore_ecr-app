@@ -11,12 +11,13 @@ import type { EnrollmentData } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Loader2, ListTree, Users, FileTextIcon, Building } from 'lucide-react';
+import { ArrowLeft, Loader2, ListTree, Users, FileTextIcon, Building, Package } from 'lucide-react'; // Added Package icon
 
 import { EhrVendorProfileDetailsTab } from '@/components/ehr-vendor-profile-details-tab';
 import { EhrVendorHcosTab } from '@/components/ehr-vendor-hcos-tab';
 import { EhrVendorDocumentsTab } from '@/components/ehr-vendor-documents-tab';
 import { EhrVendorContactsTab } from '@/components/ehr-vendor-contacts-tab';
+import { EhrVendorProductsTab } from '@/components/ehr-vendor-products-tab'; // New import
 
 export default function EhrVendorProfilePage() {
   const router = useRouter();
@@ -54,7 +55,7 @@ export default function EhrVendorProfilePage() {
         <h1 className="text-2xl font-bold mb-4">EHR/LIMS Vendor Not Found</h1>
         <p className="text-muted-foreground mb-6">The vendor with ID "{vendorValue}" could not be found.</p>
         <Button asChild variant="outline">
-          <Link href="/admin/ehr-vendors"> {/* Assuming the list is at /admin/ehr-vendors or similar. Update if needed */}
+          <Link href="/admin/ehr-vendors">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to EHR/LIMS Vendors List
           </Link>
@@ -63,7 +64,7 @@ export default function EhrVendorProfilePage() {
     );
   }
   
-  if (!vendorLabel) return null; // Should be caught by above
+  if (!vendorLabel) return null;
 
   return (
     <ScrollArea className="h-[calc(100vh-4rem)]">
@@ -81,7 +82,7 @@ export default function EhrVendorProfilePage() {
         </div>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-4 h-auto sm:h-12 mb-6 shadow-md">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-5 h-auto sm:h-12 mb-6 shadow-md"> {/* Changed to sm:grid-cols-5 */}
             <TabsTrigger value="profile" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
               <ListTree className="mr-2 h-5 w-5" /> Profile
             </TabsTrigger>
@@ -93,6 +94,9 @@ export default function EhrVendorProfilePage() {
             </TabsTrigger>
             <TabsTrigger value="contacts" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
               <Users className="mr-2 h-5 w-5" /> Contacts
+            </TabsTrigger>
+            <TabsTrigger value="products" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg"> {/* New Tab Trigger */}
+              <Package className="mr-2 h-5 w-5" /> Products
             </TabsTrigger>
           </TabsList>
 
@@ -108,9 +112,11 @@ export default function EhrVendorProfilePage() {
           <TabsContent value="contacts">
             <EhrVendorContactsTab vendorValue={typeof vendorValue === 'string' ? vendorValue : ''} />
           </TabsContent>
+          <TabsContent value="products"> {/* New Tab Content */}
+            <EhrVendorProductsTab vendorValue={typeof vendorValue === 'string' ? vendorValue : ''} />
+          </TabsContent>
         </Tabs>
       </div>
     </ScrollArea>
   );
 }
-
