@@ -17,10 +17,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { EHR_VENDORS, PENDING_ENROLLMENT_DATA_KEY, PENDING_CCD_FILE_CONTENT_KEY, PENDING_VALIDATION_RESULT_KEY } from "@/lib/constants";
 import { FileUploader } from "@/components/file-uploader";
 import { useToast } from "@/hooks/use-toast";
-import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData } from "@/types";
+import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData, CliaData } from "@/types";
 import { validateFHIR } from "@/services/fhir-validator";
 import { fetchNpiDataAction } from '@/actions/workflow-actions';
-// Removed: import { fetchCliaDataAction } from '@/actions/clia-actions';
+import { fetchCliaDataFromFirestoreAction } from '@/actions/clia-actions';
 import { summarizeValidationResults } from "@/ai/flows/summarize-validation-results";
 import { FHIRValidationDisplay } from "./fhir-validation-display";
 import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays, Hash, Search as SearchIcon, ArrowRight, FilePenLine, Beaker } from "lucide-react";
@@ -43,8 +43,8 @@ const practiceInfoSchema = z.object({
     .regex(/^\+?[0-9\s\-()]+$/, "Invalid phone number format"),
   isLabOrPerformsLabServices: z.enum(['yes', 'no'], { required_error: "Please select if this is a lab or performs lab services." }),
   cliaNumber: z.string().optional(),
-  cliaLabName: z.string().optional(), // Will not be auto-populated
-  cliaLabType: z.string().optional(), // Will not be auto-populated
+  cliaLabName: z.string().optional(),
+  cliaLabType: z.string().optional(),
 }).refine(data => {
     if (data.isLabOrPerformsLabServices === 'yes' && (!data.cliaNumber || data.cliaNumber.trim() === '')) {
       return false;
@@ -107,10 +107,10 @@ export function ProviderEnrollmentForm({
   const [npiLookupError, setNpiLookupError] = React.useState<string | null>(null);
   const [fetchedNpiData, setFetchedNpiData] = React.useState<ProviderData | null>(null);
 
-  // Removed CLIA lookup state variables
-  // const [cliaLookupLoading, setCliaLookupLoading] = React.useState(false);
-  // const [cliaLookupError, setCliaLookupError] = React.useState<string | null>(null);
-  // const [fetchedCliaData, setFetchedCliaData] = React.useState<CliaData | null>(null);
+  const [cliaLookupLoading, setCliaLookupLoading] = React.useState(false);
+  const [cliaLookupError, setCliaLookupError] = React.useState<string | null>(null);
+  const [fetchedCliaData, setFetchedCliaData] = React.useState<CliaData | null>(null);
+
 
   const dynamicEnrollmentSchema = React.useMemo(() => {
     const additionalDataShape: Record<string, z.ZodTypeAny> = {};
@@ -156,7 +156,9 @@ export function ProviderEnrollmentForm({
         address: "",
         phone: "",
         isLabOrPerformsLabServices: undefined,
-        cliaNumber: ""
+        cliaNumber: "",
+        cliaLabName: "",
+        cliaLabType: ""
       },
       contactDetails: { name: "", email: "", phone: "" },
       ehrVendor: "",
@@ -214,11 +216,10 @@ export function ProviderEnrollmentForm({
       let parsedContent: any;
 
       try {
-        // Attempt to parse as JSON. If it fails, assume it's XML or another format.
         parsedContent = JSON.parse(fileContent);
       } catch (jsonError) {
         console.warn("File is not valid JSON. Will attempt validation with raw content for XML or other formats.", jsonError);
-        parsedContent = fileContent; // Pass raw content if JSON parsing fails
+        parsedContent = fileContent;
       }
 
       try {
@@ -249,10 +250,70 @@ export function ProviderEnrollmentForm({
     }
   };
 
-  // Removed handleCliaLookup and handleClearCliaData functions
+
+  const handleCliaLookup = async () => {
+    const cliaToLookup = form.getValues('practiceInfo.cliaNumber');
+    if (!cliaToLookup || cliaToLookup.trim().length === 0) {
+      toast({ title: "CLIA Number Required", description: "Please enter a CLIA number to look up.", variant: "destructive" });
+      return;
+    }
+    if (!/^[0-9A-Z]{10}$/i.test(cliaToLookup.trim())) {
+        toast({ title: "Invalid CLIA Format", description: "CLIA number must be 10 alphanumeric characters.", variant: "destructive" });
+        return;
+    }
+
+    setCliaLookupLoading(true);
+    setCliaLookupError(null);
+    setFetchedCliaData(null);
+    console.log(`[ProviderEnrollmentForm] Initiating CLIA lookup for: ${cliaToLookup}`);
+
+    try {
+      const result = await fetchCliaDataFromFirestoreAction(cliaToLookup);
+      console.log("[ProviderEnrollmentForm] CLIA Lookup Result:", result);
+
+      if (result.success && result.data) {
+        setFetchedCliaData(result.data);
+        console.log("[ProviderEnrollmentForm] Fetched CLIA Data to be set:", result.data);
+        if (!form.getValues('practiceInfo.name')) {
+            form.setValue('practiceInfo.name', result.data.facilityName || '', { shouldValidate: true });
+        }
+        if (!form.getValues('practiceInfo.address')) {
+            form.setValue('practiceInfo.address', result.data.address || '', { shouldValidate: true });
+        }
+        if (!form.getValues('practiceInfo.phone')) {
+            form.setValue('practiceInfo.phone', result.data.phone || '', { shouldValidate: true });
+        }
+        form.setValue('practiceInfo.cliaLabName', result.data.facilityName || '', { shouldValidate: true });
+        form.setValue('practiceInfo.cliaLabType', result.data.labType || '', { shouldValidate: true });
+
+        toast({ title: "CLIA Data Fetched", description: `Data for ${result.data.facilityName} loaded. Please review and complete.` });
+      } else {
+        setCliaLookupError(result.error || `CLIA number ${cliaToLookup} not found or error during lookup.`);
+        toast({ title: 'CLIA Lookup Failed', description: result.error || `CLIA number ${cliaToLookup} not found.`, variant: 'destructive' });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to retrieve CLIA data from Firestore.";
+      console.error("[ProviderEnrollmentForm] CLIA Lookup Exception:", error);
+      setCliaLookupError(errorMessage);
+      toast({ title: 'CLIA Lookup Error', description: errorMessage, variant: 'destructive' });
+    } finally {
+      setCliaLookupLoading(false);
+    }
+  };
+
+  const handleClearCliaData = () => {
+    setFetchedCliaData(null);
+    setCliaLookupError(null);
+    // Optionally clear CLIA-derived fields if desired, or leave them for user to edit
+    // form.setValue('practiceInfo.cliaLabName', '', { shouldValidate: true });
+    // form.setValue('practiceInfo.cliaLabType', '', { shouldValidate: true });
+    toast({ title: 'CLIA Data Cleared', description: 'CLIA lookup information has been cleared from view.' });
+  };
+
 
   const handleNpiLookup = async () => {
     const npiToLookup = form.getValues('practiceInfo.organizationNPI');
+    console.log("[ProviderEnrollmentForm] Initiating NPI Lookup for:", npiToLookup);
     if (!npiToLookup || !/^\d{10}$/.test(npiToLookup)) {
       toast({ title: "Invalid NPI", description: "Please enter a valid 10-digit NPI to look up.", variant: "destructive" });
       return;
@@ -262,6 +323,7 @@ export function ProviderEnrollmentForm({
     setFetchedNpiData(null);
     try {
       const result = await fetchNpiDataAction(npiToLookup);
+      console.log("[ProviderEnrollmentForm] NPI Lookup Result:", result);
       if (result.success && result.data) {
         setFetchedNpiData(result.data);
         const provider = result.data;
@@ -279,6 +341,7 @@ export function ProviderEnrollmentForm({
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to retrieve NPI data.";
+      console.error("[ProviderEnrollmentForm] NPI Lookup Exception:", error);
       setNpiLookupError(errorMessage);
       toast({ title: 'NPI Lookup Error', description: errorMessage, variant: 'destructive' });
     } finally {
@@ -294,6 +357,10 @@ export function ProviderEnrollmentForm({
 
   const onContinue = async (data: FormSchemaType) => {
     setIsProcessingContinue(true);
+    console.log("[ProviderEnrollmentForm] onContinue triggered. Data:", data);
+    console.log("[ProviderEnrollmentForm] CCD File:", ccdFile);
+    console.log("[ProviderEnrollmentForm] Validation Result:", validationResult);
+
     if (!ccdFile) {
       toast({ title: "Missing Document", description: "Please upload a CCD/FHIR document.", variant: "destructive" });
       setIsProcessingContinue(false);
@@ -310,7 +377,8 @@ export function ProviderEnrollmentForm({
         practiceInfo: {
             ...data.practiceInfo,
             cliaNumber: data.practiceInfo.isLabOrPerformsLabServices === 'yes' ? data.practiceInfo.cliaNumber : undefined,
-            // cliaLabName and cliaLabType will rely on manual entry if any
+            cliaLabName: data.practiceInfo.isLabOrPerformsLabServices === 'yes' ? data.practiceInfo.cliaLabName : undefined,
+            cliaLabType: data.practiceInfo.isLabOrPerformsLabServices === 'yes' ? data.practiceInfo.cliaLabType : undefined,
         },
         ccdDocumentName: ccdFile.name,
         additionalData: data.additionalData || {},
@@ -318,9 +386,10 @@ export function ProviderEnrollmentForm({
       localStorage.setItem(PENDING_ENROLLMENT_DATA_KEY, JSON.stringify(enrollmentDataToStore));
       localStorage.setItem(PENDING_CCD_FILE_CONTENT_KEY, ccdFileContent || '');
       localStorage.setItem(PENDING_VALIDATION_RESULT_KEY, JSON.stringify(validationResult));
+      console.log("[ProviderEnrollmentForm] Data stored in localStorage. Navigating to /signup.");
       router.push('/signup');
     } catch (error) {
-      console.error("Error storing enrollment data in localStorage:", error);
+      console.error("[ProviderEnrollmentForm] Error storing enrollment data in localStorage:", error);
       toast({ title: "Error Saving Progress", description: "Could not save enrollment progress. Please try again.", variant: "destructive" });
     } finally {
       setIsProcessingContinue(false);
@@ -328,7 +397,7 @@ export function ProviderEnrollmentForm({
   };
 
   const sortedCustomFieldDefinitions = [...customFieldDefinitions].sort((a,b) => a.order - b.order);
-  // console.log("ProviderEnrollmentForm rendering. Fetched CLIA Data state:", fetchedCliaData); // Removed CLIA console log
+  console.log("[ProviderEnrollmentForm] Rendering. Fetched CLIA Data state:", fetchedCliaData);
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
@@ -390,15 +459,33 @@ export function ProviderEnrollmentForm({
                         placeholder="Enter CLIA Number"
                         maxLength={10}
                         className={fieldState.error ? "border-destructive" : ""}
-                        disabled={isProcessingContinue}
+                        disabled={isProcessingContinue || cliaLookupLoading}
                         value={field.value || ''}
                       />
                     )}
                   />
-                  {/* Removed CLIA Lookup Button and Clear Button */}
+                  <Button type="button" onClick={handleCliaLookup} disabled={cliaLookupLoading || isProcessingContinue || !watchedCliaNumber || watchedCliaNumber.length !== 10} size="sm">
+                    {cliaLookupLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchIcon className="h-4 w-4" />}
+                    <span className="ml-1 hidden sm:inline">Lookup CLIA</span>
+                  </Button>
+                  {fetchedCliaData && (
+                    <Button type="button" variant="ghost" onClick={handleClearCliaData} disabled={cliaLookupLoading || isProcessingContinue} size="sm">Clear</Button>
+                  )}
                 </div>
                 {form.formState.errors.practiceInfo?.cliaNumber && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.cliaNumber.message}</p>}
-                {/* Removed cliaLookupError display and fetchedCliaData display card */}
+                {cliaLookupError && <p className="text-sm text-destructive mt-1">{cliaLookupError}</p>}
+
+                {fetchedCliaData && (
+                    <Card className="mt-2 bg-muted/30">
+                        <CardHeader className="pb-2 pt-3"><CardTitle className="text-sm">Fetched CLIA Data:</CardTitle></CardHeader>
+                        <CardContent className="text-xs space-y-0.5 pb-3">
+                        {fetchedCliaData.facilityName && <p><strong>Facility Name:</strong> {fetchedCliaData.facilityName}</p>}
+                        {fetchedCliaData.address && <p><strong>Address:</strong> {fetchedCliaData.address}</p>}
+                        {fetchedCliaData.phone && <p><strong>Phone:</strong> {fetchedCliaData.phone}</p>}
+                        {fetchedCliaData.labType && <p><strong>Lab Type:</strong> {fetchedCliaData.labType}</p>}
+                        </CardContent>
+                    </Card>
+                )}
               </div>
             )}
 
@@ -515,7 +602,7 @@ export function ProviderEnrollmentForm({
           </fieldset>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isProcessingContinue || isProcessingFile || npiLookupLoading } > {/* Removed cliaLookupLoading */}
+          <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isProcessingContinue || isProcessingFile || npiLookupLoading || cliaLookupLoading } > 
             {isProcessingContinue ? ( <> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing... </> ) : ( <> Continue to Create Account <ArrowRight className="ml-2 h-4 w-4" /> </> )}
           </Button>
         </CardFooter>

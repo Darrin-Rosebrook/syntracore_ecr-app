@@ -1,23 +1,28 @@
+
 'use server';
 
 import { fetchProviderByNPI } from '@/services/npi-service';
 import { sendEmail } from '@/services/email-service';
 import { simulateAIMSValidation } from '@/services/aims-validator';
-import { validateFHIR } from '@/services/fhir-validator'; // Renamed import
+import { validateFHIR } from '@/services/fhir-validator'; 
 import type { ProviderData } from '@/types/npi';
-import type { AIMSValidationResult as AimsSimulatedResult } from '@/services/aims-validator'; // aliased to avoid confusion
+import type { AIMSValidationResult as AimsSimulatedResult } from '@/services/aims-validator'; 
 import type { FHIRValidationResult } from '@/services/fhir-validator';
 
 
 export async function fetchNpiDataAction(npi: string): Promise<{ success: boolean; data?: ProviderData; error?: string }> {
+  console.log("[workflow-actions] fetchNpiDataAction called with NPI:", npi);
   if (!npi) {
+    console.error("[workflow-actions] NPI is required.");
     return { success: false, error: 'NPI is required.' };
   }
   try {
     const providerData = await fetchProviderByNPI(npi);
+    console.log("[workflow-actions] NPI data fetched successfully:", providerData);
     return { success: true, data: providerData };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch NPI data.';
+    console.error("[workflow-actions] Error in fetchNpiDataAction:", message, error);
     return { success: false, error: message };
   }
 }
@@ -30,7 +35,6 @@ export async function sendWelcomeEmailAction(providerData: ProviderData, userEma
     return { success: false, error: 'Provider data is required.' };
   }
 
-  // Construct a simple text email, as per the user's example logic
   const textContent = `Welcome ${providerData.name || 'Provider'}${providerData.orgName ? ` from ${providerData.orgName}` : ''}! Thank you for starting the enrollment process with Onboard eCR.`;
   
   const htmlContent = `
@@ -41,18 +45,16 @@ export async function sendWelcomeEmailAction(providerData: ProviderData, userEma
   `;
 
   try {
-    // Using the existing sendEmail service function which expects an object
     const result = await sendEmail({
       to: userEmail,
       subject: `Welcome to Onboard eCR, ${providerData.name || 'Provider'}`,
       htmlContent: htmlContent,
-      textContext: textContent, // Provide plain text version
+      textContext: textContent, 
     });
 
     if (result.success) {
       return { success: true, message: result.message };
     } else {
-      // Ensure potential SendGrid error details are passed back
       const errorMessage = result.error?.errors.map(e => e.message).join(', ') || result.message || 'Failed to send email.';
       return { success: false, error: errorMessage };
     }
@@ -72,7 +74,6 @@ export async function simulateAimsValidationAction(providerData: ProviderData): 
   }
 }
 
-// New action for the simpler FHIR validation simulation
 export async function simulateFhirValidationAction(resource: any): Promise<{ success: boolean; data?: FHIRValidationResult; error?: string }> {
   try {
     const validationResult = await validateFHIR(resource);
@@ -82,3 +83,4 @@ export async function simulateFhirValidationAction(resource: any): Promise<{ suc
     return { success: false, error: message };
   }
 }
+
