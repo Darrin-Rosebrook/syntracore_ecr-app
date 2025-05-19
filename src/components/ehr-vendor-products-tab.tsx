@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'; // Added import
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Package, Info, Loader2, AlertCircle, CalendarCheck2 } from 'lucide-react';
@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 interface EhrVendorProductsTabProps {
-  developerId: number; // Changed from vendorValue to developerId (number)
+  developerId: number;
 }
 
 export function EhrVendorProductsTab({ developerId }: EhrVendorProductsTabProps) {
@@ -119,4 +119,7 @@ export function EhrVendorProductsTab({ developerId }: EhrVendorProductsTabProps)
             </Table>
           </ScrollArea>
         )}
-      </
+      </CardContent>
+    </Card>
+  );
+}
