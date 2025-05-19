@@ -7,7 +7,7 @@ import { useAppContext } from '@/context/AppContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { LayoutDashboard, LogOut, Loader2, Building, Users, ExternalLink, Workflow } from 'lucide-react';
+import { LayoutDashboard, LogOut, Loader2, Building, Users, ExternalLink, Workflow, List } from 'lucide-react';
 import Link from 'next/link';
 import type { VendorProfileData, EnrollmentData } from '@/types';
 import { getVendorProfileAction, updateVendorLastLoginAction } from '@/actions/vendor-actions';
@@ -35,7 +35,7 @@ export default function VendorPortalPage() {
     async function fetchProfileAndHcos() {
       if (currentUser && currentUser.uid) {
         setIsLoadingProfile(true);
-        await updateVendorLastLoginAction(currentUser.uid); // Update last login
+        await updateVendorLastLoginAction(currentUser.uid); 
         const profileResult = await getVendorProfileAction(currentUser.uid);
         if (profileResult.success && profileResult.data) {
           setVendorProfile(profileResult.data);
@@ -44,28 +44,29 @@ export default function VendorPortalPage() {
               (e) => e.ehrVendor === profileResult.data!.representedEhrSystemValue
             );
             setLinkedHcos(filteredHcos);
+            if (filteredHcos.length > 0 && !selectedHco) {
+              setSelectedHco(filteredHcos[0]); // Select the first HCO by default
+            }
           }
         } else {
           console.error("Failed to fetch vendor profile:", profileResult.error);
-          // Optionally, redirect or show an error if profile is crucial and not found
         }
         setIsLoadingProfile(false);
       } else if (!authLoading) {
-        // If not loading auth and no current user, implies should have been redirected
         setIsLoadingProfile(false);
       }
     }
     if (!authLoading && currentUser) {
         fetchProfileAndHcos();
     }
-  }, [currentUser, authLoading, enrollments]);
+  }, [currentUser, authLoading, enrollments, selectedHco]);
 
   const handleLogout = async () => {
     await logOut();
     router.push('/'); 
   };
 
-  if (authLoading || isLoadingProfile || appContextLoading && !vendorProfile) {
+  if (authLoading || isLoadingProfile || (appContextLoading && !vendorProfile)) {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -74,7 +75,7 @@ export default function VendorPortalPage() {
     );
   }
 
-  if (!currentUser) return null; // Should be caught by useEffect redirect
+  if (!currentUser) return null; 
 
   return (
     <div className="container mx-auto py-8 space-y-6">
@@ -97,56 +98,79 @@ export default function VendorPortalPage() {
               You are representing: {vendorProfile.representedEhrSystemValue}. Below are the HCOs using your system.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            {linkedHcos.length > 0 ? (
-              <div className="space-y-4">
-                <h3 className="text-xl font-semibold flex items-center mb-3">
-                  <Users className="mr-2 h-5 w-5 text-primary" />
-                  Your Client Health Care Organizations ({linkedHcos.length})
-                </h3>
-                <ScrollArea className="h-[200px] border rounded-md p-2 bg-muted/20">
+          <CardContent className="grid md:grid-cols-3 gap-6">
+            {/* Left Column: HCO List */}
+            <div className="md:col-span-1 space-y-3">
+              <h3 className="text-xl font-semibold flex items-center mb-2">
+                <List className="mr-2 h-5 w-5 text-primary" />
+                Client HCOs ({linkedHcos.length})
+              </h3>
+              {linkedHcos.length > 0 ? (
+                <ScrollArea className="h-[calc(100vh-26rem)] border rounded-md p-2 bg-muted/20">
                   <ul className="space-y-2">
                     {linkedHcos.map((hco) => (
                       <li key={hco.id}>
                         <Button
                           variant={selectedHco?.id === hco.id ? "default" : "outline"}
-                          className="w-full justify-start text-left"
+                          className="w-full justify-start text-left h-auto py-2 leading-snug"
                           onClick={() => setSelectedHco(hco)}
                         >
-                          {hco.practiceInfo.name} (NPI: {hco.practiceInfo.organizationNPI || 'N/A'}) - Status: {hco.status}
+                          <div className="flex flex-col">
+                            <span className="font-semibold">{hco.practiceInfo.name}</span>
+                            <span className="text-xs text-muted-foreground">NPI: {hco.practiceInfo.organizationNPI || 'N/A'}</span>
+                            <span className="text-xs text-muted-foreground">Status: {hco.status}</span>
+                          </div>
                         </Button>
                       </li>
                     ))}
                   </ul>
                 </ScrollArea>
+              ) : (
+                 <Alert>
+                    <Users className="h-4 w-4" />
+                    <AlertTitle>No Linked HCOs Found</AlertTitle>
+                    <AlertDescription>
+                    Currently, there are no HCOs registered with your EHR/LIMS: {vendorProfile.representedEhrSystemValue}.
+                    </AlertDescription>
+                </Alert>
+              )}
+            </div>
 
-                {selectedHco && (
-                  <div className="mt-6 pt-6 border-t">
-                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-xl font-semibold flex items-center">
-                            <Workflow className="mr-2 h-5 w-5 text-primary" />
-                            Onboarding Workflow: {selectedHco.practiceInfo.name}
-                        </h3>
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href={`/provider-profile/${selectedHco.id}`} target="_blank">
-                                View Full HCO Profile <ExternalLink className="ml-2 h-4 w-4" />
-                            </Link>
-                        </Button>
-                    </div>
-                    <HcoOnboardingWorkflowSteps enrollment={selectedHco} />
+            {/* Right Column: Selected HCO Workflow */}
+            <div className="md:col-span-2">
+              {selectedHco ? (
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-xl font-semibold flex items-center">
+                      <Workflow className="mr-2 h-5 w-5 text-primary" />
+                      Onboarding Workflow: {selectedHco.practiceInfo.name}
+                    </h3>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/provider-profile/${selectedHco.id}`} target="_blank">
+                        View Full HCO Profile <ExternalLink className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
                   </div>
-                )}
-
-              </div>
-            ) : (
-              <Alert>
-                <Users className="h-4 w-4" />
-                <AlertTitle>No Linked HCOs Found</AlertTitle>
-                <AlertDescription>
-                  Currently, there are no Health Care Organizations in the system registered with your EHR/LIMS: {vendorProfile.representedEhrSystemValue}.
-                </AlertDescription>
-              </Alert>
-            )}
+                  <HcoOnboardingWorkflowSteps enrollment={selectedHco} />
+                </div>
+              ) : linkedHcos.length > 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center p-10 border-2 border-dashed border-muted rounded-lg bg-muted/30">
+                  <List className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold text-muted-foreground">Select an HCO</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Choose an HCO from the list on the left to view their onboarding workflow.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center p-10 border-2 border-dashed border-muted rounded-lg bg-muted/30">
+                  <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold text-muted-foreground">No Client HCOs</h3>
+                  <p className="text-sm text-muted-foreground">
+                    There are no Health Care Organizations currently linked to your vendor profile.
+                  </p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       ) : (
