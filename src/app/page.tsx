@@ -2,7 +2,7 @@
 "use client";
 
 import React from "react";
-import Image from 'next/image'; // Correct import
+import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PHAReviewerDashboard } from "@/components/pha-reviewer-dashboard";
 import { EhrVendorsTab } from "@/components/ehr-vendors-tab";
@@ -21,7 +21,7 @@ export default function HomePage() {
     updateEnrollmentStatus,
     isLoading: isContextLoading
   } = useAppContext();
-  const { currentUser, isPhaUser, loading: authLoading } = useAuth(); // isPhaUser from AuthContext
+  const { currentUser, isPhaUser, loading: authLoading } = useAuth();
 
   const [activeTab, setActiveTab] = React.useState(""); 
 
@@ -30,15 +30,14 @@ export default function HomePage() {
 
     let newDefaultTabValue = "";
     if (isPhaUser) {
-      newDefaultTabValue = "pha-reviewer"; // Default for PHA user
+      newDefaultTabValue = "pha-reviewer";
     } else if (currentUser) { 
-      newDefaultTabValue = "dashboard"; // Default for other logged-in users
+      newDefaultTabValue = "dashboard";
     } else {
-      newDefaultTabValue = "hco-registration"; // Default for guests
+      newDefaultTabValue = "hco-registration"; // Default for guests, but now this will be handled by the new layout
     }
     
-    // Only update activeTab if it's different or not set yet to avoid unnecessary re-renders
-    if (activeTab !== newDefaultTabValue) {
+    if (activeTab !== newDefaultTabValue && newDefaultTabValue) {
       setActiveTab(newDefaultTabValue);
     }
 
@@ -63,10 +62,10 @@ export default function HomePage() {
             <div className="space-y-6">
               <div className="text-center lg:text-left mb-8">
                 <Image
-                  src="/images/SyntraCore_Logo.png" // Path relative to public folder
+                  src="/images/SyntraCore_Logo.png"
                   alt="SyntraCore Logo"
-                  width={250} // Adjust as needed
-                  height={84} // Adjust as needed
+                  width={250}
+                  height={84} 
                   priority
                   data-ai-hint="company logo"
                   className="mx-auto lg:mx-0"
@@ -104,7 +103,6 @@ export default function HomePage() {
                 Electronic Case Reporting (eCR) is the automated, real-time exchange of case report information between electronic health records (EHRs) and public health agencies.
               </p>
             </div>
-
             
             <div>
               <LoginForm />
@@ -121,13 +119,12 @@ export default function HomePage() {
       </main>
     );
   }
-
   
   let tabListCols = "sm:grid-cols-1";
   const tabsToRender: { value: string; label: string; icon: React.ElementType; content: React.ReactNode; condition?: boolean }[] = [];
 
   if (isPhaUser) {
-    tabListCols = "sm:grid-cols-4"; // Adjusted for 4 tabs
+    tabListCols = "sm:grid-cols-3"; // PHA users see 3 tabs
     tabsToRender.push(
       { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isContextLoading} />, condition: true },
       { value: "health-systems", label: "Health Systems", icon: Network, content: <HealthSystemsTab />, condition: true },
@@ -154,7 +151,6 @@ export default function HomePage() {
     );
   }
   
-
   const visibleTabs = tabsToRender.filter(tab => tab.condition !== false);
 
   return (

@@ -71,7 +71,6 @@ export function MainHeader() {
   };
   
   useEffect(() => {
-    // Update search term in header if URL changes (e.g. browser back/forward)
     setSearchTerm(searchParams.get('q') || '');
   }, [searchParams]);
 
@@ -84,10 +83,10 @@ export function MainHeader() {
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2 mr-4">
           <Image
-            src="/images/SyntraCore_Logo.png" // Path relative to public folder
+            src="/images/SyntraCore_Logo.png"
             alt="SyntraCore Logo"
-            width={150} // Adjust as needed
-            height={50}  // Adjust as needed
+            width={150}
+            height={50}
             priority
             data-ai-hint="company logo"
           />
