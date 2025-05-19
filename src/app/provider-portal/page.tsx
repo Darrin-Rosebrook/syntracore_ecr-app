@@ -7,54 +7,71 @@ import { useAppContext } from '@/context/AppContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, UserCircle, LayoutDashboard, LogOut, Workflow, Settings } from 'lucide-react'; // Added Settings
+import { Loader2, UserCircle, LayoutDashboard, LogOut, Settings } from 'lucide-react';
 import Link from 'next/link';
 import type { EnrollmentData } from '@/types';
 import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps';
 
 export default function ProviderPortalPage() {
   const { currentUser, loading: authLoading, logOut } = useAuth();
-  const { enrollments, isLoading: appContextLoading } = useAppContext();
+  const { enrollments, isLoading: appContextLoading, fetchInitialData } = useAppContext(); // Added fetchInitialData for potential refresh
   const router = useRouter();
   const [hcoEnrollment, setHcoEnrollment] = useState<EnrollmentData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
+      console.log("[ProviderPortalPage] No current user, redirecting to login.");
       router.push('/login');
     }
   }, [currentUser, authLoading, router]);
 
   useEffect(() => {
-    if (currentUser && currentUser.email && enrollments.length > 0) {
-      // Attempt to find enrollment associated with the logged-in user's email
-      // This is a simplified approach for the prototype
+    console.log("[ProviderPortalPage] useEffect for finding enrollment triggered.");
+    console.log("[ProviderPortalPage] currentUser:", currentUser ? currentUser.email : "null");
+    console.log("[ProviderPortalPage] enrollments count:", enrollments.length);
+    console.log("[ProviderPortalPage] appContextLoading:", appContextLoading);
+    console.log("[ProviderPortalPage] authLoading:", authLoading);
+
+    if (currentUser && currentUser.email && enrollments.length > 0 && !appContextLoading) {
+      console.log("[ProviderPortalPage] Attempting to find enrollment for:", currentUser.email);
       const foundEnrollment = enrollments.find(
-        (e) => e.contactDetails.email.toLowerCase() === currentUser.email!.toLowerCase() ||
-               e.additionalContacts?.some(c => c.email.toLowerCase() === currentUser.email!.toLowerCase())
+        (e) => {
+          const primaryMatch = e.contactDetails.email.toLowerCase() === currentUser.email!.toLowerCase();
+          const additionalMatch = e.additionalContacts?.some(c => c.email.toLowerCase() === currentUser.email!.toLowerCase());
+          // console.log(`[ProviderPortalPage] Checking enrollment ID ${e.id}: primaryMatch=${primaryMatch}, additionalMatch=${additionalMatch}`);
+          return primaryMatch || additionalMatch;
+        }
       );
       
       if (foundEnrollment) {
+        console.log("[ProviderPortalPage] Enrollment found:", foundEnrollment.id, foundEnrollment.practiceInfo.name);
         setHcoEnrollment(foundEnrollment);
       } else {
-        // Fallback or no specific enrollment found message
-        // For demo, could use first enrollment, or show a message
-        // setHcoEnrollment(enrollments[0]); // Example: fallback to first for demo
-        console.warn("No specific enrollment found for user:", currentUser.email);
+        console.warn("[ProviderPortalPage] No specific enrollment found for user:", currentUser.email, "in current enrollments list.");
+        setHcoEnrollment(null); // Explicitly set to null if not found
       }
-    }
-    if (!authLoading && !appContextLoading) {
-        setIsLoading(false);
+    } else if (currentUser && currentUser.email && enrollments.length === 0 && !appContextLoading) {
+        console.warn("[ProviderPortalPage] No enrollments in context to check against for user:", currentUser.email);
+        setHcoEnrollment(null);
     }
 
-  }, [currentUser, enrollments, authLoading, appContextLoading]);
+    if (!authLoading && !appContextLoading) {
+        console.log("[ProviderPortalPage] Setting isLoading to false.");
+        setIsLoading(false);
+    } else {
+        console.log("[ProviderPortalPage] Setting isLoading to true because authLoading or appContextLoading is true.");
+        setIsLoading(true);
+    }
+
+  }, [currentUser, enrollments, authLoading, appContextLoading]); // Removed fetchInitialData from here to avoid loop, keep it in form submission
 
   const handleLogout = async () => {
     await logOut();
     router.push('/');
   };
 
-  if (isLoading || authLoading || appContextLoading) {
+  if (isLoading) { // This now correctly reflects the combined loading state
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -76,6 +93,7 @@ export default function ProviderPortalPage() {
           HCO Provider Portal
         </h1>
         <div className="flex space-x-2">
+          {/* Removed temporary Admin Console button */}
           <Button variant="outline" onClick={handleLogout}>
             <LogOut className="mr-2 h-4 w-4" />
             Logout
@@ -93,7 +111,7 @@ export default function ProviderPortalPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <p><strong>Organization NPI:</strong> {hcoEnrollment.practiceInfo.organizationNPI}</p>
+              <p><strong>Organization NPI:</strong> {hcoEnrollment.practiceInfo.organizationNPI || 'N/A'}</p>
               <p><strong>Primary Contact Email:</strong> {hcoEnrollment.contactDetails.email}</p>
               <p><strong>EHR/LIMS Vendor:</strong> {hcoEnrollment.ehrVendor}</p>
               <p><strong>Current Status:</strong> <span className={`font-semibold ${
@@ -132,3 +150,5 @@ export default function ProviderPortalPage() {
     </div>
   );
 }
+
+    
