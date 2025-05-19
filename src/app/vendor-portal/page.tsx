@@ -14,7 +14,7 @@ import { getVendorProfileAction, updateVendorLastLoginAction } from '@/actions/v
 import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ECR_ONBOARDING_STAGES } from '@/lib/constants'; // Added import
+import { ECR_ONBOARDING_STAGES } from '@/lib/constants';
 
 // Helper function to determine current phase name
 const getCurrentPhaseName = (enrollmentStatus: EnrollmentData['status']): string => {
@@ -63,7 +63,7 @@ export default function VendorPortalPage() {
             );
             setLinkedHcos(filteredHcos);
             if (filteredHcos.length > 0 && !selectedHco) {
-              setSelectedHco(filteredHcos[0]); // Select the first HCO by default
+              setSelectedHco(filteredHcos[0]); 
             }
           }
         } else {
@@ -77,7 +77,7 @@ export default function VendorPortalPage() {
     if (!authLoading && currentUser) {
         fetchProfileAndHcos();
     }
-  }, [currentUser, authLoading, enrollments, selectedHco]);
+  }, [currentUser, authLoading, enrollments, selectedHco]); // selectedHco removed as a direct dependency for fetching profile and all HCOs
 
   const handleLogout = async () => {
     await logOut();
@@ -117,14 +117,13 @@ export default function VendorPortalPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid md:grid-cols-3 gap-6">
-            {/* Left Column: HCO List */}
             <div className="md:col-span-1 space-y-3">
               <h3 className="text-xl font-semibold flex items-center mb-2">
                 <List className="mr-2 h-5 w-5 text-primary" />
                 Client HCOs ({linkedHcos.length})
               </h3>
               {linkedHcos.length > 0 ? (
-                <ScrollArea className="h-[calc(100vh-26rem)] border rounded-md p-2 bg-muted/20">
+                <ScrollArea className="h-[400px] border rounded-md p-2 bg-muted/20">
                   <ul className="space-y-2">
                     {linkedHcos.map((hco) => (
                       <li key={hco.id}>
@@ -153,7 +152,6 @@ export default function VendorPortalPage() {
               )}
             </div>
 
-            {/* Right Column: Selected HCO Workflow */}
             <div className="md:col-span-2">
               {selectedHco ? (
                 <div>
@@ -168,7 +166,7 @@ export default function VendorPortalPage() {
                       </Link>
                     </Button>
                   </div>
-                  <HcoOnboardingWorkflowSteps enrollment={selectedHco} />
+                  <HcoOnboardingWorkflowSteps enrollment={selectedHco} isVendorView={true} />
                 </div>
               ) : linkedHcos.length > 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center p-10 border-2 border-dashed border-muted rounded-lg bg-muted/30">

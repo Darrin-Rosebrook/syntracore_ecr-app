@@ -4,15 +4,15 @@
 import React from 'react';
 import type { EnrollmentData, OnboardingStageStatus } from '@/types';
 import { ECR_ONBOARDING_STAGES } from '@/lib/constants';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Keep Card for structure if needed, or remove if Accordion replaces it fully
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { CheckCircle2, CircleAlert, Circle, CircleX, RefreshCw, CircleHelp, CircleDashed, WorkflowIcon, CalendarDays, Info } from 'lucide-react';
+import { CheckCircle2, CircleAlert, Circle, CircleX, RefreshCw, CircleHelp, CircleDashed, WorkflowIcon, CalendarDays, Info, Lock } from 'lucide-react'; // Added Lock icon
 import { cn } from '@/lib/utils';
 import { format, parseISO, isValid } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
 interface HcoOnboardingWorkflowStepsProps {
   enrollment: EnrollmentData;
+  isVendorView?: boolean; // New prop for vendor context
 }
 
 const statusIcons: Record<OnboardingStageStatus, React.ElementType> = {
@@ -37,10 +37,10 @@ const statusColors: Record<OnboardingStageStatus, string> = {
 
 const getEnrollmentStatusBadgeVariant = (status: EnrollmentData['status']) => {
     switch (status) {
-      case 'Approved': return 'default'; // Typically green
-      case 'Pending': return 'secondary'; // Typically yellow/orange
-      case 'Changes Requested': return 'destructive'; // Typically orange/red
-      case 'Denied': return 'destructive'; // Typically red
+      case 'Approved': return 'default'; 
+      case 'Pending': return 'secondary'; 
+      case 'Changes Requested': return 'destructive'; 
+      case 'Denied': return 'destructive'; 
       default: return 'outline';
     }
 };
@@ -72,7 +72,6 @@ const getStageStatus = (stageId: number, enrollmentStatus: EnrollmentData['statu
       return 'Not Yet Applicable';
     case 8: // Ongoing Monitoring & Support
       if (enrollmentStatus === 'Approved') {
-          // This stage becomes relevant after production approval, so could be 'Not Started' or 'Ongoing' later
           return 'Not Yet Applicable'; 
       }
       return 'Not Yet Applicable';
@@ -85,23 +84,21 @@ const getStageStatus = (stageId: number, enrollmentStatus: EnrollmentData['statu
 const getCurrentPhaseName = (enrollmentStatus: EnrollmentData['status']): string => {
   switch (enrollmentStatus) {
     case 'Pending':
-      return ECR_ONBOARDING_STAGES.find(s => s.id === 3)?.name || 'PHA Review'; // PHA Review (Stage 3)
+      return ECR_ONBOARDING_STAGES.find(s => s.id === 3)?.name || 'PHA Review';
     case 'Changes Requested':
-      return ECR_ONBOARDING_STAGES.find(s => s.id === 3)?.name || 'PHA Review'; // PHA Review (Stage 3)
+      return ECR_ONBOARDING_STAGES.find(s => s.id === 3)?.name || 'PHA Review';
     case 'Approved':
-      // Assuming after PHA approval, the next significant phase is eCR Readiness Validation
-      return ECR_ONBOARDING_STAGES.find(s => s.id === 4)?.name || 'eCR Readiness Validation'; // Stage 4
+      return ECR_ONBOARDING_STAGES.find(s => s.id === 4)?.name || 'eCR Readiness Validation'; 
     case 'Denied':
-      return ECR_ONBOARDING_STAGES.find(s => s.id === 3)?.name || 'PHA Review'; // Denied at PHA Review (Stage 3)
+      return ECR_ONBOARDING_STAGES.find(s => s.id === 3)?.name || 'PHA Review';
     default:
-      // For initial stages or if status is somehow undefined.
       const initialStage = ECR_ONBOARDING_STAGES.find(s => s.id === 1);
       return initialStage?.name || 'Initial Stage';
   }
 };
 
 
-export function HcoOnboardingWorkflowSteps({ enrollment }: HcoOnboardingWorkflowStepsProps) {
+export function HcoOnboardingWorkflowSteps({ enrollment, isVendorView = false }: HcoOnboardingWorkflowStepsProps) {
   const submissionDate = enrollment.submissionDate && isValid(parseISO(enrollment.submissionDate))
     ? format(parseISO(enrollment.submissionDate), 'PPP p')
     : 'N/A';
@@ -114,13 +111,13 @@ export function HcoOnboardingWorkflowSteps({ enrollment }: HcoOnboardingWorkflow
         <AccordionTrigger className="px-6 py-4 hover:no-underline">
           <div className="flex justify-between items-center w-full">
             <div className="flex flex-col text-left">
-              <CardTitle className="flex items-center text-xl font-semibold">
+              <h2 className="flex items-center text-xl font-semibold"> {/* Changed from CardTitle to h2 */}
                 <WorkflowIcon className="mr-2 h-6 w-6 text-primary" /> 
                 eCR Onboarding Status
-              </CardTitle>
-              <CardDescription className="text-sm text-muted-foreground mt-1">
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1"> {/* Changed from CardDescription to p */}
                 Current status of this HCO's eCR onboarding process. Click to expand/collapse.
-              </CardDescription>
+              </p>
             </div>
             <div className="text-right text-sm space-y-1 ml-4 shrink-0">
               <div className="flex items-center justify-end">
@@ -149,6 +146,7 @@ export function HcoOnboardingWorkflowSteps({ enrollment }: HcoOnboardingWorkflow
               const currentStatus = getStageStatus(stage.id, enrollment.status);
               const IconComponent = statusIcons[currentStatus];
               const colorClass = statusColors[currentStatus];
+              const showLock = isVendorView && (stage.id === 1 || stage.id === 2);
 
               return (
                 <div 
@@ -157,7 +155,9 @@ export function HcoOnboardingWorkflowSteps({ enrollment }: HcoOnboardingWorkflow
                 >
                   <IconComponent className={cn("h-7 w-7 mt-1 shrink-0", colorClass)} />
                   <div className="flex-grow">
-                    <p className="font-semibold text-md">{stage.id}. {stage.name}
+                    <p className="font-semibold text-md flex items-center">
+                      {stage.id}. {stage.name}
+                      {showLock && <Lock className="ml-2 h-4 w-4 text-muted-foreground" titleAccess="Locked for vendor view" />}
                       <span className={cn("ml-2 text-xs font-normal px-2 py-0.5 rounded-full", 
                           currentStatus === 'Complete' ? 'bg-green-100 text-green-700' :
                           currentStatus === 'In Progress' ? 'bg-yellow-100 text-yellow-700' :
@@ -181,4 +181,3 @@ export function HcoOnboardingWorkflowSteps({ enrollment }: HcoOnboardingWorkflow
     </Accordion>
   );
 }
-
