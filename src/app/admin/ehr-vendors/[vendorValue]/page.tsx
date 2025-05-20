@@ -7,13 +7,13 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Loader2, ListTree, Users, FileTextIcon, Building, Package, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, ListTree, Users, FileTextIcon, Building, Package, AlertCircle, MessageSquare } from 'lucide-react';
 import { EhrVendorProfileDetailsTab } from '@/components/ehr-vendor-profile-details-tab';
 import { EhrVendorHcosTab } from '@/components/ehr-vendor-hcos-tab';
 import { EhrVendorDocumentsTab } from '@/components/ehr-vendor-documents-tab';
 import { EhrVendorContactsTab } from '@/components/ehr-vendor-contacts-tab';
-// Removed EhrVendorProductsTab import as it's being removed
-import { EHR_VENDORS } from '@/lib/constants'; // Import local constants
+import { EhrVendorCommunicationTab } from '@/components/ehr-vendor-communication-tab'; // New import
+import { EHR_VENDORS } from '@/lib/constants'; 
 import type { EnrollmentData } from '@/types';
 import { useAppContext } from '@/context/AppContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -127,7 +127,7 @@ export default function EhrVendorProfilePage() {
         </div>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-4 h-auto sm:h-12 mb-6 shadow-md"> {/* Adjusted grid-cols */}
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-5 h-auto sm:h-12 mb-6 shadow-md"> {/* Adjusted grid-cols for 5 tabs */}
             <TabsTrigger value="profile" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
               <ListTree className="mr-2 h-5 w-5" /> Profile
             </TabsTrigger>
@@ -140,7 +140,9 @@ export default function EhrVendorProfilePage() {
             <TabsTrigger value="contacts" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
               <Users className="mr-2 h-5 w-5" /> Contacts
             </TabsTrigger>
-            {/* Products Tab Removed */}
+            <TabsTrigger value="communication" className="py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg"> {/* New Tab */}
+              <MessageSquare className="mr-2 h-5 w-5" /> Communication
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="profile">
@@ -155,7 +157,9 @@ export default function EhrVendorProfilePage() {
           <TabsContent value="contacts">
             <EhrVendorContactsTab vendorValue={currentVendor.value} />
           </TabsContent>
-          {/* Products Tab Content Removed */}
+          <TabsContent value="communication"> {/* New Tab Content */}
+            <EhrVendorCommunicationTab vendorValue={currentVendor.value} vendorLabel={currentVendor.label} />
+          </TabsContent>
         </Tabs>
       </div>
     </ScrollArea>
