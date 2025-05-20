@@ -1,67 +1,50 @@
+
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ListTree, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
-import { fetchChplDevelopersAction } from '@/actions/chpl-api-actions';
-import type { ChplDeveloper } from '@/types/chpl';
-import { useToast } from '@/hooks/use-toast';
+import { EHR_VENDORS } from '@/lib/constants'; // Import the local constants
+import { useAppContext } from '@/context/AppContext'; // To get enrollments for HCO count
+import type { EnrollmentData } from '@/types';
 import { Badge } from '@/components/ui/badge';
 
+interface DisplayVendor {
+  value: string;
+  label: string;
+  type: "EHR" | "LIMS";
+  hcoCount: number;
+}
+
 export function EhrVendorsTab() {
-  const [developers, setDevelopers] = useState<ChplDeveloper[]>([]);
+  const { enrollments, isLoading: isLoadingEnrollments } = useAppContext();
+  const [displayVendors, setDisplayVendors] = useState<DisplayVendor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
 
   useEffect(() => {
-    async function loadDevelopers() {
-      setIsLoading(true);
-      setError(null);
-      const result = await fetchChplDevelopersAction();
-      if (result.success && result.developers) {
-        // Filter for developers with "Active" status
-        const activeDevelopers = result.developers.filter(dev => dev.status?.name.toLowerCase() === 'active');
-        setDevelopers(activeDevelopers.sort((a, b) => a.name.localeCompare(b.name)));
-      } else {
-        setError(result.error || "Failed to load EHR/LIMS vendors.");
-        toast({
-          title: "Error Loading Vendors",
-          description: result.error || "Could not fetch vendors from CHPL.",
-          variant: "destructive",
-        });
-      }
+    if (!isLoadingEnrollments) {
+      const vendorsWithCounts = EHR_VENDORS.map(vendor => {
+        const count = enrollments.filter(
+          (enrollment: EnrollmentData) => enrollment.ehrVendor === vendor.value
+        ).length;
+        return { ...vendor, hcoCount: count };
+      }).sort((a,b) => a.label.localeCompare(b.label)); // Sort alphabetically by label
+      setDisplayVendors(vendorsWithCounts);
       setIsLoading(false);
+    } else {
+      setIsLoading(true);
     }
-    loadDevelopers();
-  }, [toast]);
+  }, [enrollments, isLoadingEnrollments]);
 
   if (isLoading) {
     return (
       <div className="flex justify-center items-center p-10">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2">Loading EHR/LIMS Vendors from CHPL...</span>
+        <span className="ml-2">Loading EHR/LIMS Vendors...</span>
       </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="shadow-xl m-4 md:m-6">
-        <CardHeader>
-          <CardTitle className="text-2xl font-semibold flex items-center text-destructive">
-            <AlertCircle className="mr-3 h-7 w-7" />
-            Error Loading Vendors
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">{error}</p>
-          <p className="text-muted-foreground mt-2">Please ensure the CHPL API key is correctly configured in your .env file and the CHPL API service is available.</p>
-        </CardContent>
-      </Card>
     );
   }
 
@@ -71,37 +54,38 @@ export function EhrVendorsTab() {
         <CardHeader>
           <CardTitle className="text-2xl font-semibold flex items-center">
             <ListTree className="mr-3 h-7 w-7 text-primary" />
-            EHR/LIMS Vendor (Companies) from CHPL
+            EHR/LIMS Vendors
           </CardTitle>
           <CardDescription>
-            List of active Health IT developers sourced from the ONC CHPL. Click on a vendor name to view more details and their certified products.
+            List of EHR/LIMS vendors. Click on a vendor name to view more details.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {developers.length > 0 ? (
+          {displayVendors.length > 0 ? (
             <ScrollArea className="h-[calc(100vh-20rem)] border rounded-md">
               <Table>
                 <TableHeader className="sticky top-0 bg-background z-10">
                   <TableRow>
-                    <TableHead className="w-[70%]">Developer Name</TableHead>
-                    <TableHead className="w-[20%]">CHPL ID</TableHead>
+                    <TableHead className="w-[40%]">Vendor Name</TableHead>
+                    <TableHead className="w-[25%]">Vendor Type</TableHead>
+                    <TableHead className="w-[25%]">Associated HCO Count</TableHead>
                     <TableHead className="text-right w-[10%]">Details</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {developers.map((dev) => (
-                    <TableRow key={dev.developerId} className="hover:bg-muted/50">
+                  {displayVendors.map((vendor) => (
+                    <TableRow key={vendor.value} className="hover:bg-muted/50">
                       <TableCell className="font-medium">
-                        <Link href={`/admin/ehr-vendors/${dev.developerId}`} className="text-primary hover:underline">
-                          {dev.name}
+                        <Link href={`/admin/ehr-vendors/${vendor.value}`} className="text-primary hover:underline">
+                          {vendor.label}
                         </Link>
-                        {dev.status && dev.status.name.toLowerCase() !== 'active' && (
-                            <Badge variant="outline" className="ml-2 text-xs">{dev.status.name}</Badge>
-                        )}
                       </TableCell>
-                      <TableCell>{dev.developerCode} ({dev.developerId})</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{vendor.type}</Badge>
+                      </TableCell>
+                      <TableCell>{vendor.hcoCount}</TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/admin/ehr-vendors/${dev.developerId}`} passHref legacyBehavior>
+                        <Link href={`/admin/ehr-vendors/${vendor.value}`} passHref legacyBehavior>
                           <Button variant="ghost" size="icon" title="View Vendor Details" asChild>
                             <a><ChevronRight className="h-5 w-5 text-muted-foreground hover:text-primary" /></a>
                           </Button>
@@ -114,7 +98,7 @@ export function EhrVendorsTab() {
             </ScrollArea>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No active EHR/LIMS vendors found from CHPL or failed to load data.
+              No EHR/LIMS vendors found or enrollments data is still loading.
             </p>
           )}
         </CardContent>
