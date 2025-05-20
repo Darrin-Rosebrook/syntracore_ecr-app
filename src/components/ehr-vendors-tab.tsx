@@ -11,6 +11,7 @@ import { EHR_VENDORS } from '@/lib/constants'; // Import the local constants
 import { useAppContext } from '@/context/AppContext'; // To get enrollments for HCO count
 import type { EnrollmentData } from '@/types';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button'; // Added this import
 
 interface DisplayVendor {
   value: string;
