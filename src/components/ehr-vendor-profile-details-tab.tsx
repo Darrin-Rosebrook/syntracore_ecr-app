@@ -1,74 +1,95 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ListTree, Globe, Activity, Loader2, Info, Edit3, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import type { ActivityLogEntry as BaseActivityLogEntry } from '@/types';
+import type { VendorActivityLogEntry } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'; // DialogClose is not directly used but often part of Dialog imports
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Input } from '@/components/ui/input'; // For edit dialog
-import { Label } from '@/components/ui/label'; // For edit dialog
+import { Label } from '@/components/ui/label';
+import {
+  addVendorActivityLogAction,
+  getVendorActivityLogsAction,
+  updateVendorActivityLogAction,
+  deleteVendorActivityLogAction
+} from '@/actions/vendor-activity-log-actions';
+
 
 interface EhrVendorProfileDetailsTabProps {
-  vendorValue: string;
+  vendorValue: string; // e.g., "epic"
   vendorLabel: string | null;
-}
-
-// Extend ActivityLogEntry for client-side simulation to include creator info
-interface ClientActivityLogEntry extends BaseActivityLogEntry {
-  id: string; // Add a unique ID for client-side manipulation
-  creatorId?: string;
-  creatorName?: string;
 }
 
 export function EhrVendorProfileDetailsTab({ vendorValue, vendorLabel }: EhrVendorProfileDetailsTabProps) {
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [newActivityLogText, setNewActivityLogText] = useState('');
-  const [displayedActivityLogs, setDisplayedActivityLogs] = useState<ClientActivityLogEntry[]>([]);
-  const [isSimulatingAction, setIsSimulatingAction] = useState(false);
+  const [activityLogs, setActivityLogs] = useState<VendorActivityLogEntry[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(true);
+  const [isSubmittingLog, setIsSubmittingLog] = useState(false);
 
   const [isEditLogDialogOpen, setIsEditLogDialogOpen] = useState(false);
-  const [editingLogEntry, setEditingLogEntry] = useState<ClientActivityLogEntry | null>(null);
+  const [editingLogEntry, setEditingLogEntry] = useState<VendorActivityLogEntry | null>(null);
   const [editedLogText, setEditedLogText] = useState('');
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [logToDeleteId, setLogToDeleteId] = useState<string | null>(null);
 
-  const vendorWebsite = vendorValue === 'epic' ? 'https://www.epic.com/' : 'Not Available';
+  const vendorWebsite = vendorValue === 'epic' ? 'https://www.epic.com/' : 
+                        vendorValue === 'cerner' ? 'https://www.oracle.com/health/' :
+                        vendorValue === 'meditech' ? 'https://ehr.meditech.com/' :
+                        'Not Available';
 
-  const handleAddActivityLog = () => {
+  const fetchLogs = useCallback(async () => {
+    if (!vendorValue || !currentUser) return;
+    setIsLoadingLogs(true);
+    const result = await getVendorActivityLogsAction(vendorValue);
+    if (result.success && result.logs) {
+      setActivityLogs(result.logs);
+    } else {
+      toast({ title: "Error Loading Logs", description: result.error || "Could not fetch activity logs.", variant: "destructive" });
+      setActivityLogs([]);
+    }
+    setIsLoadingLogs(false);
+  }, [vendorValue, currentUser, toast]);
+
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
+
+  const handleAddActivityLog = async () => {
     if (!newActivityLogText.trim() || !currentUser) {
       toast({ title: 'Error', description: 'Log content is empty or user not logged in.', variant: 'destructive' });
       return;
     }
-    setIsSimulatingAction(true);
-    const newLog: ClientActivityLogEntry = {
-      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-      timestamp: new Date().toISOString(),
+    setIsSubmittingLog(true);
+    const logData = {
+      vendorValue: vendorValue,
       entry: newActivityLogText,
-      type: 'UserAction',
-      user: currentUser.displayName || currentUser.email || 'PHA Admin', // This is the 'user' field from BaseActivityLogEntry
+      type: 'UserAction' as VendorActivityLogEntry['type'], // Ensure type matches
       creatorId: currentUser.uid,
       creatorName: currentUser.displayName || currentUser.email || 'PHA Admin',
     };
-    setDisplayedActivityLogs(prev => [newLog, ...prev].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
-    setNewActivityLogText('');
-    toast({
-      title: 'Activity Log Added (Simulated)',
-      description: `Your note for ${vendorLabel || 'this vendor'} has been added to the local history for this session.`,
-    });
-    setIsSimulatingAction(false);
+
+    const result = await addVendorActivityLogAction(logData);
+    if (result.success) {
+      setNewActivityLogText('');
+      await fetchLogs(); // Re-fetch logs to include the new one
+      toast({ title: 'Activity Log Added', description: 'Your note has been saved.' });
+    } else {
+      toast({ title: "Error Adding Log", description: result.error || "Could not save log entry.", variant: "destructive" });
+    }
+    setIsSubmittingLog(false);
   };
 
-  const handleOpenEditDialog = (logEntry: ClientActivityLogEntry) => {
+  const handleOpenEditDialog = (logEntry: VendorActivityLogEntry) => {
     if (logEntry.creatorId !== currentUser?.uid) {
       toast({ title: "Permission Denied", description: "You can only edit your own log entries.", variant: "destructive" });
       return;
@@ -78,40 +99,46 @@ export function EhrVendorProfileDetailsTab({ vendorValue, vendorLabel }: EhrVend
     setIsEditLogDialogOpen(true);
   };
 
-  const handleSaveEditedLog = () => {
-    if (!editingLogEntry || !editedLogText.trim()) {
-      toast({ title: "Error", description: "Log content cannot be empty.", variant: "destructive" });
+  const handleSaveEditedLog = async () => {
+    if (!editingLogEntry || !editedLogText.trim() || !currentUser) {
+      toast({ title: "Error", description: "Log content cannot be empty or user invalid.", variant: "destructive" });
       return;
     }
-    setIsSimulatingAction(true);
-    setDisplayedActivityLogs(prevLogs =>
-      prevLogs.map(log =>
-        log.id === editingLogEntry.id ? { ...log, entry: editedLogText, timestamp: new Date().toISOString() } : log
-      )
-    );
-    setIsEditLogDialogOpen(false);
-    setEditingLogEntry(null);
-    toast({ title: "Log Entry Updated (Simulated)" });
-    setIsSimulatingAction(false);
+    setIsSubmittingLog(true);
+    const result = await updateVendorActivityLogAction(editingLogEntry.id, editedLogText, currentUser.uid);
+    if (result.success) {
+      setIsEditLogDialogOpen(false);
+      setEditingLogEntry(null);
+      await fetchLogs();
+      toast({ title: "Log Entry Updated" });
+    } else {
+      toast({ title: "Error Updating Log", description: result.error || "Could not update log entry.", variant: "destructive" });
+    }
+    setIsSubmittingLog(false);
   };
 
-  const handleOpenDeleteConfirmDialog = (logId: string, creatorId?: string) => {
-    if (creatorId !== currentUser?.uid) {
+  const handleOpenDeleteConfirmDialog = (log: VendorActivityLogEntry) => {
+    if (log.creatorId !== currentUser?.uid) {
       toast({ title: "Permission Denied", description: "You can only delete your own log entries.", variant: "destructive" });
       return;
     }
-    setLogToDeleteId(logId);
+    setLogToDeleteId(log.id);
     setIsDeleteConfirmOpen(true);
   };
 
-  const handleConfirmDeleteLog = () => {
-    if (!logToDeleteId) return;
-    setIsSimulatingAction(true);
-    setDisplayedActivityLogs(prevLogs => prevLogs.filter(log => log.id !== logToDeleteId));
-    setIsDeleteConfirmOpen(false);
-    setLogToDeleteId(null);
-    toast({ title: "Log Entry Deleted (Simulated)" });
-    setIsSimulatingAction(false);
+  const handleConfirmDeleteLog = async () => {
+    if (!logToDeleteId || !currentUser) return;
+    setIsSubmittingLog(true);
+    const result = await deleteVendorActivityLogAction(logToDeleteId, currentUser.uid);
+    if (result.success) {
+      setIsDeleteConfirmOpen(false);
+      setLogToDeleteId(null);
+      await fetchLogs();
+      toast({ title: "Log Entry Deleted" });
+    } else {
+      toast({ title: "Error Deleting Log", description: result.error || "Could not delete log entry.", variant: "destructive" });
+    }
+    setIsSubmittingLog(false);
   };
 
 
@@ -155,22 +182,27 @@ export function EhrVendorProfileDetailsTab({ vendorValue, vendorLabel }: EhrVend
         {/* Lower Section: Activity Log */}
         <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3">
           <h3 className="text-md font-medium text-muted-foreground mb-2 flex items-center">
-            <Activity className="mr-1.5 h-4 w-4" /> Activity Log/Notes (Simulated)
+            <Activity className="mr-1.5 h-4 w-4" /> Activity Log/Notes
           </h3>
           <Textarea
             value={newActivityLogText}
             onChange={(e) => setNewActivityLogText(e.target.value)}
             placeholder="Log internal notes or manual activity related to this vendor..."
             className="w-full p-2 border rounded-md min-h-[80px] bg-background"
-            disabled={isSimulatingAction || !currentUser}
+            disabled={isSubmittingLog || !currentUser}
           />
-          <Button onClick={handleAddActivityLog} disabled={isSimulatingAction || !newActivityLogText.trim() || !currentUser} className="mt-2" size="sm">
-            {isSimulatingAction && !editingLogEntry && !logToDeleteId ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Add Log Entry
+          <Button onClick={handleAddActivityLog} disabled={isSubmittingLog || !newActivityLogText.trim() || !currentUser} className="mt-2" size="sm">
+            {isSubmittingLog ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Add Log Entry
           </Button>
           <ScrollArea className="h-[200px] border rounded-md p-3 bg-background mt-3">
-            {displayedActivityLogs.length > 0 ? (
+            {isLoadingLogs ? (
+              <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Loading logs...</span>
+              </div>
+            ) : activityLogs.length > 0 ? (
               <ul className="space-y-3">
-                {displayedActivityLogs.map((log) => (
+                {activityLogs.map((log) => (
                   <li key={log.id} className="text-sm p-3 rounded-md bg-muted/50 shadow-sm flex justify-between items-start">
                     <div>
                       <span className="font-medium text-primary block">
@@ -181,34 +213,26 @@ export function EhrVendorProfileDetailsTab({ vendorValue, vendorLabel }: EhrVend
                     </div>
                     {currentUser && log.creatorId === currentUser.uid && (
                       <div className="flex space-x-1 shrink-0 ml-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(log)} title="Edit Log" disabled={isSimulatingAction}>
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(log)} title="Edit Log" disabled={isSubmittingLog}>
                           <Edit3 className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenDeleteConfirmDialog(log.id, log.creatorId)} title="Delete Log" disabled={isSimulatingAction}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <AlertDialogTrigger asChild>
+                           <Button variant="ghost" size="icon" onClick={() => handleOpenDeleteConfirmDialog(log)} title="Delete Log" disabled={isSubmittingLog}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
                       </div>
                     )}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-muted-foreground text-center py-4">No activity logged for this vendor in this session.</p>
+              <p className="text-muted-foreground text-center py-4">No activity logged for this vendor.</p>
             )}
           </ScrollArea>
-           <div className="mt-3 p-2 border-l-4 border-accent bg-accent/10 rounded-r-md text-xs">
-            <div className="flex items-center">
-                <Info className="h-4 w-4 text-accent mr-1.5 shrink-0" />
-                <h4 className="font-semibold text-accent">Prototype Note</h4>
-            </div>
-            <p className="text-accent/80 mt-0.5">
-              Activity logs for vendor entities are simulated and not persistently stored in the database for this prototype. Edits and deletes are also client-side for this session.
-            </p>
-          </div>
         </div>
       </CardContent>
 
-      {/* Edit Log Dialog */}
       <Dialog open={isEditLogDialogOpen} onOpenChange={setIsEditLogDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -223,31 +247,30 @@ export function EhrVendorProfileDetailsTab({ vendorValue, vendorLabel }: EhrVend
               onChange={(e) => setEditedLogText(e.target.value)}
               rows={5}
               className="w-full"
-              disabled={isSimulatingAction}
+              disabled={isSubmittingLog}
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditLogDialogOpen(false)} disabled={isSimulatingAction}>Cancel</Button>
-            <Button onClick={handleSaveEditedLog} disabled={isSimulatingAction || !editedLogText.trim()}>
-              {isSimulatingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save Changes
+            <Button variant="outline" onClick={() => {setIsEditLogDialogOpen(false); setEditingLogEntry(null);}} disabled={isSubmittingLog}>Cancel</Button>
+            <Button onClick={handleSaveEditedLog} disabled={isSubmittingLog || !editedLogText.trim()}>
+              {isSubmittingLog ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Log Confirmation Dialog */}
       <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this log entry? This action cannot be undone for this session.
+              Are you sure you want to delete this log entry? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setLogToDeleteId(null)} disabled={isSimulatingAction}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDeleteLog} disabled={isSimulatingAction} className="bg-destructive hover:bg-destructive/90">
-              {isSimulatingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete
+            <AlertDialogCancel onClick={() => setLogToDeleteId(null)} disabled={isSubmittingLog}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteLog} disabled={isSubmittingLog} className="bg-destructive hover:bg-destructive/90">
+              {isSubmittingLog ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

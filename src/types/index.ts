@@ -73,8 +73,19 @@ export interface ActivityLogEntry {
   timestamp: string;
   entry: string;
   type: 'System' | 'UserAction' | 'Communication' | 'PHAComment' | 'DocumentChange' | 'ContactChange';
-  user?: string;
+  user?: string; // Name or email of the user performing the action
 }
+
+export interface VendorActivityLogEntry {
+  id: string; // Firestore document ID for the log entry
+  vendorValue: string; // e.g., "epic", "cerner" - to link to the vendor company
+  timestamp: string; // ISO string of when the log was created/updated
+  entry: string; // The text content of the log
+  type: 'UserAction' | 'SystemNote' | 'CommunicationAttempt'; // Type of log
+  creatorId: string; // Firebase Auth UID of the PHA user who created/owns this log
+  creatorName: string; // Display name/email of the creator
+}
+
 
 export interface DocumentEntry {
   id: string;
