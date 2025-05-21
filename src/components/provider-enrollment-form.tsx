@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { EHR_VENDORS } from "@/lib/constants";
 import { FileUploader } from "@/components/file-uploader";
 import { useToast } from "@/hooks/use-toast";
-import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData, HealthSystemEntry } from "@/types";
+import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData, HealthSystemEntry, CliaData } from "@/types"; // Added CliaData
 import { validateFHIR } from "@/services/fhir-validator";
 import { fetchNpiDataAction } from '@/actions/workflow-actions';
 import { fetchCliaDataAction } from '@/actions/clia-actions';
@@ -68,7 +68,7 @@ const practiceInfoSchema = z.object({
     return true;
   }, {
     message: "Either Organization NPI or CLIA Number (if applicable) is required.",
-    path: ["organizationNPI"],
+    path: ["organizationNPI"], // Or cliaNumber, but error is usually tied to one path
   });
 
 const contactDetailsSchema = z.object({
@@ -116,7 +116,7 @@ export function ProviderEnrollmentForm({
 
   const [cliaLookupLoading, setCliaLookupLoading] = React.useState(false);
   const [cliaLookupError, setCliaLookupError] = React.useState<string | null>(null);
-  const [fetchedCliaData, setFetchedCliaData] = React.useState<any | null>(null);
+  const [fetchedCliaData, setFetchedCliaData] = React.useState<CliaData | null>(null);
 
 
   const dynamicEnrollmentSchema = React.useMemo(() => {
@@ -218,15 +218,18 @@ export function ProviderEnrollmentForm({
       toast({title: "Please Log In", description: "You must be logged in to submit an HCO registration.", variant: "destructive"});
       router.push('/signup?type=hco');
     } else if (currentUser) {
+      // Pre-fill Contact Name from currentUser.displayName if available and not already set
       if (!form.getValues('contactDetails.name') && currentUser.displayName) {
-        form.setValue('contactDetails.name', currentUser.displayName);
+        form.setValue('contactDetails.name', currentUser.displayName, { shouldValidate: true, shouldDirty: true });
       }
+      // Pre-fill Contact Email from currentUser.email if available and not already set
       if (!form.getValues('contactDetails.email') && currentUser.email) {
-        form.setValue('contactDetails.email', currentUser.email);
+        form.setValue('contactDetails.email', currentUser.email, { shouldValidate: true, shouldDirty: true });
       }
-      if (healthSystems && healthSystems.length > 0) {
+      // Pre-fill Health System if the current user registered one and it's not already set
+      if (healthSystems && healthSystems.length > 0 && !form.getValues('practiceInfo.healthSystem')) {
         const userHealthSystem = healthSystems.find(hs => hs.registeredByUserId === currentUser.uid);
-        if (userHealthSystem && !form.getValues('practiceInfo.healthSystem')) {
+        if (userHealthSystem) {
           form.setValue('practiceInfo.healthSystem', userHealthSystem.id, { shouldValidate: true, shouldDirty: true });
         }
       }
@@ -245,12 +248,13 @@ export function ProviderEnrollmentForm({
       let parsedContent: any;
 
       try {
-        try {
+         try {
           parsedContent = JSON.parse(fileContent);
-          console.log("[ProviderEnrollmentForm] File content parsed as JSON successfully.");
-        } catch (jsonError) {
-          console.warn("[ProviderEnrollmentForm] File content is not valid JSON. Trying XML or other text.", jsonError);
-          parsedContent = fileContent;
+        } catch (error) {
+          console.error("Error parsing uploaded file content as JSON:", error);
+          // If not JSON, assume it's XML or other text for FHIR validation
+          // The validateFHIR function should be robust enough to handle this
+          parsedContent = fileContent; 
         }
 
         const rawValidationResult = await validateFHIR(parsedContent);
@@ -335,6 +339,10 @@ export function ProviderEnrollmentForm({
     setFetchedNpiData(null);
     setNpiLookupError(null);
     form.setValue('practiceInfo.organizationNPI', '');
+    // Clear fields that might have been auto-populated from NPI lookup
+    // form.setValue('practiceInfo.name', ''); // Decide if you want to clear these too
+    // form.setValue('practiceInfo.address', '');
+    // form.setValue('practiceInfo.phone', '');
     toast({ title: 'NPI Data Cleared', description: 'NPI lookup information has been cleared.' });
   };
 
@@ -363,11 +371,11 @@ export function ProviderEnrollmentForm({
 
         toast({ title: "CLIA Data Fetched", description: `Data for ${labData.facilityName || 'lab'} loaded. Please review.` });
       } else {
-        setCliaLookupError(result.error || `CLIA number ${cliaToLookup} not found in local registry.`);
-        toast({ title: 'CLIA Lookup Failed', description: result.error || "CLIA number not found in local registry.", variant: 'destructive' });
+        setCliaLookupError(result.error || `CLIA number ${cliaToLookup} not found.`);
+        toast({ title: 'CLIA Lookup Failed', description: result.error || "CLIA number not found.", variant: 'destructive' });
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to retrieve CLIA data from local registry.";
+      const errorMessage = error instanceof Error ? error.message : "Failed to retrieve CLIA data.";
       console.error("[ProviderEnrollmentForm] CLIA Lookup Exception:", error);
       setCliaLookupError(errorMessage);
       toast({ title: 'CLIA Lookup Error', description: errorMessage, variant: 'destructive' });
@@ -630,7 +638,9 @@ export function ProviderEnrollmentForm({
                       <SelectValue placeholder="Select Health System if applicable" />
                     </SelectTrigger>
                     <SelectContent>
-                      {healthSystemOptions.map(system => (
+                      {healthSystemOptions
+                        .filter(opt => opt.value && opt.value.trim() !== '')
+                        .map(system => (
                         <SelectItem key={system.value} value={system.value}>{system.label}</SelectItem>
                       ))}
                     </SelectContent>
