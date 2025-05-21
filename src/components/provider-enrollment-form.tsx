@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { EHR_VENDORS } from "@/lib/constants"; // OHIO_HEALTH_SYSTEMS will come from context
+import { EHR_VENDORS } from "@/lib/constants";
 import { FileUploader } from "@/components/file-uploader";
 import { useToast } from "@/hooks/use-toast";
 import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData, HealthSystemEntry } from "@/types";
@@ -45,7 +45,7 @@ const practiceInfoSchema = z.object({
     .string()
     .min(10, "Valid phone number is required")
     .regex(/^\+?[0-9\s\-()]+$/, "Invalid phone number format"),
-  healthSystem: z.string().optional(), // Will store HealthSystemEntry ID
+  healthSystem: z.string().optional(),
   isLabOrPerformsLabServices: z.enum(['yes', 'no'], { required_error: "Please select if this is a lab or performs lab services." }),
   cliaNumber: z.string().optional(),
   cliaLabName: z.string().optional(),
@@ -102,7 +102,7 @@ export function ProviderEnrollmentForm({
   const { toast } = useToast();
   const router = useRouter();
   const { currentUser, loading: authLoading } = useAuth();
-  const { fetchInitialData, healthSystems } = useAppContext(); // Get healthSystems from context
+  const { fetchInitialData, healthSystems } = useAppContext();
 
   const [ccdFile, setCcdFile] = React.useState<File | null>(null);
   const [ccdFileContent, setCcdFileContent] = React.useState<string | null>(null);
@@ -116,7 +116,8 @@ export function ProviderEnrollmentForm({
 
   const [cliaLookupLoading, setCliaLookupLoading] = React.useState(false);
   const [cliaLookupError, setCliaLookupError] = React.useState<string | null>(null);
-  const [fetchedCliaData, setFetchedCliaData] = React.useState<CliaData | null>(null);
+  const [fetchedCliaData, setFetchedCliaData] = React.useState<any | null>(null);
+
 
   const dynamicEnrollmentSchema = React.useMemo(() => {
     const additionalDataShape: Record<string, z.ZodTypeAny> = {};
@@ -223,7 +224,6 @@ export function ProviderEnrollmentForm({
       if (!form.getValues('contactDetails.email') && currentUser.email) {
         form.setValue('contactDetails.email', currentUser.email);
       }
-      // Default Health System if user is associated with one
       if (healthSystems && healthSystems.length > 0) {
         const userHealthSystem = healthSystems.find(hs => hs.registeredByUserId === currentUser.uid);
         if (userHealthSystem && !form.getValues('practiceInfo.healthSystem')) {
@@ -256,7 +256,7 @@ export function ProviderEnrollmentForm({
         const rawValidationResult = await validateFHIR(parsedContent);
         console.log("[ProviderEnrollmentForm] Raw FHIR validation result:", rawValidationResult);
 
-        if (rawValidationResult.isValid && Object.keys(rawValidationResult).length > 0) { // Check if not empty result
+        if (rawValidationResult.isValid && Object.keys(rawValidationResult).length > 0) {
           const aiSummaryResult = await summarizeValidationResults({ validationResults: rawValidationResult });
           console.log("[ProviderEnrollmentForm] AI summary result:", aiSummaryResult);
           setValidationResult({
@@ -264,7 +264,7 @@ export function ProviderEnrollmentForm({
             summary: aiSummaryResult.summary,
           });
         } else if (!rawValidationResult.isValid) {
-           setValidationResult(rawValidationResult); // Set even if invalid
+           setValidationResult(rawValidationResult);
         } else {
             throw new Error("FHIR validation returned an unexpected or empty result.");
         }
@@ -349,31 +349,25 @@ export function ProviderEnrollmentForm({
     setCliaLookupError(null);
     setFetchedCliaData(null);
     try {
-      const result = await fetchCliaDataAction(cliaToLookup); // Using the updated action
-      console.log("[ProviderEnrollmentForm] CLIA Lookup Result:", result);
+      const result = await fetchCliaDataAction(cliaToLookup);
+      console.log("[ProviderEnrollmentForm] CLIA Lookup Result from Firestore:", result);
       if (result.success && result.data) {
         setFetchedCliaData(result.data);
         const labData = result.data;
 
-        if (!form.getValues('practiceInfo.name') || form.getValues('practiceInfo.name') === fetchedNpiData?.name) { // Only set if empty or from NPI
-            form.setValue('practiceInfo.name', labData.facilityName || form.getValues('practiceInfo.name') || '', { shouldValidate: true });
-        }
-        if (!form.getValues('practiceInfo.address')) {
-            form.setValue('practiceInfo.address', labData.address || '', { shouldValidate: true });
-        }
-        if (!form.getValues('practiceInfo.phone')) {
-            form.setValue('practiceInfo.phone', labData.phone || '', { shouldValidate: true });
-        }
+        form.setValue('practiceInfo.name', labData.facilityName || form.getValues('practiceInfo.name') || '', { shouldValidate: true });
+        form.setValue('practiceInfo.address', labData.address || form.getValues('practiceInfo.address') || '', { shouldValidate: true });
+        form.setValue('practiceInfo.phone', labData.phone || form.getValues('practiceInfo.phone') || '', { shouldValidate: true });
         form.setValue('practiceInfo.cliaLabName', labData.facilityName || '', { shouldValidate: true });
         form.setValue('practiceInfo.cliaLabType', labData.labType || '', { shouldValidate: true });
 
         toast({ title: "CLIA Data Fetched", description: `Data for ${labData.facilityName || 'lab'} loaded. Please review.` });
       } else {
-        setCliaLookupError(result.error || `CLIA number ${cliaToLookup} not found.`);
-        toast({ title: 'CLIA Lookup Failed', description: result.error || "CLIA number not found.", variant: 'destructive' });
+        setCliaLookupError(result.error || `CLIA number ${cliaToLookup} not found in local registry.`);
+        toast({ title: 'CLIA Lookup Failed', description: result.error || "CLIA number not found in local registry.", variant: 'destructive' });
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to retrieve CLIA data.";
+      const errorMessage = error instanceof Error ? error.message : "Failed to retrieve CLIA data from local registry.";
       console.error("[ProviderEnrollmentForm] CLIA Lookup Exception:", error);
       setCliaLookupError(errorMessage);
       toast({ title: 'CLIA Lookup Error', description: errorMessage, variant: 'destructive' });
@@ -458,7 +452,7 @@ export function ProviderEnrollmentForm({
   console.log("[ProviderEnrollmentForm] Rendering. Fetched NPI Data state:", fetchedNpiData);
   console.log("[ProviderEnrollmentForm] Rendering. Fetched CLIA Data state:", fetchedCliaData);
 
-  const healthSystemOptions = healthSystems.map(hs => ({ label: hs.name, value: hs.id }));
+  const healthSystemOptions = healthSystems.map(hs => ({ label: hs.name, value: hs.id })).filter(opt => opt.value && opt.value.trim() !== '');
 
 
   if (authLoading) {
@@ -636,7 +630,6 @@ export function ProviderEnrollmentForm({
                       <SelectValue placeholder="Select Health System if applicable" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
                       {healthSystemOptions.map(system => (
                         <SelectItem key={system.value} value={system.value}>{system.label}</SelectItem>
                       ))}
@@ -705,3 +698,4 @@ export function ProviderEnrollmentForm({
     </Card>
   );
 }
+
