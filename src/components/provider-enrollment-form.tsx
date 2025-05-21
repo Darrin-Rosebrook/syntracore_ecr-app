@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { EHR_VENDORS } from "@/lib/constants";
 import { FileUploader } from "@/components/file-uploader";
 import { useToast } from "@/hooks/use-toast";
-import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData, HealthSystemEntry, CliaData } from "@/types"; // Added CliaData
+import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData, HealthSystemEntry } from "@/types";
 import { validateFHIR } from "@/services/fhir-validator";
 import { fetchNpiDataAction } from '@/actions/workflow-actions';
 import { fetchCliaDataAction } from '@/actions/clia-actions';
@@ -68,7 +68,7 @@ const practiceInfoSchema = z.object({
     return true;
   }, {
     message: "Either Organization NPI or CLIA Number (if applicable) is required.",
-    path: ["organizationNPI"], // Or cliaNumber, but error is usually tied to one path
+    path: ["organizationNPI"], 
   });
 
 const contactDetailsSchema = z.object({
@@ -113,11 +113,6 @@ export function ProviderEnrollmentForm({
   const [npiLookupLoading, setNpiLookupLoading] = React.useState(false);
   const [npiLookupError, setNpiLookupError] = React.useState<string | null>(null);
   const [fetchedNpiData, setFetchedNpiData] = React.useState<ProviderData | null>(null);
-
-  const [cliaLookupLoading, setCliaLookupLoading] = React.useState(false);
-  const [cliaLookupError, setCliaLookupError] = React.useState<string | null>(null);
-  const [fetchedCliaData, setFetchedCliaData] = React.useState<CliaData | null>(null);
-
 
   const dynamicEnrollmentSchema = React.useMemo(() => {
     const additionalDataShape: Record<string, z.ZodTypeAny> = {};
@@ -182,7 +177,6 @@ export function ProviderEnrollmentForm({
   const watchedIsLab = form.watch('practiceInfo.isLabOrPerformsLabServices');
   const watchedOrganizationNPI = form.watch('practiceInfo.organizationNPI');
 
-
   React.useEffect(() => {
     const defaultAdditionalData: Record<string, any> = {};
     const current = form.getValues().additionalData || {};
@@ -214,24 +208,44 @@ export function ProviderEnrollmentForm({
   }, [customFieldDefinitions, form]);
 
    React.useEffect(() => {
-    if (!authLoading && !currentUser) {
+    console.log("[ProviderEnrollmentForm] useEffect for pre-filling triggered. AuthLoading:", authLoading);
+    if (authLoading) return; 
+
+    if (!currentUser) {
+      console.log("[ProviderEnrollmentForm] No currentUser, redirecting to signup.");
       toast({title: "Please Log In", description: "You must be logged in to submit an HCO registration.", variant: "destructive"});
       router.push('/signup?type=hco');
-    } else if (currentUser) {
-      // Pre-fill Contact Name from currentUser.displayName if available and not already set
-      if (!form.getValues('contactDetails.name') && currentUser.displayName) {
-        form.setValue('contactDetails.name', currentUser.displayName, { shouldValidate: true, shouldDirty: true });
-      }
-      // Pre-fill Contact Email from currentUser.email if available and not already set
-      if (!form.getValues('contactDetails.email') && currentUser.email) {
-        form.setValue('contactDetails.email', currentUser.email, { shouldValidate: true, shouldDirty: true });
-      }
-      // Pre-fill Health System if the current user registered one and it's not already set
-      if (healthSystems && healthSystems.length > 0 && !form.getValues('practiceInfo.healthSystem')) {
-        const userHealthSystem = healthSystems.find(hs => hs.registeredByUserId === currentUser.uid);
-        if (userHealthSystem) {
-          form.setValue('practiceInfo.healthSystem', userHealthSystem.id, { shouldValidate: true, shouldDirty: true });
-        }
+      return;
+    }
+
+    console.log("[ProviderEnrollmentForm] CurrentUser available:", currentUser.email, "DisplayName:", currentUser.displayName);
+    console.log("[ProviderEnrollmentForm] Current contactDetails.name:", form.getValues('contactDetails.name'));
+    console.log("[ProviderEnrollmentForm] Current contactDetails.email:", form.getValues('contactDetails.email'));
+    console.log("[ProviderEnrollmentForm] Current practiceInfo.healthSystem:", form.getValues('practiceInfo.healthSystem'));
+
+
+    if (!form.getValues('contactDetails.name') && currentUser.displayName) {
+      console.log("[ProviderEnrollmentForm] PRE-FILLING Contact Name with currentUser.displayName:", currentUser.displayName);
+      form.setValue('contactDetails.name', currentUser.displayName, { shouldValidate: true, shouldDirty: true });
+    } else if (form.getValues('contactDetails.name')) {
+      console.log("[ProviderEnrollmentForm] Contact Name already has a value:", form.getValues('contactDetails.name'));
+    } else if (!currentUser.displayName) {
+       console.log("[ProviderEnrollmentForm] currentUser.displayName is empty, not pre-filling contact name.");
+    }
+    
+    if (!form.getValues('contactDetails.email') && currentUser.email) {
+      console.log("[ProviderEnrollmentForm] PRE-FILLING Contact Email with currentUser.email:", currentUser.email);
+      form.setValue('contactDetails.email', currentUser.email, { shouldValidate: true, shouldDirty: true });
+    }
+    
+    if (healthSystems && healthSystems.length > 0 && !form.getValues('practiceInfo.healthSystem')) {
+      console.log("[ProviderEnrollmentForm] Checking for user's registered Health System. Current User UID:", currentUser.uid);
+      const userHealthSystem = healthSystems.find(hs => hs.registeredByUserId === currentUser.uid);
+      if (userHealthSystem) {
+        console.log("[ProviderEnrollmentForm] PRE-FILLING Health System for user:", userHealthSystem.name, "ID:", userHealthSystem.id);
+        form.setValue('practiceInfo.healthSystem', userHealthSystem.id, { shouldValidate: true, shouldDirty: true });
+      } else {
+        console.log("[ProviderEnrollmentForm] No specific Health System found registered by this user UID:", currentUser.uid);
       }
     }
   }, [currentUser, authLoading, router, toast, form, healthSystems]);
@@ -251,26 +265,27 @@ export function ProviderEnrollmentForm({
          try {
           parsedContent = JSON.parse(fileContent);
         } catch (error) {
-          console.error("Error parsing uploaded file content as JSON:", error);
-          // If not JSON, assume it's XML or other text for FHIR validation
-          // The validateFHIR function should be robust enough to handle this
+          console.error("[ProviderEnrollmentForm] Error parsing uploaded file content as JSON, treating as text:", error);
           parsedContent = fileContent; 
         }
 
         const rawValidationResult = await validateFHIR(parsedContent);
         console.log("[ProviderEnrollmentForm] Raw FHIR validation result:", rawValidationResult);
 
-        if (rawValidationResult.isValid && Object.keys(rawValidationResult).length > 0) {
+        if (Object.keys(rawValidationResult).length > 0) { // Check if result is not empty
           const aiSummaryResult = await summarizeValidationResults({ validationResults: rawValidationResult });
           console.log("[ProviderEnrollmentForm] AI summary result:", aiSummaryResult);
           setValidationResult({
             ...rawValidationResult,
             summary: aiSummaryResult.summary,
           });
-        } else if (!rawValidationResult.isValid) {
-           setValidationResult(rawValidationResult);
         } else {
-            throw new Error("FHIR validation returned an unexpected or empty result.");
+            console.warn("[ProviderEnrollmentForm] FHIR validation returned an empty result. Defaulting to invalid.");
+            setValidationResult({
+                isValid: false,
+                messages: ["File validation returned an empty or unexpected result. Please check file format."],
+                summary: "File processing failed due to empty validation result."
+            });
         }
 
       } catch (validationError) {
@@ -339,52 +354,9 @@ export function ProviderEnrollmentForm({
     setFetchedNpiData(null);
     setNpiLookupError(null);
     form.setValue('practiceInfo.organizationNPI', '');
-    // Clear fields that might have been auto-populated from NPI lookup
-    // form.setValue('practiceInfo.name', ''); // Decide if you want to clear these too
-    // form.setValue('practiceInfo.address', '');
-    // form.setValue('practiceInfo.phone', '');
     toast({ title: 'NPI Data Cleared', description: 'NPI lookup information has been cleared.' });
   };
-
-  const handleCliaLookup = async () => {
-    const cliaToLookup = form.getValues('practiceInfo.cliaNumber');
-    console.log("[ProviderEnrollmentForm] Initiating CLIA Lookup for:", cliaToLookup);
-    if (!cliaToLookup || cliaToLookup.trim().length === 0) {
-      toast({ title: "Invalid CLIA", description: "Please enter a CLIA number to look up.", variant: "destructive" });
-      return;
-    }
-    setCliaLookupLoading(true);
-    setCliaLookupError(null);
-    setFetchedCliaData(null);
-    try {
-      const result = await fetchCliaDataAction(cliaToLookup);
-      console.log("[ProviderEnrollmentForm] CLIA Lookup Result from Firestore:", result);
-      if (result.success && result.data) {
-        setFetchedCliaData(result.data);
-        const labData = result.data;
-
-        form.setValue('practiceInfo.name', labData.facilityName || form.getValues('practiceInfo.name') || '', { shouldValidate: true });
-        form.setValue('practiceInfo.address', labData.address || form.getValues('practiceInfo.address') || '', { shouldValidate: true });
-        form.setValue('practiceInfo.phone', labData.phone || form.getValues('practiceInfo.phone') || '', { shouldValidate: true });
-        form.setValue('practiceInfo.cliaLabName', labData.facilityName || '', { shouldValidate: true });
-        form.setValue('practiceInfo.cliaLabType', labData.labType || '', { shouldValidate: true });
-
-        toast({ title: "CLIA Data Fetched", description: `Data for ${labData.facilityName || 'lab'} loaded. Please review.` });
-      } else {
-        setCliaLookupError(result.error || `CLIA number ${cliaToLookup} not found.`);
-        toast({ title: 'CLIA Lookup Failed', description: result.error || "CLIA number not found.", variant: 'destructive' });
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to retrieve CLIA data.";
-      console.error("[ProviderEnrollmentForm] CLIA Lookup Exception:", error);
-      setCliaLookupError(errorMessage);
-      toast({ title: 'CLIA Lookup Error', description: errorMessage, variant: 'destructive' });
-    } finally {
-      setCliaLookupLoading(false);
-    }
-  };
-
-
+  
   const onSubmitRegistration = async (data: FormSchemaType) => {
     setIsSubmittingForm(true);
     console.log("[ProviderEnrollmentForm] Form is submitting...");
@@ -419,6 +391,8 @@ export function ProviderEnrollmentForm({
         },
         ccdDocumentName: ccdFile.name,
         additionalData: data.additionalData || {},
+        userId: currentUser.uid,
+        userEmail: currentUser.email,
       };
 
       console.log("[ProviderEnrollmentForm] Data being sent to addEnrollmentToFirestore:", JSON.stringify(enrollmentDataToSubmit, null, 2));
@@ -458,9 +432,8 @@ export function ProviderEnrollmentForm({
 
   const sortedCustomFieldDefinitions = [...customFieldDefinitions].sort((a,b) => a.order - b.order);
   console.log("[ProviderEnrollmentForm] Rendering. Fetched NPI Data state:", fetchedNpiData);
-  console.log("[ProviderEnrollmentForm] Rendering. Fetched CLIA Data state:", fetchedCliaData);
 
-  const healthSystemOptions = healthSystems.map(hs => ({ label: hs.name, value: hs.id })).filter(opt => opt.value && opt.value.trim() !== '');
+  const healthSystemOptions = healthSystems.map(hs => ({ label: hs.name, value: hs.id }));
 
 
   if (authLoading) {
@@ -531,30 +504,14 @@ export function ProviderEnrollmentForm({
                             placeholder="Enter CLIA Number"
                             maxLength={10}
                             className={fieldState.error ? "border-destructive" : ""}
-                            disabled={isSubmittingForm || cliaLookupLoading}
+                            disabled={isSubmittingForm}
                             value={field.value || ''}
                         />
                         )}
                     />
-                     <Button type="button" onClick={handleCliaLookup} disabled={cliaLookupLoading || isSubmittingForm || !form.getValues('practiceInfo.cliaNumber')} size="sm">
-                        {cliaLookupLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchIcon className="h-4 w-4" />}
-                        <span className="ml-1 hidden sm:inline">Lookup CLIA</span>
-                    </Button>
                 </div>
                 {form.formState.errors.practiceInfo?.cliaNumber && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.cliaNumber.message}</p>}
-                {cliaLookupError && <p className="text-sm text-destructive mt-1">{cliaLookupError}</p>}
-
-                {fetchedCliaData && (
-                    <Card className="mt-2 bg-muted/30 text-xs">
-                        <CardHeader className="pb-1 pt-2"><CardTitle className="text-xs">Fetched CLIA Data:</CardTitle></CardHeader>
-                        <CardContent className="pb-2 space-y-0.5">
-                        <p><strong>Lab Name:</strong> {fetchedCliaData.facilityName || 'N/A'}</p>
-                        <p><strong>Address:</strong> {fetchedCliaData.address || 'N/A'}</p>
-                        <p><strong>Phone:</strong> {fetchedCliaData.phone || 'N/A'}</p>
-                        <p><strong>Lab Type:</strong> {fetchedCliaData.labType || 'N/A'}</p>
-                        </CardContent>
-                    </Card>
-                )}
+                
                 <div>
                     <Label htmlFor="cliaLabName" className="text-xs">CLIA Lab Name (if different or not found)</Label>
                     <Input id="cliaLabName" {...form.register("practiceInfo.cliaLabName")} placeholder="Enter Lab Name" disabled={isSubmittingForm} />
@@ -675,8 +632,8 @@ export function ProviderEnrollmentForm({
                     {fieldDef.type === 'textarea' && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || ''} render={({ field }) => <Textarea id={fieldName} {...field} placeholder={fieldDef.placeholder} className={error ? "border-destructive" : ""} disabled={isSubmittingForm} />} /> )}
                     {fieldDef.type === 'select' && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || ''} render={({ field }) => { let currentOptions = fieldDef.options || []; if (fieldDef.parentFieldId && fieldDef.dependentOptionsJson && watchedAdditionalData) { const parentValue = watchedAdditionalData[fieldDef.parentFieldId]; if (parentValue) { try { const dependentOptionsMap = JSON.parse(fieldDef.dependentOptionsJson); currentOptions = dependentOptionsMap[parentValue] || []; } catch (e) { console.error("Error parsing dependentOptionsJson", e); } } else { currentOptions = []; } } return ( <Select onValueChange={field.onChange} value={field.value} disabled={isSubmittingForm || (fieldDef.parentFieldId && watchedAdditionalData && !watchedAdditionalData[fieldDef.parentFieldId] && currentOptions.length === 0)}> <SelectTrigger id={fieldName} className={error ? "border-destructive" : ""}> <SelectValue placeholder={fieldDef.placeholder || "Select an option"} /> </SelectTrigger> <SelectContent> {currentOptions.filter(opt => opt.value && opt.value.trim() !== '').map((option: CustomFieldOption) => (<SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>))} {currentOptions.length === 0 && fieldDef.parentFieldId && watchedAdditionalData && watchedAdditionalData[fieldDef.parentFieldId] && ( <SelectItem value="NO_OPTIONS_TEMP_VALUE_PLACEHOLDER" disabled>No options for selected parent</SelectItem> )} {currentOptions.length === 0 && fieldDef.parentFieldId && (!watchedAdditionalData || !watchedAdditionalData[fieldDef.parentFieldId]) && ( <SelectItem value="SELECT_PARENT_TEMP_VALUE_PLACEHOLDER" disabled>Select parent field first</SelectItem> )} </SelectContent> </Select> ); }} /> )}
                     {fieldDef.type === 'checkbox' && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || false} render={({ field }) => ( <div className="flex items-center space-x-2 mt-1"> <Checkbox id={fieldName} checked={!!field.value} onCheckedChange={field.onChange} disabled={isSubmittingForm}/> <Label htmlFor={fieldName} className="font-normal">{fieldDef.placeholder || fieldDef.label}</Label> </div> )}/> )}
-                    {fieldDef.type === 'checkbox-group' && fieldDef.options && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || []} render={({ field }) => ( <div className="space-y-2 mt-1"> {fieldDef.options!.map(option => ( <div key={option.value} className="flex items-center space-x-2"> <Checkbox id={`${fieldName}-${option.value}`} checked={Array.isArray(field.value) && field.value.includes(option.value)} onCheckedChange={(checked) => { const newValue = checked ? [...(Array.isArray(field.value) ? field.value : []), option.value] : (Array.isArray(field.value) ? field.value : []).filter((v: string) => v !== option.value); field.onChange(newValue); }} disabled={isSubmittingForm} /> <Label htmlFor={`${fieldName}-${option.value}`} className="font-normal">{option.label}</Label> </div> ))} </div> )}/> )}
-                    {fieldDef.type === 'radio-group' && fieldDef.options && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || ''} render={({ field }) => ( <RadioGroup onValueChange={field.onChange} value={field.value} className="mt-1 space-y-1" disabled={isSubmittingForm}> {fieldDef.options!.map(option => ( <div key={option.value} className="flex items-center space-x-2"> <RadioGroupItem value={option.value} id={`${fieldName}-${option.value}`} /> <Label htmlFor={`${fieldName}-${option.value}`} className="font-normal">{option.label}</Label> </div> ))} </RadioGroup> )}/> )}
+                    {fieldDef.type === 'checkbox-group' && fieldDef.options && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || []} render={({ field }) => ( <div className="space-y-2 mt-1"> {fieldDef.options!.filter(opt => opt.value && opt.value.trim() !== '').map(option => ( <div key={option.value} className="flex items-center space-x-2"> <Checkbox id={`${fieldName}-${option.value}`} checked={Array.isArray(field.value) && field.value.includes(option.value)} onCheckedChange={(checked) => { const newValue = checked ? [...(Array.isArray(field.value) ? field.value : []), option.value] : (Array.isArray(field.value) ? field.value : []).filter((v: string) => v !== option.value); field.onChange(newValue); }} disabled={isSubmittingForm} /> <Label htmlFor={`${fieldName}-${option.value}`} className="font-normal">{option.label}</Label> </div> ))} </div> )}/> )}
+                    {fieldDef.type === 'radio-group' && fieldDef.options && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || ''} render={({ field }) => ( <RadioGroup onValueChange={field.onChange} value={field.value} className="mt-1 space-y-1" disabled={isSubmittingForm}> {fieldDef.options!.filter(opt => opt.value && opt.value.trim() !== '').map(option => ( <div key={option.value} className="flex items-center space-x-2"> <RadioGroupItem value={option.value} id={`${fieldName}-${option.value}`} /> <Label htmlFor={`${fieldName}-${option.value}`} className="font-normal">{option.label}</Label> </div> ))} </RadioGroup> )}/> )}
                     {fieldDef.type === 'date' && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || ''} render={({ field }) => ( <Popover> <PopoverTrigger asChild> <Button variant={"outline"} className={`w-full justify-start text-left font-normal mt-1 ${!field.value && "text-muted-foreground"} ${error ? "border-destructive" : ""}`} disabled={isSubmittingForm} > <CalendarDays className="mr-2 h-4 w-4" /> {field.value && isValid(parseISO(field.value)) ? format(parseISO(field.value), "PPP") : <span>{fieldDef.placeholder || "Pick a date"}</span>} </Button> </PopoverTrigger> <PopoverContent className="w-auto p-0"> <Calendar mode="single" selected={field.value && isValid(parseISO(field.value)) ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date ? date.toISOString() : '')} initialFocus disabled={isSubmittingForm} /> </PopoverContent> </Popover> )}/> )}
                     {error && <p className="text-sm text-destructive mt-1">{(error as any).message || "Invalid input"}</p>}
                   </div>
@@ -700,7 +657,7 @@ export function ProviderEnrollmentForm({
           </fieldset>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isSubmittingForm || isProcessingFile || npiLookupLoading || cliaLookupLoading } >
+          <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isSubmittingForm || isProcessingFile || npiLookupLoading } >
             {isSubmittingForm ? ( <> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting Registration... </> ) : ( <> Submit Registration <ArrowRight className="ml-2 h-4 w-4" /> </> )}
           </Button>
         </CardFooter>
@@ -708,4 +665,4 @@ export function ProviderEnrollmentForm({
     </Card>
   );
 }
-
+    
