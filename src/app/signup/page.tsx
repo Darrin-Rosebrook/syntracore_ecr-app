@@ -18,14 +18,14 @@ import { EULA_TEXT } from '@/lib/constants';
 function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const registrationType = searchParams.get('type') || 'hco'; // Default to hco if no type
+  const registrationType = searchParams.get('type') || 'hco';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [phone, setPhone] = useState(''); // Kept for potential future use or if EULA requires a contact phone during signup itself
-  const [role, setRole] = useState('');   // Kept for potential future use
+  const [phone, setPhone] = useState('');
+  // const [role, setRole] = useState(''); // Role is not set directly at signup anymore
 
   const { signUp, loading: authLoading, currentUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,13 +34,13 @@ function SignupForm() {
 
   useEffect(() => {
     if (currentUser) {
-      // If user is already logged in, redirect based on type or to dashboard
-      switch (registrationType) {
-        case 'hco': router.push('/hco-registration'); break;
-        case 'vendor': router.push('/vendor-registration'); break;
-        case 'healthsystem': router.push('/health-system-detailed-registration'); break;
-        default: router.push('/');
-      }
+      // This effect is for users who are ALREADY logged in when they visit the signup page.
+      // It redirects them to the appropriate next step if they somehow land here.
+      // It should NOT interfere with the redirect logic *after* a new signup on this page.
+      console.log("[SignupPage] useEffect - currentUser exists. Type:", registrationType, "Email:", currentUser.email);
+      // If a user is already logged in and lands here, guide them.
+      // This is less common if the main page already routes them away from signup options when logged in.
+      // For now, we'll let the proceedWithSignup handle post-signup redirect.
     }
   }, [currentUser, router, registrationType]);
 
@@ -54,34 +54,41 @@ function SignupForm() {
       toast({ title: "Password Mismatch", description: "Passwords do not match!", variant: "destructive" });
       return;
     }
-    setShowEulaDialog(true); // Show EULA before actual account creation
+    setShowEulaDialog(true);
   };
 
   const proceedWithSignup = async () => {
     setIsSubmitting(true);
-    // Pass name to signUp so it can be set on Firebase Auth profile
+    console.log("[SignupPage] proceedWithSignup called. Registration Type from searchParams:", registrationType);
+
     const user = await signUp(email, password, name);
     setIsSubmitting(false);
 
     if (user) {
       toast({ title: "Account Created", description: "Redirecting to complete your registration..." });
-      // Redirect to specific registration form based on type
+      console.log("[SignupPage] Account created for user:", user.email, "Attempting redirect for type:", registrationType);
       switch (registrationType) {
         case 'hco':
+          console.log("[SignupPage] Redirecting to /hco-registration");
           router.push('/hco-registration');
           break;
         case 'vendor':
+          console.log("[SignupPage] Redirecting to /vendor-registration");
           router.push('/vendor-registration');
           break;
         case 'healthsystem':
+          console.log("[SignupPage] Redirecting to /health-system-detailed-registration");
           router.push('/health-system-detailed-registration');
           break;
         default:
-          toast({ title: "Error", description: "Unknown registration type.", variant: "destructive" });
-          router.push('/'); // Fallback
+          console.error("[SignupPage] Unknown registration type during redirect:", registrationType);
+          toast({ title: "Error", description: `Unknown registration type: ${registrationType}. Redirecting to home.`, variant: "destructive" });
+          router.push('/');
       }
+    } else {
+      console.error("[SignupPage] Signup failed, user object is null. No redirect will occur from proceedWithSignup.");
+      // Error toast is handled by signUp in AuthContext
     }
-    // Error handling for signUp is within AuthContext and shows a toast
   };
 
   const handleEulaAccept = () => {
@@ -107,10 +114,11 @@ function SignupForm() {
           </div>
           <CardTitle className="text-2xl">Create Your Account</CardTitle>
           <CardDescription>
-            Enter your details to create an account. You will then be directed to complete your
-            {registrationType === 'hco' && ' HCO/Lab Registration.'}
-            {registrationType === 'vendor' && ' Vendor Profile.'}
-            {registrationType === 'healthsystem' && ' Health System Registration.'}
+            Enter your details to create an account. You are registering as a
+            {registrationType === 'hco' && ' Health Care Organization / Laboratory representative.'}
+            {registrationType === 'vendor' && ' EHR/LIMS Vendor representative.'}
+            {registrationType === 'healthsystem' && ' Health System representative.'}
+            {!['hco', 'vendor', 'healthsystem'].includes(registrationType || '') && ' representative (type not specified).'}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -159,6 +167,7 @@ function SignupForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={authLoading || isSubmitting}
+                minLength={6} // Firebase default min password length
               />
             </div>
             <div className="space-y-2">
@@ -219,7 +228,6 @@ function SignupForm() {
   );
 }
 
-// Wrap with Suspense because useSearchParams() needs it for SSR compatibility
 export default function SignupPage() {
   return (
     <Suspense fallback={<div className="flex min-h-[calc(100vh-4rem)] items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
