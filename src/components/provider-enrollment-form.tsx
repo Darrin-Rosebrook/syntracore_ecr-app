@@ -14,16 +14,16 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { EHR_VENDORS, OHIO_HEALTH_SYSTEMS } from "@/lib/constants";
+import { EHR_VENDORS } from "@/lib/constants"; // OHIO_HEALTH_SYSTEMS will come from context
 import { FileUploader } from "@/components/file-uploader";
 import { useToast } from "@/hooks/use-toast";
-import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData, CliaData } from "@/types";
+import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData, HealthSystemEntry } from "@/types";
 import { validateFHIR } from "@/services/fhir-validator";
 import { fetchNpiDataAction } from '@/actions/workflow-actions';
 import { fetchCliaDataAction } from '@/actions/clia-actions';
 import { summarizeValidationResults } from "@/ai/flows/summarize-validation-results";
 import { FHIRValidationDisplay } from "./fhir-validation-display";
-import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays, Hash, Search as SearchIcon, ArrowRight, FilePenLine, Beaker } from "lucide-react";
+import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays, Hash, Search as SearchIcon, ArrowRight, FilePenLine, Beaker, Network } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isValid } from 'date-fns';
@@ -45,11 +45,11 @@ const practiceInfoSchema = z.object({
     .string()
     .min(10, "Valid phone number is required")
     .regex(/^\+?[0-9\s\-()]+$/, "Invalid phone number format"),
-  healthSystem: z.string().optional(),
+  healthSystem: z.string().optional(), // Will store HealthSystemEntry ID
   isLabOrPerformsLabServices: z.enum(['yes', 'no'], { required_error: "Please select if this is a lab or performs lab services." }),
   cliaNumber: z.string().optional(),
-  cliaLabName: z.string().optional(), // Populated from lookup or manual entry
-  cliaLabType: z.string().optional(), // Populated from lookup or manual entry
+  cliaLabName: z.string().optional(),
+  cliaLabType: z.string().optional(),
 }).refine(data => {
     if (data.isLabOrPerformsLabServices === 'yes' && (!data.cliaNumber || data.cliaNumber.trim() === '')) {
       return false;
@@ -68,7 +68,7 @@ const practiceInfoSchema = z.object({
     return true;
   }, {
     message: "Either Organization NPI or CLIA Number (if applicable) is required.",
-    path: ["organizationNPI"], 
+    path: ["organizationNPI"],
   });
 
 const contactDetailsSchema = z.object({
@@ -102,7 +102,7 @@ export function ProviderEnrollmentForm({
   const { toast } = useToast();
   const router = useRouter();
   const { currentUser, loading: authLoading } = useAuth();
-  const { fetchInitialData } = useAppContext();
+  const { fetchInitialData, healthSystems } = useAppContext(); // Get healthSystems from context
 
   const [ccdFile, setCcdFile] = React.useState<File | null>(null);
   const [ccdFileContent, setCcdFileContent] = React.useState<string | null>(null);
@@ -117,7 +117,6 @@ export function ProviderEnrollmentForm({
   const [cliaLookupLoading, setCliaLookupLoading] = React.useState(false);
   const [cliaLookupError, setCliaLookupError] = React.useState<string | null>(null);
   const [fetchedCliaData, setFetchedCliaData] = React.useState<CliaData | null>(null);
-
 
   const dynamicEnrollmentSchema = React.useMemo(() => {
     const additionalDataShape: Record<string, z.ZodTypeAny> = {};
@@ -181,7 +180,7 @@ export function ProviderEnrollmentForm({
   });
   const watchedIsLab = form.watch('practiceInfo.isLabOrPerformsLabServices');
   const watchedOrganizationNPI = form.watch('practiceInfo.organizationNPI');
-  const watchedCliaNumber = form.watch('practiceInfo.cliaNumber');
+
 
   React.useEffect(() => {
     const defaultAdditionalData: Record<string, any> = {};
@@ -212,18 +211,27 @@ export function ProviderEnrollmentForm({
       shouldDirty: Object.keys(defaultAdditionalData).length > 0,
     });
   }, [customFieldDefinitions, form]);
-  
+
    React.useEffect(() => {
     if (!authLoading && !currentUser) {
       toast({title: "Please Log In", description: "You must be logged in to submit an HCO registration.", variant: "destructive"});
       router.push('/signup?type=hco');
-    } else if (currentUser && !form.getValues('contactDetails.name') && currentUser.displayName) {
-      form.setValue('contactDetails.name', currentUser.displayName);
+    } else if (currentUser) {
+      if (!form.getValues('contactDetails.name') && currentUser.displayName) {
+        form.setValue('contactDetails.name', currentUser.displayName);
+      }
+      if (!form.getValues('contactDetails.email') && currentUser.email) {
+        form.setValue('contactDetails.email', currentUser.email);
+      }
+      // Default Health System if user is associated with one
+      if (healthSystems && healthSystems.length > 0) {
+        const userHealthSystem = healthSystems.find(hs => hs.registeredByUserId === currentUser.uid);
+        if (userHealthSystem && !form.getValues('practiceInfo.healthSystem')) {
+          form.setValue('practiceInfo.healthSystem', userHealthSystem.id, { shouldValidate: true, shouldDirty: true });
+        }
+      }
     }
-    if (currentUser && !form.getValues('contactDetails.email') && currentUser.email) {
-      form.setValue('contactDetails.email', currentUser.email);
-    }
-  }, [currentUser, authLoading, router, toast, form]);
+  }, [currentUser, authLoading, router, toast, form, healthSystems]);
 
 
   const handleFileSelect = async (file: File | null, fileContent: string | null) => {
@@ -237,34 +245,41 @@ export function ProviderEnrollmentForm({
       let parsedContent: any;
 
       try {
-        // Attempt to parse as JSON, if it fails, assume it's XML or other text
         try {
           parsedContent = JSON.parse(fileContent);
           console.log("[ProviderEnrollmentForm] File content parsed as JSON successfully.");
         } catch (jsonError) {
-          console.warn("[ProviderEnrollmentForm] File content is not valid JSON. Proceeding with raw content for validation (e.g., XML).", jsonError);
-          parsedContent = fileContent; // Use raw content if JSON.parse fails
+          console.warn("[ProviderEnrollmentForm] File content is not valid JSON. Trying XML or other text.", jsonError);
+          parsedContent = fileContent;
         }
-        
+
         const rawValidationResult = await validateFHIR(parsedContent);
         console.log("[ProviderEnrollmentForm] Raw FHIR validation result:", rawValidationResult);
-        const aiSummaryResult = await summarizeValidationResults({ validationResults: rawValidationResult });
-        console.log("[ProviderEnrollmentForm] AI summary result:", aiSummaryResult);
-        setValidationResult({
-          ...rawValidationResult,
-          summary: aiSummaryResult.summary,
-        });
+
+        if (rawValidationResult.isValid && Object.keys(rawValidationResult).length > 0) { // Check if not empty result
+          const aiSummaryResult = await summarizeValidationResults({ validationResults: rawValidationResult });
+          console.log("[ProviderEnrollmentForm] AI summary result:", aiSummaryResult);
+          setValidationResult({
+            ...rawValidationResult,
+            summary: aiSummaryResult.summary,
+          });
+        } else if (!rawValidationResult.isValid) {
+           setValidationResult(rawValidationResult); // Set even if invalid
+        } else {
+            throw new Error("FHIR validation returned an unexpected or empty result.");
+        }
+
       } catch (validationError) {
         console.error("[ProviderEnrollmentForm] Error during FHIR validation or AI summarization:", validationError);
         toast({
           title: "Processing Error",
-          description: "An error occurred while validating the file or generating a summary.",
+          description: `An error occurred while validating the file: ${(validationError as Error).message}`,
           variant: "destructive",
         });
         setValidationResult({
             isValid: false,
             messages: ["Error during validation or AI summarization.", (validationError as Error).message],
-            summary: "File processing failed during validation or summarization."
+            summary: "File processing failed."
         });
       } finally {
         setIsProcessingFile(false);
@@ -291,9 +306,9 @@ export function ProviderEnrollmentForm({
       if (result.success && result.data) {
         setFetchedNpiData(result.data);
         const provider = result.data;
-        
+
         form.setValue('practiceInfo.name', provider.orgName || provider.name || '', { shouldValidate: true });
-        
+
         let formattedAddress = '';
         if (provider.address) {
           formattedAddress = [provider.address.address_1, provider.address.address_2, provider.address.city, provider.address.state, provider.address.postal_code].filter(Boolean).join(', ').replace(/ ,/g, ',');
@@ -319,17 +334,14 @@ export function ProviderEnrollmentForm({
   const handleClearNpiData = () => {
     setFetchedNpiData(null);
     setNpiLookupError(null);
-    form.setValue('practiceInfo.organizationNPI', ''); // Also clear the NPI field
-    // form.setValue('practiceInfo.name', ''); // Keep these commented or uncomment if full reset is desired
-    // form.setValue('practiceInfo.address', '');
-    // form.setValue('practiceInfo.phone', '');
+    form.setValue('practiceInfo.organizationNPI', '');
     toast({ title: 'NPI Data Cleared', description: 'NPI lookup information has been cleared.' });
   };
 
   const handleCliaLookup = async () => {
     const cliaToLookup = form.getValues('practiceInfo.cliaNumber');
     console.log("[ProviderEnrollmentForm] Initiating CLIA Lookup for:", cliaToLookup);
-    if (!cliaToLookup || cliaToLookup.trim().length === 0) { // Keep this check for empty string
+    if (!cliaToLookup || cliaToLookup.trim().length === 0) {
       toast({ title: "Invalid CLIA", description: "Please enter a CLIA number to look up.", variant: "destructive" });
       return;
     }
@@ -337,23 +349,21 @@ export function ProviderEnrollmentForm({
     setCliaLookupError(null);
     setFetchedCliaData(null);
     try {
-      const result = await fetchCliaDataAction(cliaToLookup);
+      const result = await fetchCliaDataAction(cliaToLookup); // Using the updated action
       console.log("[ProviderEnrollmentForm] CLIA Lookup Result:", result);
       if (result.success && result.data) {
         setFetchedCliaData(result.data);
         const labData = result.data;
-        
-        // Only pre-fill if the corresponding form field is currently empty
-        if (!form.getValues('practiceInfo.name') && labData.facilityName) {
-            form.setValue('practiceInfo.name', labData.facilityName, { shouldValidate: true });
+
+        if (!form.getValues('practiceInfo.name') || form.getValues('practiceInfo.name') === fetchedNpiData?.name) { // Only set if empty or from NPI
+            form.setValue('practiceInfo.name', labData.facilityName || form.getValues('practiceInfo.name') || '', { shouldValidate: true });
         }
-        if (!form.getValues('practiceInfo.address') && labData.address) {
-            form.setValue('practiceInfo.address', labData.address, { shouldValidate: true });
+        if (!form.getValues('practiceInfo.address')) {
+            form.setValue('practiceInfo.address', labData.address || '', { shouldValidate: true });
         }
-         if (!form.getValues('practiceInfo.phone') && labData.phone) {
-            form.setValue('practiceInfo.phone', labData.phone, { shouldValidate: true });
+        if (!form.getValues('practiceInfo.phone')) {
+            form.setValue('practiceInfo.phone', labData.phone || '', { shouldValidate: true });
         }
-        // Always set these specific CLIA fields
         form.setValue('practiceInfo.cliaLabName', labData.facilityName || '', { shouldValidate: true });
         form.setValue('practiceInfo.cliaLabType', labData.labType || '', { shouldValidate: true });
 
@@ -372,15 +382,6 @@ export function ProviderEnrollmentForm({
     }
   };
 
-  const handleClearCliaData = () => {
-    setFetchedCliaData(null);
-    setCliaLookupError(null);
-    form.setValue('practiceInfo.cliaNumber', ''); // Also clear CLIA number field
-    // form.setValue('practiceInfo.cliaLabName', '');
-    // form.setValue('practiceInfo.cliaLabType', '');
-    toast({ title: 'CLIA Data Cleared', description: 'CLIA lookup information has been cleared.' });
-  };
-
 
   const onSubmitRegistration = async (data: FormSchemaType) => {
     setIsSubmittingForm(true);
@@ -388,7 +389,6 @@ export function ProviderEnrollmentForm({
     console.log("[ProviderEnrollmentForm] Raw Form Data:", JSON.stringify(data, null, 2));
     console.log("[ProviderEnrollmentForm] Current CCD File:", ccdFile ? ccdFile.name : "No file selected/processed");
     console.log("[ProviderEnrollmentForm] Current Validation Result:", JSON.stringify(validationResult, null, 2));
-
 
     if (!currentUser || !currentUser.uid || !currentUser.email) {
         toast({ title: "Authentication Error", description: "You must be logged in to submit.", variant: "destructive" });
@@ -418,7 +418,7 @@ export function ProviderEnrollmentForm({
         ccdDocumentName: ccdFile.name,
         additionalData: data.additionalData || {},
       };
-      
+
       console.log("[ProviderEnrollmentForm] Data being sent to addEnrollmentToFirestore:", JSON.stringify(enrollmentDataToSubmit, null, 2));
 
       const submissionResult = await addEnrollmentToFirestore(
@@ -437,7 +437,7 @@ export function ProviderEnrollmentForm({
           description: `Practice "${data.practiceInfo.name}" enrollment complete. ID: ${submissionResult.id.slice(0,8)}...`,
           className: "bg-green-500 text-white",
         });
-        await fetchInitialData(); // Refresh context data
+        await fetchInitialData();
         router.push('/provider-portal');
       } else {
         toast({
@@ -457,6 +457,8 @@ export function ProviderEnrollmentForm({
   const sortedCustomFieldDefinitions = [...customFieldDefinitions].sort((a,b) => a.order - b.order);
   console.log("[ProviderEnrollmentForm] Rendering. Fetched NPI Data state:", fetchedNpiData);
   console.log("[ProviderEnrollmentForm] Rendering. Fetched CLIA Data state:", fetchedCliaData);
+
+  const healthSystemOptions = healthSystems.map(hs => ({ label: hs.name, value: hs.id }));
 
 
   if (authLoading) {
@@ -527,22 +529,36 @@ export function ProviderEnrollmentForm({
                             placeholder="Enter CLIA Number"
                             maxLength={10}
                             className={fieldState.error ? "border-destructive" : ""}
-                            disabled={isSubmittingForm}
+                            disabled={isSubmittingForm || cliaLookupLoading}
                             value={field.value || ''}
                         />
                         )}
                     />
+                     <Button type="button" onClick={handleCliaLookup} disabled={cliaLookupLoading || isSubmittingForm || !form.getValues('practiceInfo.cliaNumber')} size="sm">
+                        {cliaLookupLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchIcon className="h-4 w-4" />}
+                        <span className="ml-1 hidden sm:inline">Lookup CLIA</span>
+                    </Button>
                 </div>
                 {form.formState.errors.practiceInfo?.cliaNumber && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.cliaNumber.message}</p>}
                 {cliaLookupError && <p className="text-sm text-destructive mt-1">{cliaLookupError}</p>}
 
-                {/* Manual entry for CLIA Lab Name and Type */}
+                {fetchedCliaData && (
+                    <Card className="mt-2 bg-muted/30 text-xs">
+                        <CardHeader className="pb-1 pt-2"><CardTitle className="text-xs">Fetched CLIA Data:</CardTitle></CardHeader>
+                        <CardContent className="pb-2 space-y-0.5">
+                        <p><strong>Lab Name:</strong> {fetchedCliaData.facilityName || 'N/A'}</p>
+                        <p><strong>Address:</strong> {fetchedCliaData.address || 'N/A'}</p>
+                        <p><strong>Phone:</strong> {fetchedCliaData.phone || 'N/A'}</p>
+                        <p><strong>Lab Type:</strong> {fetchedCliaData.labType || 'N/A'}</p>
+                        </CardContent>
+                    </Card>
+                )}
                 <div>
-                    <Label htmlFor="cliaLabName" className="text-xs">CLIA Lab Name</Label>
-                    <Input id="cliaLabName" {...form.register("practiceInfo.cliaLabName")} placeholder="Enter Lab Name as per CLIA" disabled={isSubmittingForm} />
+                    <Label htmlFor="cliaLabName" className="text-xs">CLIA Lab Name (if different or not found)</Label>
+                    <Input id="cliaLabName" {...form.register("practiceInfo.cliaLabName")} placeholder="Enter Lab Name" disabled={isSubmittingForm} />
                 </div>
                 <div>
-                    <Label htmlFor="cliaLabType" className="text-xs">CLIA Lab Type</Label>
+                    <Label htmlFor="cliaLabType" className="text-xs">CLIA Lab Type (if different or not found)</Label>
                     <Input id="cliaLabType" {...form.register("practiceInfo.cliaLabType")} placeholder="e.g., Hospital, Independent" disabled={isSubmittingForm} />
                 </div>
               </div>
@@ -610,7 +626,7 @@ export function ProviderEnrollmentForm({
               {form.formState.errors.practiceInfo?.phone && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.phone.message}</p>}
             </div>
             <div>
-              <Label htmlFor="healthSystem" className="flex items-center">Health System (Optional)</Label>
+              <Label htmlFor="healthSystem" className="flex items-center"><Network className="mr-2 h-4 w-4 text-muted-foreground"/>Health System (Optional)</Label>
               <Controller
                 name="practiceInfo.healthSystem"
                 control={form.control}
@@ -620,8 +636,8 @@ export function ProviderEnrollmentForm({
                       <SelectValue placeholder="Select Health System if applicable" />
                     </SelectTrigger>
                     <SelectContent>
-                      
-                      {OHIO_HEALTH_SYSTEMS.map(system => (
+                      <SelectItem value="">None</SelectItem>
+                      {healthSystemOptions.map(system => (
                         <SelectItem key={system.value} value={system.value}>{system.label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -689,4 +705,3 @@ export function ProviderEnrollmentForm({
     </Card>
   );
 }
-

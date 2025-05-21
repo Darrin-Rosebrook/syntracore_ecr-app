@@ -8,32 +8,31 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Network, Building, ChevronRight, Loader2, Hash, Mail, Phone } from 'lucide-react';
-import { OHIO_HEALTH_SYSTEMS } from '@/lib/constants';
+import { ArrowLeft, Network, Building, ChevronRight, Loader2, Hash, Mail, Phone, Globe } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
-import type { EnrollmentData } from '@/types';
+import type { EnrollmentData, HealthSystemEntry } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
-import { Label } from '@/components/ui/label'; // Added import for Label
+import { Label } from '@/components/ui/label';
 
 export default function HealthSystemProfilePage() {
   const router = useRouter();
   const params = useParams();
-  const { healthSystemValue } = params;
-  const { enrollments, isLoading: isContextLoading } = useAppContext();
+  const { healthSystemValue } = params; // This is the healthSystem ID
+  const { enrollments, healthSystems, isLoading: isContextLoading } = useAppContext();
 
-  const healthSystemDetails = useMemo(() => {
-    if (typeof healthSystemValue !== 'string') return null;
-    return OHIO_HEALTH_SYSTEMS.find(hs => hs.value === healthSystemValue);
-  }, [healthSystemValue]);
+  const healthSystemDetails = useMemo((): HealthSystemEntry | undefined => {
+    if (typeof healthSystemValue !== 'string' || !healthSystems) return undefined;
+    return healthSystems.find(hs => hs.id === healthSystemValue);
+  }, [healthSystemValue, healthSystems]);
 
   const linkedHcos = useMemo(() => {
     if (!healthSystemDetails) return [];
     return enrollments.filter(
-      (enrollment: EnrollmentData) => enrollment.practiceInfo.healthSystem === healthSystemDetails.value
+      (enrollment: EnrollmentData) => enrollment.practiceInfo.healthSystem === healthSystemDetails.id
     );
   }, [enrollments, healthSystemDetails]);
-  
+
   const getStatusBadgeVariant = (status: EnrollmentData['status']) => {
     switch (status) {
       case 'Approved': return 'default';
@@ -43,7 +42,7 @@ export default function HealthSystemProfilePage() {
       default: return 'outline';
     }
   };
-  
+
   const getStatusBadgeClass = (status: EnrollmentData['status']) => {
      switch (status) {
       case 'Approved': return 'bg-green-500 hover:bg-green-600 text-white';
@@ -70,7 +69,7 @@ export default function HealthSystemProfilePage() {
         <h1 className="text-2xl font-bold mb-4">Health System Not Found</h1>
         <p className="text-muted-foreground mb-6">The health system with ID "{healthSystemValue}" could not be found.</p>
         <Button asChild variant="outline" onClick={() => router.back()}>
-          <Link href="/admin/health-systems"> {/* Fallback link */}
+          <Link href="/admin/health-systems">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Health Systems List
           </Link>
@@ -89,7 +88,7 @@ export default function HealthSystemProfilePage() {
           </Button>
           <h1 className="text-2xl font-bold text-primary flex items-center">
             <Network className="mr-3 h-7 w-7" />
-            Health System: {healthSystemDetails.label}
+            Health System: {healthSystemDetails.name}
           </h1>
           <div>{/* Placeholder for actions */}</div>
         </div>
@@ -101,27 +100,41 @@ export default function HealthSystemProfilePage() {
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-medium text-muted-foreground">Name</Label>
-              <p className="text-md">{healthSystemDetails.label}</p>
+              <p className="text-md">{healthSystemDetails.name}</p>
             </div>
             <div>
-              <Label className="text-sm font-medium text-muted-foreground">Identifier</Label>
-              <p className="text-md">{healthSystemDetails.value}</p>
+              <Label className="text-sm font-medium text-muted-foreground">Identifier (ID)</Label>
+              <p className="text-md">{healthSystemDetails.id}</p>
             </div>
             <div>
-              <Label className="text-sm font-medium text-muted-foreground">Location</Label>
-              <p className="text-md">{healthSystemDetails.location}</p>
+              <Label className="text-sm font-medium text-muted-foreground flex items-center"><Building className="mr-1.5 h-4 w-4"/>Headquarters Address</Label>
+              <p className="text-md">{healthSystemDetails.hqAddress || <span className="italic text-muted-foreground">Not provided</span>}</p>
             </div>
             <div>
-              <Label className="text-sm font-medium text-muted-foreground">Address</Label>
-              <p className="text-md italic text-muted-foreground">(Address details not yet available)</p>
+              <Label className="text-sm font-medium text-muted-foreground flex items-center"><Phone className="mr-1.5 h-4 w-4"/>Contact Phone</Label>
+              <p className="text-md">{healthSystemDetails.contactPhone || <span className="italic text-muted-foreground">Not provided</span>}</p>
             </div>
             <div>
-              <Label className="text-sm font-medium text-muted-foreground">Primary Contact</Label>
-              <p className="text-md italic text-muted-foreground">(Contact info not yet available)</p>
+              <Label className="text-sm font-medium text-muted-foreground flex items-center"><Mail className="mr-1.5 h-4 w-4"/>Contact Email</Label>
+              <p className="text-md">{healthSystemDetails.contactEmail || <span className="italic text-muted-foreground">Not provided</span>}</p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground flex items-center"><Globe className="mr-1.5 h-4 w-4"/>Corporate Website</Label>
+              <p className="text-md">
+                {healthSystemDetails.corporateWebsite ? (
+                  <a href={healthSystemDetails.corporateWebsite.startsWith('http') ? healthSystemDetails.corporateWebsite : `//${healthSystemDetails.corporateWebsite}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    {healthSystemDetails.corporateWebsite}
+                  </a>
+                ) : <span className="italic text-muted-foreground">Not provided</span>}
+              </p>
             </div>
              <div>
               <Label className="text-sm font-medium text-muted-foreground">Total Affiliated HCOs</Label>
               <p className="text-md">{linkedHcos.length}</p>
+            </div>
+             <div>
+              <Label className="text-sm font-medium text-muted-foreground">Registered By User ID</Label>
+              <p className="text-md truncate" title={healthSystemDetails.registeredByUserId}>{healthSystemDetails.registeredByUserId || 'N/A'}</p>
             </div>
           </CardContent>
         </Card>
@@ -133,7 +146,7 @@ export default function HealthSystemProfilePage() {
               Affiliated Health Care Organizations ({linkedHcos.length})
             </CardTitle>
             <CardDescription>
-              List of HCOs associated with {healthSystemDetails.label}.
+              List of HCOs associated with {healthSystemDetails.name}.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -169,7 +182,7 @@ export default function HealthSystemProfilePage() {
                             <div className="text-xs text-muted-foreground flex items-center mt-0.5">
                                 <Mail className="mr-1 h-3 w-3"/> {hco.contactDetails.email}
                             </div>
-                             {hco.contactDetails.phone && 
+                             {hco.contactDetails.phone &&
                                 <div className="text-xs text-muted-foreground flex items-center mt-0.5">
                                     <Phone className="mr-1 h-3 w-3"/> {hco.contactDetails.phone}
                                 </div>

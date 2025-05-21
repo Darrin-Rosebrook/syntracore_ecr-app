@@ -1,34 +1,40 @@
 
 "use client";
 
-import React, { useMemo } from 'react'; // Added useMemo
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Network, ChevronRight } from 'lucide-react';
-import { OHIO_HEALTH_SYSTEMS } from '@/lib/constants';
-import { useAppContext } from '@/context/AppContext'; // Import AppContext to get enrollments
-import type { EnrollmentData } from '@/types';
+import { Network, ChevronRight, Loader2 } from 'lucide-react';
+import { useAppContext } from '@/context/AppContext';
+import type { EnrollmentData, HealthSystemEntry } from '@/types';
 
-interface HealthSystemDisplayInfo {
-  label: string;
-  value: string;
-  location: string;
+interface HealthSystemDisplayInfo extends HealthSystemEntry {
   hcoCount: number;
 }
 
 export function HealthSystemsTab() {
-  const { enrollments } = useAppContext(); // Get enrollments from context
+  const { enrollments, healthSystems, isLoading: isContextLoading } = useAppContext();
 
-  const healthSystemsWithCounts = useMemo(() => {
-    return OHIO_HEALTH_SYSTEMS.map(system => {
+  const healthSystemsWithCounts = useMemo((): HealthSystemDisplayInfo[] => {
+    if (isContextLoading || !healthSystems) return []; // Return empty if still loading or no health systems
+    return healthSystems.map(system => {
       const count = enrollments.filter(
-        (enrollment: EnrollmentData) => enrollment.practiceInfo.healthSystem === system.value
+        (enrollment: EnrollmentData) => enrollment.practiceInfo.healthSystem === system.id
       ).length;
-      return { ...system, hcoCount: count }; // Dynamically calculate hcoCount
-    });
-  }, [enrollments]);
+      return { ...system, hcoCount: count };
+    }).sort((a,b) => a.name.localeCompare(b.name)); // Sort by name
+  }, [enrollments, healthSystems, isContextLoading]);
+
+  if (isContextLoading && healthSystems.length === 0) { // Show loader if context is loading and no systems yet
+    return (
+      <div className="flex justify-center items-center p-10">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading Health Systems...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -36,10 +42,10 @@ export function HealthSystemsTab() {
         <CardHeader>
           <CardTitle className="text-2xl font-semibold flex items-center">
             <Network className="mr-3 h-7 w-7 text-primary" />
-            Health Systems (Parent Organizations) - Ohio
+            Registered Health Systems
           </CardTitle>
           <CardDescription>
-            List of major health systems in Ohio. Click on a system name to view more details.
+            List of registered health systems. Click on a system name to view more details.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -49,23 +55,23 @@ export function HealthSystemsTab() {
                 <TableHeader className="sticky top-0 bg-background z-10">
                   <TableRow>
                     <TableHead className="w-[50%]">Health System Name</TableHead>
-                    <TableHead className="w-[25%]">Location</TableHead>
+                    <TableHead className="w-[25%]">Primary Contact Email</TableHead> {/* Example: Use a field from HealthSystemEntry */}
                     <TableHead className="text-right w-[20%]">Affiliated HCO Count</TableHead>
                     <TableHead className="text-right w-[5%]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {healthSystemsWithCounts.map((system: HealthSystemDisplayInfo) => (
-                    <TableRow key={system.value} className="hover:bg-muted/50">
+                    <TableRow key={system.id} className="hover:bg-muted/50">
                       <TableCell className="font-medium">
-                        <Link href={`/admin/health-systems/${system.value}`} className="text-primary hover:underline">
-                          {system.label}
+                        <Link href={`/admin/health-systems/${system.id}`} className="text-primary hover:underline">
+                          {system.name}
                         </Link>
                       </TableCell>
-                      <TableCell>{system.location}</TableCell>
+                      <TableCell>{system.contactEmail || 'N/A'}</TableCell>
                       <TableCell className="text-right">{system.hcoCount}</TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/admin/health-systems/${system.value}`} passHref legacyBehavior>
+                        <Link href={`/admin/health-systems/${system.id}`} passHref legacyBehavior>
                             <ChevronRight className="h-5 w-5 text-muted-foreground hover:text-primary cursor-pointer" />
                         </Link>
                       </TableCell>
@@ -76,7 +82,7 @@ export function HealthSystemsTab() {
             </ScrollArea>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No health systems data available.
+              No health systems registered yet. Health Systems can register via the main landing page.
             </p>
           )}
         </CardContent>

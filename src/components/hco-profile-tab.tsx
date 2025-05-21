@@ -3,7 +3,7 @@
 
 import React from 'react';
 import type { ChangeEvent } from 'react';
-import type { EnrollmentData, CustomFieldDefinition, CustomFieldOption } from '@/types';
+import type { EnrollmentData, CustomFieldDefinition, CustomFieldOption, HealthSystemEntry } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,10 +15,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO, isValid } from 'date-fns';
 import { Edit, Save, UserCircle, Building, Settings2, FileText, CalendarDays, Info, Loader2, User, Hash, Network } from 'lucide-react';
-import { EHR_VENDORS, OHIO_HEALTH_SYSTEMS } from '@/lib/constants';
+import { EHR_VENDORS } from '@/lib/constants';
 import { FHIRValidationDisplay } from '@/components/fhir-validation-display';
 import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useAppContext } from '@/context/AppContext'; // For dynamic health systems
 
 type EditableFieldOnChangeEvent =
   | ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -31,7 +32,8 @@ interface EditableFieldProps {
   isEditing: boolean;
   onChange: (event: EditableFieldOnChangeEvent) => void;
   type?: string;
-  options?: { label: string; value: string }[];
+  options?: { label: string; value: string }[]; // For EHR Vendors, etc.
+  dynamicOptions?: HealthSystemEntry[]; // For dynamic health systems
   customField?: CustomFieldDefinition;
   allCustomFields?: CustomFieldDefinition[];
   formData?: Record<string, any>;
@@ -40,8 +42,9 @@ interface EditableFieldProps {
 
 const EditableField: React.FC<EditableFieldProps> = ({
   label, value, name, isEditing, onChange, type = 'text',
-  options, customField, allCustomFields, formData, icon: Icon
+  options, dynamicOptions, customField, allCustomFields, formData, icon: Icon
 }) => {
+  const { healthSystems: contextHealthSystems } = useAppContext(); // Get dynamic health systems
 
   const displayValue = (val: any, cf?: CustomFieldDefinition) => {
     if (val === undefined || val === null || val === '') return <span className="italic text-muted-foreground">Not provided</span>;
@@ -65,9 +68,9 @@ const EditableField: React.FC<EditableFieldProps> = ({
         const vendor = EHR_VENDORS.find(v => v.value === val);
         return vendor ? vendor.label : String(val);
     }
-    if (name === 'practiceInfo.healthSystem' && OHIO_HEALTH_SYSTEMS) {
-        const system = OHIO_HEALTH_SYSTEMS.find(hs => hs.value === val);
-        return system ? system.label : String(val);
+    if (name === 'practiceInfo.healthSystem' && contextHealthSystems) { // Use contextHealthSystems
+        const system = contextHealthSystems.find(hs => hs.id === val);
+        return system ? system.name : String(val);
     }
     return String(val);
   };
@@ -89,6 +92,7 @@ const EditableField: React.FC<EditableFieldProps> = ({
   const isRequired = customField?.required || false;
 
   if (customField) {
+    // Custom field rendering logic remains the same
     switch (customField.type) {
       case 'text':
         return (
@@ -134,12 +138,12 @@ const EditableField: React.FC<EditableFieldProps> = ({
             >
               <SelectTrigger id={fieldId} className="ml-6 w-[calc(100%-1.5rem)]"><SelectValue placeholder={customField.placeholder || "Select an option"} /></SelectTrigger>
               <SelectContent>
-                {currentOptions.map((option: CustomFieldOption) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                {currentOptions.filter(opt => opt.value && opt.value.trim() !== '').map((option: CustomFieldOption) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
                  {currentOptions.length === 0 && customField.parentFieldId && formData && formData[`additionalData.${customField.parentFieldId}`] && (
-                    <SelectItem value="" disabled>No options for selected parent</SelectItem>
+                    <SelectItem value="NO_OPTIONS_TEMP_VALUE_PLACEHOLDER" disabled>No options for selected parent</SelectItem>
                 )}
                  {currentOptions.length === 0 && customField.parentFieldId && (!formData || !formData[`additionalData.${customField.parentFieldId}`]) && (
-                    <SelectItem value="" disabled>Select parent field first</SelectItem>
+                    <SelectItem value="SELECT_PARENT_TEMP_VALUE_PLACEHOLDER" disabled>Select parent field first</SelectItem>
                 )}
               </SelectContent>
             </Select>
@@ -236,7 +240,11 @@ const EditableField: React.FC<EditableFieldProps> = ({
       </div>
     );
   }
-  if (type === 'select' && options) {
+  if (type === 'select') {
+     const selectOptions = name === 'practiceInfo.healthSystem' && dynamicOptions
+        ? dynamicOptions.map(hs => ({ label: hs.name, value: hs.id }))
+        : options;
+
      return (
       <div className="mb-3">
         <Label htmlFor={fieldId} className="flex items-center">
@@ -246,7 +254,8 @@ const EditableField: React.FC<EditableFieldProps> = ({
         <Select name={fieldId} onValueChange={(val) => onChange({target: {name: fieldId, value: val}})} value={value || ''}>
           <SelectTrigger id={fieldId} className="ml-6 w-[calc(100%-1.5rem)]"><SelectValue placeholder={`Select ${fieldLabel.toLowerCase()}`} /></SelectTrigger>
           <SelectContent>
-            {options.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+             <SelectItem value="">None</SelectItem>
+            {selectOptions?.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -288,6 +297,7 @@ export function HcoProfileTab({
   isSaving,
   currentEnrollment,
 }: HcoProfileTabProps) {
+  const { healthSystems } = useAppContext(); // Get dynamic health systems
 
   const handleInputChange = (e: EditableFieldOnChangeEvent) => {
     const { name, value } = e.target;
@@ -311,8 +321,6 @@ export function HcoProfileTab({
   };
 
   const sortedCustomFieldDefinitions = [...customFieldDefinitions].sort((a, b) => a.order - b.order);
-
-  const healthSystemOptions = OHIO_HEALTH_SYSTEMS.map(hs => ({ label: hs.label, value: hs.value }));
 
   return (
     <div className="space-y-6">
@@ -350,9 +358,8 @@ export function HcoProfileTab({
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
             {/* Column 1: Practice Information */}
-            <div>
-              <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><Building className="mr-2 h-4 w-4 text-muted-foreground"/>Practice Information</h4>
-              <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
+            <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
+              <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><Building className="mr-2 h-4 w-4 text-muted-foreground"/>Practice Information</h4>
                 <EditableField label="Organization NPI" name="practiceInfo.organizationNPI" value={formData.practiceInfo?.organizationNPI} isEditing={isEditing} onChange={handleInputChange} icon={Hash} />
                 <EditableField label="Practice Name" name="practiceInfo.name" value={formData.practiceInfo?.name} isEditing={isEditing} onChange={handleInputChange} />
                 <EditableField label="Address" name="practiceInfo.address" value={formData.practiceInfo?.address} type="textarea" isEditing={isEditing} onChange={handleInputChange} />
@@ -364,28 +371,22 @@ export function HcoProfileTab({
                   isEditing={isEditing}
                   onChange={handleInputChange}
                   type="select"
-                  options={healthSystemOptions}
+                  dynamicOptions={healthSystems} // Pass dynamic list
                   icon={Network}
                 />
-              </div>
             </div>
 
             {/* Column 2: Contains nested grid for Primary Contact and EHR Info */}
             <div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-                {/* Sub-Column 1 of Right Column: Primary Contact Details */}
-                <div>
-                  <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><User className="mr-2 h-4 w-4 text-muted-foreground"/>Primary Contact Details</h4>
-                  <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
+                <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
+                  <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><User className="mr-2 h-4 w-4 text-muted-foreground"/>Primary Contact Details</h4>
                     <EditableField label="Contact Name" name="contactDetails.name" value={formData.contactDetails?.name} isEditing={isEditing} onChange={handleInputChange} />
                     <EditableField label="Email" name="contactDetails.email" value={formData.contactDetails?.email} type="email" isEditing={isEditing} onChange={handleInputChange} />
                     <EditableField label="Phone" name="contactDetails.phone" value={formData.contactDetails?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
-                  </div>
                 </div>
-                {/* Sub-Column 2 of Right Column: EHR & System Info */}
-                <div>
-                  <h4 className="text-md font-medium mb-2 mt-2 flex items-center"><Settings2 className="mr-2 h-4 w-4 text-muted-foreground"/>EHR &amp; System Info</h4>
-                  <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
+                <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
+                  <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><Settings2 className="mr-2 h-4 w-4 text-muted-foreground"/>EHR &amp; System Info</h4>
                     <EditableField
                       label="EHR Vendor"
                       name="ehrVendor"
@@ -396,7 +397,6 @@ export function HcoProfileTab({
                       options={EHR_VENDORS}
                       icon={Settings2}
                     />
-                  </div>
                 </div>
               </div>
             </div>
@@ -426,7 +426,7 @@ export function HcoProfileTab({
         </CardContent>
       </Card>
 
-      <div className="mt-6 pt-0"> 
+      <div className="mt-6 pt-0">
         <HcoOnboardingWorkflowSteps enrollment={enrollment} />
       </div>
 

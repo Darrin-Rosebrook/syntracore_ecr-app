@@ -2,10 +2,11 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import type { EnrollmentData, CustomFieldDefinition, ActivityLogEntry, EnrollmentFormData, FHIRValidationResult, DocumentEntry, ContactEntry, MessageEntry } from '@/types'; // Added MessageEntry
+import type { EnrollmentData, CustomFieldDefinition, ActivityLogEntry, FHIRValidationResult, DocumentEntry, ContactEntry, MessageEntry, HealthSystemEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase'; 
+import { db } from '@/lib/firebase';
 // import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { getHealthSystemsAction } from '@/actions/health-system-actions'; // Import new action
 
 import {
   collection,
@@ -22,12 +23,13 @@ import {
   arrayRemove,
   getDoc,
 } from 'firebase/firestore';
-import { useAuth } from './AuthContext'; // Import useAuth
+import { useAuth } from './AuthContext';
 
 interface AppContextState {
   enrollments: EnrollmentData[];
   customFieldDefinitions: CustomFieldDefinition[];
-  isLoading: boolean; 
+  healthSystems: HealthSystemEntry[]; // Add health systems state
+  isLoading: boolean;
 }
 
 interface AppContextActions {
@@ -41,13 +43,13 @@ interface AppContextActions {
 
   addDocumentToEnrollment: (enrollmentId: string, documentFile: File, uploadedBy: string) => Promise<void>;
   deleteDocumentFromEnrollment: (enrollmentId: string, documentId: string) => Promise<void>;
-  
+
   addContactToEnrollment: (enrollmentId: string, contact: Omit<ContactEntry, 'id'>) => Promise<void>;
   updateContactInEnrollment: (enrollmentId: string, contact: ContactEntry) => Promise<void>;
   deleteContactFromEnrollment: (enrollmentId: string, contactId: string) => Promise<void>;
   setPrimaryContactForEnrollment: (enrollmentId: string, newPrimaryContactId: string) => Promise<void>;
 
-  addMessageToEnrollment: (enrollmentId: string, messageContent: string, senderId: string, senderName: string, senderRole: 'PHA' | 'Provider' | 'Vendor' | 'System') => Promise<void>; // New messaging action
+  addMessageToEnrollment: (enrollmentId: string, messageContent: string, senderId: string, senderName: string, senderRole: 'PHA' | 'Provider' | 'Vendor' | 'System') => Promise<void>;
 }
 
 type AppContextProps = AppContextState & AppContextActions;
@@ -57,9 +59,10 @@ const AppContext = createContext<AppContextProps | undefined>(undefined);
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [enrollments, setEnrollments] = useState<EnrollmentData[]>([]);
   const [customFieldDefinitions, setCustomFieldDefinitions] = useState<CustomFieldDefinition[]>([]);
+  const [healthSystems, setHealthSystems] = useState<HealthSystemEntry[]>([]); // State for health systems
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const { currentUser } = useAuth(); // Get current user for messaging
+  const { currentUser } = useAuth();
 
   const fetchInitialData = useCallback(async () => {
     setIsLoading(true);
@@ -86,13 +89,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             uploadDate: (doc.uploadDate as Timestamp)?.toDate ? (doc.uploadDate as Timestamp).toDate().toISOString() : doc.uploadDate,
           })) || [],
           additionalContacts: data.additionalContacts || [],
-          messages: data.messages?.map((msg: any) => ({ // Process messages
+          messages: data.messages?.map((msg: any) => ({
             ...msg,
             timestamp: (msg.timestamp as Timestamp)?.toDate ? (msg.timestamp as Timestamp).toDate().toISOString() : msg.timestamp,
           })) || [],
         } as EnrollmentData;
       });
       setEnrollments(enrollmentsData);
+
+      // Fetch Health Systems
+      const healthSystemsResult = await getHealthSystemsAction();
+      if (healthSystemsResult.success && healthSystemsResult.systems) {
+        setHealthSystems(healthSystemsResult.systems);
+      } else {
+        console.error("Error fetching health systems for AppContext:", healthSystemsResult.error);
+        // Optionally toast error for health systems loading
+      }
 
     } catch (error) {
       console.error("Error fetching initial data from Firestore:", error);
@@ -108,7 +120,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const addActivityLogEntry = useCallback(async (enrollmentId: string, entryText: string, type: ActivityLogEntry['type'], user?: string) => {
     const newLogEntry: ActivityLogEntry = {
-      timestamp: new Date().toISOString(), 
+      timestamp: new Date().toISOString(),
       entry: entryText,
       type,
       user: user || 'System',
@@ -131,11 +143,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: 'Error', description: 'Could not save activity log.', variant: 'destructive' });
     }
   }, [toast]);
-  
+
   const updateEnrollmentStatus = async (id: string, status: EnrollmentData['status'], comments?: string) => {
     const enrollmentDocRef = doc(db, 'enrollments', id);
     try {
-      const updateData: Partial<EnrollmentData> & { activityLog?: any } = { status }; 
+      const updateData: Partial<EnrollmentData> & { activityLog?: any } = { status };
       const activityLogsToAdd: ActivityLogEntry[] = [];
 
       const statusChangeEntry: ActivityLogEntry = {
@@ -154,16 +166,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           user: currentUser?.displayName || currentUser?.email || 'PHA Reviewer',
         };
         activityLogsToAdd.push(phaCommentEntry);
-        
+
         const currentEnrollmentDoc = await getDoc(enrollmentDocRef);
         const currentEnrollmentData = currentEnrollmentDoc.data() as EnrollmentData | undefined;
         const existingMessages = currentEnrollmentData?.validationResult?.messages || [];
         updateData.validationResult = {
-            ...(currentEnrollmentData?.validationResult || { isValid: status !== "Changes Requested", messages: [] }), 
-            messages: [...existingMessages.filter(msg => !msg.startsWith("PHA Comments:")), `PHA Comments: ${comments}`] 
+            ...(currentEnrollmentData?.validationResult || { isValid: status !== "Changes Requested", messages: [] }),
+            messages: [...existingMessages.filter(msg => !msg.startsWith("PHA Comments:")), `PHA Comments: ${comments}`]
         };
          if (status !== "Changes Requested" && updateData.validationResult) {
-            updateData.validationResult.isValid = true; 
+            updateData.validationResult.isValid = true;
         } else if (status === "Changes Requested" && updateData.validationResult) {
             updateData.validationResult.isValid = false;
         }
@@ -176,9 +188,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         };
         activityLogsToAdd.push(denialReasonEntry);
       }
-      
+
       const firestoreLogEntries = activityLogsToAdd.map(log => ({...log, timestamp: Timestamp.fromDate(new Date(log.timestamp))}));
-      
+
       const updatePayload: { status: EnrollmentData['status'], activityLog?: any, validationResult?: FHIRValidationResult } = { status };
       if (firestoreLogEntries.length > 0) {
           updatePayload.activityLog = arrayUnion(...firestoreLogEntries);
@@ -192,14 +204,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setEnrollments(prevEnrollments =>
         prevEnrollments.map(e =>
           e.id === id
-            ? { 
-                ...e, 
-                status, 
+            ? {
+                ...e,
+                status,
                 validationResult: updateData.validationResult ? {
                     ...updateData.validationResult,
-                     summary: e.validationResult?.summary 
+                     summary: e.validationResult?.summary
                 } : e.validationResult,
-                activityLog: [...(e.activityLog || []), ...activityLogsToAdd] 
+                activityLog: [...(e.activityLog || []), ...activityLogsToAdd]
               }
             : e
         )
@@ -216,11 +228,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     try {
       await updateDoc(enrollmentDocRef, updatedFields);
       await addActivityLogEntry(enrollmentId, 'Provider details updated by PHA Admin.', 'UserAction', currentUser?.displayName || currentUser?.email || 'PHA Admin');
-      
+
       setEnrollments(prevEnrollments =>
         prevEnrollments.map(e =>
           e.id === enrollmentId
-            ? { ...e, ...updatedFields } 
+            ? { ...e, ...updatedFields }
             : e
         )
       );
@@ -238,7 +250,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     const fieldDocRef = doc(db, 'customFieldDefinitions', fieldDefinition.id);
     try {
-      await setDoc(fieldDocRef, fieldDefinition); 
+      await setDoc(fieldDocRef, fieldDefinition);
       setCustomFieldDefinitions(prevFields => [...prevFields, fieldDefinition].sort((a, b) => a.order - b.order));
       toast({ title: 'Success', description: `Custom field "${fieldDefinition.label}" added.` });
     } catch (error) {
@@ -277,7 +289,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const addDocumentToEnrollment = async (enrollmentId: string, documentFile: File, uploadedBy: string) => {
     console.log("Attempting to add document", documentFile.name, "for enrollment", enrollmentId, "by", uploadedBy);
     const newDocEntry: DocumentEntry = {
-      id: `doc_${Date.now()}_${Math.random().toString(36).substring(2,9)}`, 
+      id: `doc_${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
       name: documentFile.name,
       type: documentFile.type,
       size: documentFile.size,
@@ -290,7 +302,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         documents: arrayUnion({...newDocEntry, uploadDate: Timestamp.fromDate(new Date(newDocEntry.uploadDate))})
       });
       await addActivityLogEntry(enrollmentId, `Document "${newDocEntry.name}" uploaded.`, 'DocumentChange', uploadedBy);
-      fetchInitialData(); 
+      fetchInitialData();
       toast({title: "Document Uploaded", description: `${newDocEntry.name} added.`});
     } catch (error) {
       console.error("Error adding document:", error);
@@ -321,7 +333,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         toast({title: "Delete Failed", description: "Could not delete document.", variant: "destructive"});
     }
   };
-  
+
   const addContactToEnrollment = async (enrollmentId: string, contactData: Omit<ContactEntry, 'id'>) => {
     const newContact: ContactEntry = {
         ...contactData,
@@ -374,7 +386,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         toast({title: "Delete Contact Failed", description: (error as Error).message || "Could not delete contact.", variant: "destructive"});
     }
   };
-  
+
   const setPrimaryContactForEnrollment = async (enrollmentId: string, newPrimaryContactIdFromAdditional: string) => {
     const enrollmentDocRef = doc(db, "enrollments", enrollmentId);
     try {
@@ -384,24 +396,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const currentData = docSnap.data() as EnrollmentData;
         const currentPrimaryContact = currentData.contactDetails;
         const additionalContacts = currentData.additionalContacts || [];
-        
+
         const newPrimaryContact = additionalContacts.find(c => c.id === newPrimaryContactIdFromAdditional);
         if (!newPrimaryContact) throw new Error("New primary contact not found in additional contacts.");
 
         const updatedAdditionalContacts = additionalContacts.filter(c => c.id !== newPrimaryContactIdFromAdditional);
-        if (currentPrimaryContact && currentPrimaryContact.name) { 
+        if (currentPrimaryContact && currentPrimaryContact.name) {
             updatedAdditionalContacts.push({
-                id: `contact_${Date.now()}_${Math.random().toString(36).substring(2,9)}`, 
+                id: `contact_${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
                 name: currentPrimaryContact.name,
                 email: currentPrimaryContact.email,
                 phone: currentPrimaryContact.phone,
-                role: 'Former Primary', 
+                role: 'Former Primary',
                 isAlternative: false,
             });
         }
-        
+
         await updateDoc(enrollmentDocRef, {
-            contactDetails: { 
+            contactDetails: {
                 name: newPrimaryContact.name,
                 email: newPrimaryContact.email,
                 phone: newPrimaryContact.phone,
@@ -434,7 +446,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       await updateDoc(enrollmentDocRef, {
         messages: arrayUnion(messageForFirestore)
       });
-      
+
       setEnrollments(prevEnrollments =>
         prevEnrollments.map(e =>
           e.id === enrollmentId
@@ -455,7 +467,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       value={{
         enrollments,
         customFieldDefinitions,
-        isLoading, 
+        healthSystems, // Provide health systems
+        isLoading,
         updateEnrollmentStatus,
         updateEnrollmentData,
         addActivityLogEntry,
@@ -469,7 +482,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         updateContactInEnrollment,
         deleteContactFromEnrollment,
         setPrimaryContactForEnrollment,
-        addMessageToEnrollment, // Expose new action
+        addMessageToEnrollment,
       }}
     >
       {children}

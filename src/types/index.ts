@@ -6,7 +6,7 @@ export interface PracticeInfo {
   name: string;
   address: string;
   phone: string;
-  healthSystem?: string;
+  healthSystem?: string; // Will store HealthSystemEntry ID
   isLabOrPerformsLabServices?: 'yes' | 'no';
   cliaNumber?: string;
   cliaLabName?: string;
@@ -234,6 +234,22 @@ export interface VendorProfileData {
   lastUpdatedAt?: string; // ISO string
 }
 
+// Health System Entry Data
+export interface HealthSystemEntry {
+  id: string; // Firestore document ID
+  name: string;
+  hqAddress?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  corporateWebsite?: string;
+  registeredByUserId: string; // Firebase Auth UID of user who registered it
+  createdAt: string; // ISO string
+  eulaAccepted: boolean;
+  eulaAcceptedTimestamp: string; // ISO string
+  // location?: string; // If needed for simple display, but full address is better
+}
+
+
 // CLIA Data Types
 export interface CliaAddress {
   st_adr: string;
@@ -279,5 +295,3 @@ export interface ResourceItem {
   createdAt: string; // ISO string
   lastUpdated: string; // ISO string
 }
-
-    

@@ -14,9 +14,12 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { UserCircle } from 'lucide-react';
+import { addHealthSystemAction } from '@/actions/health-system-actions';
+import { useAppContext } from '@/context/AppContext';
 
 export default function HealthSystemDetailedRegistrationPage() {
   const { currentUser, loading: authLoading } = useAuth();
+  const { fetchInitialData } = useAppContext(); // To refresh health systems list
   const router = useRouter();
   const { toast } = useToast();
 
@@ -36,7 +39,7 @@ export default function HealthSystemDetailedRegistrationPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!currentUser) {
+    if (!currentUser || !currentUser.uid) {
       toast({ title: "Authentication Error", description: "You must be logged in to submit.", variant: "destructive" });
       return;
     }
@@ -45,25 +48,33 @@ export default function HealthSystemDetailedRegistrationPage() {
       return;
     }
     setIsSubmitting(true);
-    // Simulate submission
-    console.log("Health System Details Submitted:", {
-      userId: currentUser.uid,
-      userEmail: currentUser.email,
-      officialName,
-      hqAddress,
-      contactPhone,
-      contactEmail,
-      corporateWebsite,
-    });
+    
+    const healthSystemData = {
+      name: officialName.trim(),
+      hqAddress: hqAddress.trim(),
+      contactPhone: contactPhone.trim(),
+      contactEmail: contactEmail.trim(),
+      corporateWebsite: corporateWebsite.trim(),
+    };
 
-    // Placeholder: In a real app, you'd call a server action here to save to Firestore
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    console.log("Health System Details Submitted to action:", healthSystemData, "by user:", currentUser.uid);
 
-    toast({
-      title: "Health System Details Recorded",
-      description: `Details for ${officialName} have been recorded (simulated).`,
-    });
-    setSubmissionComplete(true);
+    const result = await addHealthSystemAction(healthSystemData, currentUser.uid);
+
+    if (result.success && result.id) {
+      toast({
+        title: "Health System Details Recorded",
+        description: `Details for ${officialName} have been saved.`,
+      });
+      await fetchInitialData(); // Refresh AppContext data, including health systems
+      setSubmissionComplete(true);
+    } else {
+      toast({
+        title: "Submission Failed",
+        description: result.error || "Could not save health system details.",
+        variant: "destructive",
+      });
+    }
     setIsSubmitting(false);
   };
 
@@ -71,7 +82,7 @@ export default function HealthSystemDetailedRegistrationPage() {
     return <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
-  if (!currentUser && !authLoading) { // Check !authLoading here as well
+  if (!currentUser && !authLoading) {
      return (
         <div className="container mx-auto py-8 flex flex-col items-center justify-center">
             <Alert variant="destructive" className="max-w-md text-center">
