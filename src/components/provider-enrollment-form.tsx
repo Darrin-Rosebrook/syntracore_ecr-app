@@ -30,6 +30,8 @@ import { format, parseISO, isValid } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/context/AuthContext';
 import { addEnrollmentToFirestore } from '@/lib/firestore-add-enrollment';
+import { useAppContext } from '@/context/AppContext';
+
 
 const practiceInfoSchema = z.object({
   organizationNPI: z
@@ -46,8 +48,8 @@ const practiceInfoSchema = z.object({
   healthSystem: z.string().optional(),
   isLabOrPerformsLabServices: z.enum(['yes', 'no'], { required_error: "Please select if this is a lab or performs lab services." }),
   cliaNumber: z.string().optional(),
-  cliaLabName: z.string().optional(),
-  cliaLabType: z.string().optional(),
+  cliaLabName: z.string().optional(), // Populated from lookup or manual entry
+  cliaLabType: z.string().optional(), // Populated from lookup or manual entry
 }).refine(data => {
     if (data.isLabOrPerformsLabServices === 'yes' && (!data.cliaNumber || data.cliaNumber.trim() === '')) {
       return false;
@@ -66,7 +68,7 @@ const practiceInfoSchema = z.object({
     return true;
   }, {
     message: "Either Organization NPI or CLIA Number (if applicable) is required.",
-    path: ["organizationNPI"], // Or path: ["cliaNumber"] or a more general path
+    path: ["organizationNPI"], 
   });
 
 const contactDetailsSchema = z.object({
@@ -100,6 +102,7 @@ export function ProviderEnrollmentForm({
   const { toast } = useToast();
   const router = useRouter();
   const { currentUser, loading: authLoading } = useAuth();
+  const { fetchInitialData } = useAppContext();
 
   const [ccdFile, setCcdFile] = React.useState<File | null>(null);
   const [ccdFileContent, setCcdFileContent] = React.useState<string | null>(null);
@@ -298,7 +301,7 @@ export function ProviderEnrollmentForm({
         form.setValue('practiceInfo.address', formattedAddress, { shouldValidate: true });
         form.setValue('practiceInfo.phone', provider.address?.telephone_number || '', { shouldValidate: true });
 
-        toast({ title: "NPI Data Fetched", description: `Data for ${provider.name} loaded. Please review and complete the form.` });
+        toast({ title: "NPI Data Fetched", description: `Data for ${provider.name || provider.orgName} loaded. Please review and complete the form.` });
       } else {
         setNpiLookupError(result.error || "NPI not found or no exact match.");
         toast({ title: 'NPI Lookup Failed', description: result.error || "NPI not found.", variant: 'destructive' });
@@ -316,8 +319,8 @@ export function ProviderEnrollmentForm({
   const handleClearNpiData = () => {
     setFetchedNpiData(null);
     setNpiLookupError(null);
-    // Optionally clear form fields pre-filled by NPI lookup if desired
-    // form.setValue('practiceInfo.name', '');
+    form.setValue('practiceInfo.organizationNPI', ''); // Also clear the NPI field
+    // form.setValue('practiceInfo.name', ''); // Keep these commented or uncomment if full reset is desired
     // form.setValue('practiceInfo.address', '');
     // form.setValue('practiceInfo.phone', '');
     toast({ title: 'NPI Data Cleared', description: 'NPI lookup information has been cleared.' });
@@ -326,7 +329,7 @@ export function ProviderEnrollmentForm({
   const handleCliaLookup = async () => {
     const cliaToLookup = form.getValues('practiceInfo.cliaNumber');
     console.log("[ProviderEnrollmentForm] Initiating CLIA Lookup for:", cliaToLookup);
-    if (!cliaToLookup || cliaToLookup.trim().length === 0) {
+    if (!cliaToLookup || cliaToLookup.trim().length === 0) { // Keep this check for empty string
       toast({ title: "Invalid CLIA", description: "Please enter a CLIA number to look up.", variant: "destructive" });
       return;
     }
@@ -340,6 +343,7 @@ export function ProviderEnrollmentForm({
         setFetchedCliaData(result.data);
         const labData = result.data;
         
+        // Only pre-fill if the corresponding form field is currently empty
         if (!form.getValues('practiceInfo.name') && labData.facilityName) {
             form.setValue('practiceInfo.name', labData.facilityName, { shouldValidate: true });
         }
@@ -349,6 +353,7 @@ export function ProviderEnrollmentForm({
          if (!form.getValues('practiceInfo.phone') && labData.phone) {
             form.setValue('practiceInfo.phone', labData.phone, { shouldValidate: true });
         }
+        // Always set these specific CLIA fields
         form.setValue('practiceInfo.cliaLabName', labData.facilityName || '', { shouldValidate: true });
         form.setValue('practiceInfo.cliaLabType', labData.labType || '', { shouldValidate: true });
 
@@ -370,7 +375,7 @@ export function ProviderEnrollmentForm({
   const handleClearCliaData = () => {
     setFetchedCliaData(null);
     setCliaLookupError(null);
-    // Optionally clear CLIA specific fields from form if desired
+    form.setValue('practiceInfo.cliaNumber', ''); // Also clear CLIA number field
     // form.setValue('practiceInfo.cliaLabName', '');
     // form.setValue('practiceInfo.cliaLabType', '');
     toast({ title: 'CLIA Data Cleared', description: 'CLIA lookup information has been cleared.' });
@@ -379,9 +384,11 @@ export function ProviderEnrollmentForm({
 
   const onSubmitRegistration = async (data: FormSchemaType) => {
     setIsSubmittingForm(true);
-    console.log("[ProviderEnrollmentForm] onSubmitRegistration triggered. Form Data:", JSON.stringify(data, null, 2));
-    console.log("[ProviderEnrollmentForm] Current CCD File:", ccdFile ? ccdFile.name : "No file");
+    console.log("[ProviderEnrollmentForm] Form is submitting...");
+    console.log("[ProviderEnrollmentForm] Raw Form Data:", JSON.stringify(data, null, 2));
+    console.log("[ProviderEnrollmentForm] Current CCD File:", ccdFile ? ccdFile.name : "No file selected/processed");
     console.log("[ProviderEnrollmentForm] Current Validation Result:", JSON.stringify(validationResult, null, 2));
+
 
     if (!currentUser || !currentUser.uid || !currentUser.email) {
         toast({ title: "Authentication Error", description: "You must be logged in to submit.", variant: "destructive" });
@@ -430,6 +437,7 @@ export function ProviderEnrollmentForm({
           description: `Practice "${data.practiceInfo.name}" enrollment complete. ID: ${submissionResult.id.slice(0,8)}...`,
           className: "bg-green-500 text-white",
         });
+        await fetchInitialData(); // Refresh context data
         router.push('/provider-portal');
       } else {
         toast({
@@ -519,41 +527,22 @@ export function ProviderEnrollmentForm({
                             placeholder="Enter CLIA Number"
                             maxLength={10}
                             className={fieldState.error ? "border-destructive" : ""}
-                            disabled={cliaLookupLoading || isSubmittingForm}
+                            disabled={isSubmittingForm}
                             value={field.value || ''}
                         />
                         )}
                     />
-                    <Button type="button" onClick={handleCliaLookup} disabled={cliaLookupLoading || isSubmittingForm || !watchedCliaNumber || watchedCliaNumber.length !== 10} size="sm">
-                        {cliaLookupLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchIcon className="h-4 w-4" />}
-                        <span className="ml-1 hidden sm:inline">Lookup CLIA</span>
-                    </Button>
-                    {fetchedCliaData && (
-                        <Button type="button" variant="ghost" onClick={handleClearCliaData} disabled={cliaLookupLoading || isSubmittingForm} size="sm">Clear</Button>
-                    )}
                 </div>
                 {form.formState.errors.practiceInfo?.cliaNumber && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.cliaNumber.message}</p>}
                 {cliaLookupError && <p className="text-sm text-destructive mt-1">{cliaLookupError}</p>}
 
-                {fetchedCliaData && (
-                <Card className="mt-2 bg-muted/30">
-                    <CardHeader className="pb-2 pt-3"><CardTitle className="text-sm">Fetched CLIA Data:</CardTitle></CardHeader>
-                    <CardContent className="text-xs space-y-0.5 pb-3">
-                    {fetchedCliaData.facilityName && <p><strong>Lab Name:</strong> {fetchedCliaData.facilityName}</p>}
-                    {fetchedCliaData.address && <p><strong>Address:</strong> {fetchedCliaData.address}</p>}
-                    {fetchedCliaData.phone && <p><strong>Phone:</strong> {fetchedCliaData.phone}</p>}
-                    {fetchedCliaData.labType && <p><strong>Lab Type:</strong> {fetchedCliaData.labType}</p>}
-                    </CardContent>
-                </Card>
-                )}
-                
-                {/* Manual entry for CLIA Lab Name and Type (if not auto-filled by lookup) */}
+                {/* Manual entry for CLIA Lab Name and Type */}
                 <div>
-                    <Label htmlFor="cliaLabName" className="text-xs">CLIA Lab Name (if different or not found)</Label>
+                    <Label htmlFor="cliaLabName" className="text-xs">CLIA Lab Name</Label>
                     <Input id="cliaLabName" {...form.register("practiceInfo.cliaLabName")} placeholder="Enter Lab Name as per CLIA" disabled={isSubmittingForm} />
                 </div>
                 <div>
-                    <Label htmlFor="cliaLabType" className="text-xs">CLIA Lab Type (if different or not found)</Label>
+                    <Label htmlFor="cliaLabType" className="text-xs">CLIA Lab Type</Label>
                     <Input id="cliaLabType" {...form.register("practiceInfo.cliaLabType")} placeholder="e.g., Hospital, Independent" disabled={isSubmittingForm} />
                 </div>
               </div>
@@ -631,7 +620,7 @@ export function ProviderEnrollmentForm({
                       <SelectValue placeholder="Select Health System if applicable" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      
                       {OHIO_HEALTH_SYSTEMS.map(system => (
                         <SelectItem key={system.value} value={system.value}>{system.label}</SelectItem>
                       ))}
@@ -665,7 +654,7 @@ export function ProviderEnrollmentForm({
                     <Label htmlFor={fieldName} className="flex items-center"> {fieldDef.label} {fieldDef.required && <span className="text-destructive ml-1">*</span>} </Label>
                     {fieldDef.type === 'text' && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || ''} render={({ field }) => <Input id={fieldName} {...field} placeholder={fieldDef.placeholder} className={error ? "border-destructive" : ""} disabled={isSubmittingForm}/>} /> )}
                     {fieldDef.type === 'textarea' && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || ''} render={({ field }) => <Textarea id={fieldName} {...field} placeholder={fieldDef.placeholder} className={error ? "border-destructive" : ""} disabled={isSubmittingForm} />} /> )}
-                    {fieldDef.type === 'select' && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || ''} render={({ field }) => { let currentOptions = fieldDef.options || []; if (fieldDef.parentFieldId && fieldDef.dependentOptionsJson && watchedAdditionalData) { const parentValue = watchedAdditionalData[fieldDef.parentFieldId]; if (parentValue) { try { const dependentOptionsMap = JSON.parse(fieldDef.dependentOptionsJson); currentOptions = dependentOptionsMap[parentValue] || []; } catch (e) { console.error("Error parsing dependentOptionsJson", e); } } else { currentOptions = []; } } return ( <Select onValueChange={field.onChange} value={field.value} disabled={isSubmittingForm || (fieldDef.parentFieldId && watchedAdditionalData && !watchedAdditionalData[fieldDef.parentFieldId] && currentOptions.length === 0)}> <SelectTrigger id={fieldName} className={error ? "border-destructive" : ""}> <SelectValue placeholder={fieldDef.placeholder || "Select an option"} /> </SelectTrigger> <SelectContent> {currentOptions.map((option: CustomFieldOption) => (<SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>))} {currentOptions.length === 0 && fieldDef.parentFieldId && watchedAdditionalData && watchedAdditionalData[fieldDef.parentFieldId] && ( <SelectItem value="" disabled>No options for selected parent</SelectItem> )} {currentOptions.length === 0 && fieldDef.parentFieldId && (!watchedAdditionalData || !watchedAdditionalData[fieldDef.parentFieldId]) && ( <SelectItem value="" disabled>Select parent field first</SelectItem> )} </SelectContent> </Select> ); }} /> )}
+                    {fieldDef.type === 'select' && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || ''} render={({ field }) => { let currentOptions = fieldDef.options || []; if (fieldDef.parentFieldId && fieldDef.dependentOptionsJson && watchedAdditionalData) { const parentValue = watchedAdditionalData[fieldDef.parentFieldId]; if (parentValue) { try { const dependentOptionsMap = JSON.parse(fieldDef.dependentOptionsJson); currentOptions = dependentOptionsMap[parentValue] || []; } catch (e) { console.error("Error parsing dependentOptionsJson", e); } } else { currentOptions = []; } } return ( <Select onValueChange={field.onChange} value={field.value} disabled={isSubmittingForm || (fieldDef.parentFieldId && watchedAdditionalData && !watchedAdditionalData[fieldDef.parentFieldId] && currentOptions.length === 0)}> <SelectTrigger id={fieldName} className={error ? "border-destructive" : ""}> <SelectValue placeholder={fieldDef.placeholder || "Select an option"} /> </SelectTrigger> <SelectContent> {currentOptions.filter(opt => opt.value && opt.value.trim() !== '').map((option: CustomFieldOption) => (<SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>))} {currentOptions.length === 0 && fieldDef.parentFieldId && watchedAdditionalData && watchedAdditionalData[fieldDef.parentFieldId] && ( <SelectItem value="NO_OPTIONS_TEMP_VALUE_PLACEHOLDER" disabled>No options for selected parent</SelectItem> )} {currentOptions.length === 0 && fieldDef.parentFieldId && (!watchedAdditionalData || !watchedAdditionalData[fieldDef.parentFieldId]) && ( <SelectItem value="SELECT_PARENT_TEMP_VALUE_PLACEHOLDER" disabled>Select parent field first</SelectItem> )} </SelectContent> </Select> ); }} /> )}
                     {fieldDef.type === 'checkbox' && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || false} render={({ field }) => ( <div className="flex items-center space-x-2 mt-1"> <Checkbox id={fieldName} checked={!!field.value} onCheckedChange={field.onChange} disabled={isSubmittingForm}/> <Label htmlFor={fieldName} className="font-normal">{fieldDef.placeholder || fieldDef.label}</Label> </div> )}/> )}
                     {fieldDef.type === 'checkbox-group' && fieldDef.options && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || []} render={({ field }) => ( <div className="space-y-2 mt-1"> {fieldDef.options!.map(option => ( <div key={option.value} className="flex items-center space-x-2"> <Checkbox id={`${fieldName}-${option.value}`} checked={Array.isArray(field.value) && field.value.includes(option.value)} onCheckedChange={(checked) => { const newValue = checked ? [...(Array.isArray(field.value) ? field.value : []), option.value] : (Array.isArray(field.value) ? field.value : []).filter((v: string) => v !== option.value); field.onChange(newValue); }} disabled={isSubmittingForm} /> <Label htmlFor={`${fieldName}-${option.value}`} className="font-normal">{option.label}</Label> </div> ))} </div> )}/> )}
                     {fieldDef.type === 'radio-group' && fieldDef.options && ( <Controller name={fieldName} control={form.control} defaultValue={form.getValues(fieldName) || ''} render={({ field }) => ( <RadioGroup onValueChange={field.onChange} value={field.value} className="mt-1 space-y-1" disabled={isSubmittingForm}> {fieldDef.options!.map(option => ( <div key={option.value} className="flex items-center space-x-2"> <RadioGroupItem value={option.value} id={`${fieldName}-${option.value}`} /> <Label htmlFor={`${fieldName}-${option.value}`} className="font-normal">{option.label}</Label> </div> ))} </RadioGroup> )}/> )}
