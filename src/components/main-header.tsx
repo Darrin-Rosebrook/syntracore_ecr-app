@@ -27,18 +27,21 @@ export function MainHeader() {
     pathname === '/hco-registration' ||
     (pathname === '/' && !currentUser) ||
     pathname === '/login' ||
-    pathname === '/vendor-portal' // Hide global search on vendor portal
+    pathname === '/vendor-portal' ||
+    pathname === '/health-system-portal' || // Added to hide on health system portal
+    pathname === '/health-system-detailed-registration' // Added to hide on health system registration
   );
 
   useEffect(() => {
     const determineVendorRole = async () => {
-      if (currentUser && currentUser.uid && !isPhaUser) {
+      if (currentUser && currentUser.uid && !isPhaUser) { // Only check if not PHA user
         setIsCheckingVendorRole(true);
         try {
           const profileResult = await getVendorProfileAction(currentUser.uid);
           setIsVendorRole(profileResult.success && !!profileResult.data);
+          console.log("[MainHeader] Vendor role check complete. isVendorRole:", profileResult.success && !!profileResult.data);
         } catch (error) {
-          console.error("Error checking vendor role:", error);
+          console.error("[MainHeader] Error checking vendor role:", error);
           setIsVendorRole(false);
         } finally {
           setIsCheckingVendorRole(false);
@@ -55,7 +58,7 @@ export function MainHeader() {
         setIsVendorRole(false);
         setIsCheckingVendorRole(false);
     }
-  }, [currentUser, authLoading, isPhaUser]);
+  }, [currentUser, authLoading, isPhaUser]); // Added isPhaUser dependency
 
   const handleLogout = async () => {
     await logOut();
@@ -75,8 +78,10 @@ export function MainHeader() {
     setSearchTerm(searchParams.get('q') || '');
   }, [searchParams]);
 
+  const isHcoUser = currentUser && !isPhaUser && !isVendorRole; // Generic HCO user
+  const isHealthSystemUser = currentUser && !isPhaUser && !isVendorRole; // For now, treat Health System users similar to HCOs for portal link, this needs refinement for dedicated HS portal
+                                                                         // A more robust role system would distinguish HS from generic HCO.
 
-  const isHcoUser = currentUser && !isPhaUser && !isVendorRole;
   const overallLoading = authLoading || (currentUser && !isPhaUser && isCheckingVendorRole);
 
   return (
@@ -138,15 +143,26 @@ export function MainHeader() {
                   </Link>
                 </Button>
               )}
-
-              {isHcoUser && (
+               {/* Placeholder for Health System Portal link, refine when HS user role is distinct */}
+              {!isPhaUser && !isVendorRole && pathname !== '/health-system-detailed-registration' && pathname !== '/health-system-portal' && (
                 <Button variant="ghost" size="sm" asChild>
-                  <Link href="/provider-portal">
+                  <Link href="/provider-portal"> {/* Default to provider portal for now */}
                     <LayoutDashboard className="mr-1 md:mr-2 h-4 w-4" />
                      <span className="hidden md:inline">Provider Portal</span>
                   </Link>
                 </Button>
               )}
+              {/* Specific link for users who are on health system pages or registered as such */}
+              {/* This part needs a better way to identify 'health system users' if they are distinct from HCO users */}
+              {!isPhaUser && !isVendorRole && (pathname === '/health-system-detailed-registration' || pathname === '/health-system-portal') && (
+                 <Button variant="ghost" size="sm" asChild>
+                  <Link href="/health-system-portal">
+                    <LayoutDashboard className="mr-1 md:mr-2 h-4 w-4" /> {/* Using same icon for now */}
+                     <span className="hidden md:inline">Health System Portal</span>
+                  </Link>
+                </Button>
+              )}
+
 
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="mr-0 sm:mr-2 h-4 w-4" />

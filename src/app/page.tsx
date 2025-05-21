@@ -25,14 +25,13 @@ export default function HomePage() {
 
   const [activeTab, setActiveTab] = React.useState(""); 
 
-  // Define tabs based on user role
   const tabsToRender: { value: string; label: string; icon: React.ElementType; content: React.ReactNode; condition?: boolean }[] = React.useMemo(() => {
     const allTabs = [];
     if (isPhaUser) {
       allTabs.push(
         { value: "pha-reviewer", label: "PHA Reviewer", icon: ClipboardList, content: <PHAReviewerDashboard enrollments={enrollments} updateEnrollmentStatus={updateEnrollmentStatus} isLoadingContext={isContextLoading} />, condition: true },
         { value: "health-systems", label: "Health Systems", icon: Network, content: <HealthSystemsTab />, condition: true },
-        { value: "ehr-vendors", label: "EHR/LIMS Vendors", icon: ListTree, content: <EhrVendorsTab enrollments={enrollments} />, condition: true },
+        { value: "ehr-vendors", label: "EHR/LIMS Vendors", icon: ListTree, content: <EhrVendorsTab />, condition: true },
         { value: "reports", label: "Reports", icon: BarChart3, content: (
           <Card className="w-full shadow-xl text-center">
             <CardHeader><CardTitle className="text-3xl font-bold flex items-center justify-center"><BarChart3 className="mr-3 h-8 w-8 text-primary" />Reports Dashboard</CardTitle><CardDescription className="text-lg text-foreground/80 mt-2">Access and generate various reports related to HCO onboarding and system data.</CardDescription></CardHeader>
@@ -53,46 +52,37 @@ export default function HomePage() {
             </Card>
         ), condition: true }
       );
-    } else { // Guest users
-      allTabs.push(
-        // Dashboard / Splash for guests is handled by the direct return block below
-      );
+    } else { // Guest users - no tabs, specific layout handled below
+      // The main page for guests (not logged in) will show the combined registration/login view directly.
     }
     return allTabs.filter(tab => tab.condition !== false);
-  }, [isPhaUser, currentUser, enrollments, updateEnrollmentStatus, isContextLoading]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPhaUser, currentUser, enrollments, updateEnrollmentStatus, isContextLoading]); 
   
   React.useEffect(() => {
-    if (authLoading) return; // Don't do anything if auth state is still loading
+    if (authLoading) return; 
 
-    let initialTab = "";
+    let defaultTabValue = "";
     if (isPhaUser) {
-      initialTab = "pha-reviewer";
+      defaultTabValue = "pha-reviewer";
     } else if (currentUser) {
-      initialTab = "dashboard";
-    } else { // Guest
-      // No default tab needed here as guests see a different layout
+      defaultTabValue = "dashboard"; 
     }
-    
-    const currentVisibleTabValues = tabsToRender.map(t => t.value);
+    // For guests, activeTab remains "" as they see a different layout
 
-    if (currentUser || isPhaUser) { // Only manage activeTab for logged-in users via this effect
-        if (!activeTab || !currentVisibleTabValues.includes(activeTab)) {
-            if (initialTab && currentVisibleTabValues.includes(initialTab)) {
-                setActiveTab(initialTab);
-            } else if (currentVisibleTabValues.length > 0) {
-                setActiveTab(currentVisibleTabValues[0]);
-            } else {
-                setActiveTab(""); // No valid tabs
-            }
-        }
-    } else {
-        setActiveTab(""); // Clear active tab for guests as they have a different layout
+    const currentVisibleTabValues = tabsToRender.map(t => t.value);
+    if (defaultTabValue && currentVisibleTabValues.includes(defaultTabValue)) {
+      if (activeTab !== defaultTabValue) { // Only set if it's different or not set
+        setActiveTab(defaultTabValue);
+      }
+    } else if (currentVisibleTabValues.length > 0 && !currentVisibleTabValues.includes(activeTab)) {
+      setActiveTab(currentVisibleTabValues[0]);
+    } else if (currentVisibleTabValues.length === 0) {
+        setActiveTab(""); // No tabs to show for this role.
     }
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPhaUser, currentUser, authLoading, tabsToRender]); // activeTab is intentionally omitted from deps
-                                                          // to make this effect primarily for setting initial/role-changed default tab.
-                                                          // tabsToRender is added because the list of valid tabs can change.
-
 
   if (isContextLoading || authLoading) {
     return (
@@ -103,7 +93,7 @@ export default function HomePage() {
     );
   }
 
-  if (!currentUser) {
+  if (!currentUser) { // Guest user view: Combined Registration Options and Login Form
     return (
       <main className="flex-1">
         <div className="container mx-auto py-8 lg:py-12">
@@ -171,15 +161,13 @@ export default function HomePage() {
   }
   
   let tabListCols = "sm:grid-cols-1";
-  if (isPhaUser) {
-    tabListCols = `sm:grid-cols-${tabsToRender.length > 0 ? tabsToRender.length : 1}`; // Dynamic based on number of PHA tabs
-  } else if (currentUser) {
-    tabListCols = "sm:grid-cols-1";
+  if (tabsToRender.length > 0) {
+      tabListCols = `sm:grid-cols-${tabsToRender.length}`;
   }
-
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
+      {/* MainHeader is rendered in RootLayout */}
       <main className="flex-1">
         <div className="container mx-auto py-6">
           {activeTab && tabsToRender.length > 0 ? (
@@ -216,3 +204,4 @@ export default function HomePage() {
     </div>
   );
 }
+

@@ -26,7 +26,7 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
-  isPhaUser: boolean;
+  isPhaUser: boolean; // Keep this for direct PHA admin check
   signUp: (email: string, password: string, displayName?: string) => Promise<User | null>;
   logIn: (identifier: string, password: string) => Promise<User | null>;
   logOut: () => Promise<void>;
@@ -83,11 +83,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signUp = async (email: string, password: string, displayName?: string): Promise<User | null> => {
     setLoading(true);
-    setIsPhaUser(false);
+    // isPhaUser will be determined by onAuthStateChanged logic based on Firestore data
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       if (displayName && userCredential.user) {
         await updateProfile(userCredential.user, { displayName });
+        // Re-trigger user object update to reflect displayName
+        setCurrentUser(auth.currentUser); 
       }
       toast({ title: 'Sign Up Successful', description: 'Welcome!' });
       return userCredential.user;
@@ -111,7 +113,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const logIn = async (identifier: string, password: string): Promise<User | null> => {
     setLoading(true);
-    setIsPhaUser(false);
+    // isPhaUser will be determined by onAuthStateChanged logic
     let emailToUse = identifier;
 
     if (!identifier.includes('@')) {
@@ -154,7 +156,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setLoading(true);
     try {
       await signOut(auth);
-      setIsPhaUser(false);
+      setIsPhaUser(false); // Reset on logout
       toast({
         title: 'Logged Out',
         description: 'You have been successfully logged out.',

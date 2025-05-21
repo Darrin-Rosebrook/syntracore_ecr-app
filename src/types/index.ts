@@ -295,3 +295,4 @@ export interface ResourceItem {
   createdAt: string; // ISO string
   lastUpdated: string; // ISO string
 }
+
