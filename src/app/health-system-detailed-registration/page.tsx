@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Share2, ArrowLeft, Building, Phone, Mail, Globe } from 'lucide-react';
+import { Loader2, Share2, ArrowLeft, Building, Phone, Mail, Globe, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +26,7 @@ export default function HealthSystemDetailedRegistrationPage() {
   const [contactEmail, setContactEmail] = useState('');
   const [corporateWebsite, setCorporateWebsite] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionComplete, setSubmissionComplete] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -56,16 +57,13 @@ export default function HealthSystemDetailedRegistrationPage() {
     });
 
     // Placeholder: In a real app, you'd call a server action here to save to Firestore
-    // For now, simulate a delay and show success
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     toast({
-      title: "Health System Details Submitted",
+      title: "Health System Details Recorded",
       description: `Details for ${officialName} have been recorded (simulated).`,
     });
-    // Redirect to a health system portal or dashboard (to be created)
-    // For now, redirecting to home page after "submission"
-    router.push('/');
+    setSubmissionComplete(true);
     setIsSubmitting(false);
   };
 
@@ -73,7 +71,7 @@ export default function HealthSystemDetailedRegistrationPage() {
     return <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
-  if (!currentUser) {
+  if (!currentUser && !authLoading) { // Check !authLoading here as well
      return (
         <div className="container mx-auto py-8 flex flex-col items-center justify-center">
             <Alert variant="destructive" className="max-w-md text-center">
@@ -87,6 +85,34 @@ export default function HealthSystemDetailedRegistrationPage() {
                 <Link href="/signup?type=healthsystem">Create Account for Health System Registration</Link>
             </Button>
         </div>
+    );
+  }
+
+  if (submissionComplete) {
+    return (
+      <div className="container mx-auto py-8 flex flex-col items-center justify-center">
+        <Card className="w-full max-w-xl mx-auto shadow-xl text-center">
+          <CardHeader>
+            <div className="flex justify-center mb-2">
+              <CheckCircle2 className="h-12 w-12 text-green-500" />
+            </div>
+            <CardTitle className="text-2xl">Details Submitted Successfully!</CardTitle>
+            <CardDescription>
+              Thank you for providing your Health System's details.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Your information for "{officialName}" has been recorded. You can now proceed to your Health System Portal.
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Button asChild className="w-full bg-primary hover:bg-primary/90">
+              <Link href="/health-system-portal">Continue to Portal</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
     );
   }
 
