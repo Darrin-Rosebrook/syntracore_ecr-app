@@ -11,6 +11,7 @@ export interface PracticeInfo {
   cliaNumber?: string;
   cliaLabName?: string;
   cliaLabType?: string;
+  organizationType?: string; // New field
 }
 
 export interface ContactDetails {

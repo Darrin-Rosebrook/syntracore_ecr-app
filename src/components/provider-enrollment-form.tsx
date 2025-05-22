@@ -46,6 +46,7 @@ const practiceInfoSchema = z.object({
     .min(10, "Valid phone number is required")
     .regex(/^\+?[0-9\s\-()]+$/, "Invalid phone number format"),
   healthSystem: z.string().optional(),
+  organizationType: z.string().optional(),
   isLabOrPerformsLabServices: z.enum(['yes', 'no'], { required_error: "Please select if this is a lab or performs lab services." }),
   cliaNumber: z.string().optional(),
   cliaLabName: z.string().optional(), // Retained as optional manual entry
@@ -158,6 +159,7 @@ export function ProviderEnrollmentForm({
         address: "",
         phone: "",
         healthSystem: "",
+        organizationType: "", // Added organizationType
         isLabOrPerformsLabServices: undefined,
         cliaNumber: "",
         cliaLabName: "",
@@ -610,6 +612,28 @@ export function ProviderEnrollmentForm({
                   </Select>
                 )}
               />
+            </div>
+
+            <div>
+              <Label htmlFor="organizationType">Organization Type</Label>
+              <Controller
+                name="practiceInfo.organizationType"
+                control={form.control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmittingForm}>
+                    <SelectTrigger id="organizationType">
+                      <SelectValue placeholder="Select Organization Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Hospital">Hospital</SelectItem>
+                      <SelectItem value="Clinic">Clinic</SelectItem>
+                      <SelectItem value="Lab">Lab</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {/* Optional: Display error message if needed in the future */}
+              {/* {form.formState.errors.practiceInfo?.organizationType && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.organizationType.message}</p>} */}
             </div>
           </fieldset>
 

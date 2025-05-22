@@ -40,6 +40,7 @@ export async function addEnrollmentToFirestore(
         cliaNumber: formData.practiceInfo.cliaNumber || undefined,
         cliaLabName: formData.practiceInfo.cliaLabName || undefined,
         cliaLabType: formData.practiceInfo.cliaLabType || undefined,
+        organizationType: formData.practiceInfo.organizationType || undefined, // Add this line
       },
       contactDetails: formData.contactDetails,
       ehrVendor: formData.ehrVendor,
