@@ -18,29 +18,51 @@ interface LoginFormProps {
 export function LoginForm({ onLoginSuccess }: LoginFormProps) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const { logIn, loading: authLoading, currentUser, resetPassword } = useAuth();
+  const { logIn, loading: authLoading, currentUser, userType, resetPassword } = useAuth();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
 
   useEffect(() => {
-    if (currentUser && onLoginSuccess) {
-      onLoginSuccess();
-    } else if (currentUser) {
-      router.push('/'); // Default redirect if no callback
+    // Redirect after login once currentUser and userType are available and auth is not loading
+    if (currentUser && !authLoading && userType) {
+      console.log(`[LoginForm] Attempting redirect. User: ${currentUser.email}, UserType: ${userType}`);
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      } else {
+        if (userType === 'hco') {
+          console.log('[LoginForm] Redirecting HCO user to /provider-portal');
+          router.push('/provider-portal');
+        } else if (userType === 'vendor') {
+          console.log('[LoginForm] Redirecting Vendor user to /vendor-portal');
+          router.push('/vendor-portal');
+        } else if (userType === 'healthsystem') {
+          console.log('[LoginForm] Redirecting Health System user to /health-system-portal');
+          router.push('/health-system-portal');
+        } else if (userType === 'pha') {
+          console.log('[LoginForm] Redirecting PHA user to / (main page)');
+          router.push('/'); // Main page handles PHA tabs
+        } else {
+          console.log(`[LoginForm] User logged in, unknown userType ('${userType}'), redirecting to /`);
+          router.push('/');
+        }
+      }
+    } else if (currentUser && !authLoading && !userType) {
+        // This case can happen if user is authenticated but userType determination is still pending or failed
+        console.warn(`[LoginForm] User ${currentUser.email} logged in, but userType is not yet resolved. Waiting or defaulting to /.`);
+        // Potentially add a small delay or rely on onAuthStateChanged to eventually set userType
+        // For now, if user is logged in but type isn't known, they might land on '/' and page.tsx will handle display
     }
-  }, [currentUser, router, onLoginSuccess]);
+  }, [currentUser, authLoading, userType, router, onLoginSuccess]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
+    console.log(`[LoginForm] Attempting login for identifier: ${identifier}`);
     const user = await logIn(identifier, password);
-    if (user) {
-      if (onLoginSuccess) {
-        onLoginSuccess();
-      } else {
-        router.push('/'); // Default redirect
-      }
+    // Redirection is now handled by the useEffect hook above
+    if (!user) {
+      console.log('[LoginForm] Login failed for identifier:', identifier);
     }
     setIsSubmitting(false);
   };

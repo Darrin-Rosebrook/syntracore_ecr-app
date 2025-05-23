@@ -12,31 +12,52 @@ import { Label } from '@/components/ui/label';
 import { Loader2, LogInIcon } from 'lucide-react';
 
 export default function LoginPage() {
-  const [identifier, setIdentifier] = useState(''); // Changed from email to identifier
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const { logIn, loading, currentUser, resetPassword } = useAuth();
+  const { logIn, loading: authLoading, currentUser, userType, resetPassword } = useAuth();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [forgotPasswordEmail, setForgotPasswordEmail] = useState(''); // For the reset password flow
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
 
   useEffect(() => {
-    if (currentUser) {
-      router.push('/'); 
+    // Redirect after login once currentUser and userType are available and auth is not loading
+    if (currentUser && !authLoading && userType) {
+      console.log(`[LoginPage] Attempting redirect. User: ${currentUser.email}, UserType: ${userType}`);
+      if (userType === 'hco') {
+        console.log('[LoginPage] Redirecting HCO user to /provider-portal');
+        router.push('/provider-portal');
+      } else if (userType === 'vendor') {
+        console.log('[LoginPage] Redirecting Vendor user to /vendor-portal');
+        router.push('/vendor-portal');
+      } else if (userType === 'healthsystem') {
+        console.log('[LoginPage] Redirecting Health System user to /health-system-portal');
+        router.push('/health-system-portal');
+      } else if (userType === 'pha') {
+        console.log('[LoginPage] Redirecting PHA user to / (main page)');
+        router.push('/'); // Main page handles PHA tabs
+      } else {
+        console.log(`[LoginPage] User logged in, unknown userType ('${userType}'), redirecting to /`);
+        router.push('/');
+      }
+    } else if (currentUser && !authLoading && !userType) {
+      console.warn(`[LoginPage] User ${currentUser.email} logged in, but userType is not yet resolved. Waiting or defaulting to /.`);
     }
-  }, [currentUser, router]);
+  }, [currentUser, authLoading, userType, router]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const user = await logIn(identifier, password); // Pass identifier
-    if (user) {
-      router.push('/');
+    console.log(`[LoginPage] Attempting login for identifier: ${identifier}`);
+    const user = await logIn(identifier, password);
+    if (!user) {
+      console.log('[LoginPage] Login failed for identifier:', identifier);
     }
+    // Redirection is handled by the useEffect hook
     setIsSubmitting(false);
   };
 
   const handlePasswordReset = async () => {
-    if (!forgotPasswordEmail && identifier.includes('@')) { // Use identifier if it's an email
+    if (!forgotPasswordEmail && identifier.includes('@')) {
         setForgotPasswordEmail(identifier); 
     }
     if (!forgotPasswordEmail && !identifier.includes('@')) {
@@ -62,12 +83,12 @@ export default function LoginPage() {
             <LogInIcon className="h-8 w-8 text-primary" />
           </div>
           <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>Enter your username or email and password to login.</CardDescription> {/* Updated description */}
+          <CardDescription>Enter your username or email and password to login.</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="identifier">Username or Email</Label> {/* Updated label */}
+              <Label htmlFor="identifier">Username or Email</Label>
               <Input
                 id="identifier"
                 type="text" 
@@ -75,12 +96,12 @@ export default function LoginPage() {
                 value={identifier}
                 onChange={(e) => {
                     setIdentifier(e.target.value);
-                    if (e.target.value.includes('@')) { // Auto-fill forgot password email if identifier is an email
+                    if (e.target.value.includes('@')) { 
                         setForgotPasswordEmail(e.target.value);
                     }
                 }}
                 required
-                disabled={loading || isSubmitting}
+                disabled={authLoading || isSubmitting}
               />
             </div>
             <div className="space-y-2">
@@ -91,13 +112,13 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                disabled={loading || isSubmitting}
+                disabled={authLoading || isSubmitting}
               />
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-3">
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading || isSubmitting}>
-              {(loading || isSubmitting) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={authLoading || isSubmitting}>
+              {(authLoading || isSubmitting) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Login
             </Button>
             <div className="w-full text-sm">
@@ -109,9 +130,9 @@ export default function LoginPage() {
                     value={forgotPasswordEmail}
                     onChange={(e) => setForgotPasswordEmail(e.target.value)}
                     className="mb-2 text-xs h-8"
-                    disabled={loading || isSubmitting}
+                    disabled={authLoading || isSubmitting}
                 />
-                <Button type="button" variant="link" onClick={handlePasswordReset} disabled={loading || isSubmitting || !forgotPasswordEmail} className="p-0 h-auto">
+                <Button type="button" variant="link" onClick={handlePasswordReset} disabled={authLoading || isSubmitting || !forgotPasswordEmail} className="p-0 h-auto">
                   Forgot password?
                 </Button>
             </div>
