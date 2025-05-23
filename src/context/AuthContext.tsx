@@ -8,8 +8,10 @@ import React, {
   useEffect,
   ReactNode,
 } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase'; // db is already here
 import type { User, AuthError } from 'firebase/auth';
+import { UserProfile, UserType } from '@/types'; // UserProfile, UserType should be here
+import { doc, setDoc, Timestamp, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore'; // Added getDoc, collection, query, where, getDocs, limit
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -26,8 +28,10 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
-  isPhaUser: boolean; // Keep this for direct PHA admin check
-  signUp: (email: string, password: string, displayName?: string) => Promise<User | null>;
+  isPhaUser: boolean; 
+  userProfile: UserProfile | null; // Added userProfile
+  userType: UserType | null; // Added userType
+  signUp: (email: string, password: string, displayName: string, registrationType: string, phone?: string) => Promise<User | null>; 
   logIn: (identifier: string, password: string) => Promise<User | null>;
   logOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -51,29 +55,79 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPhaUser, setIsPhaUser] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null); // Added userProfile state
+  const [userType, setUserType] = useState<UserType | null>(null); // Added userType state
   const [showGlobalLoader, setShowGlobalLoader] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log("Auth state changed. User:", user ? user.email : null);
-      setCurrentUser(user);
-      if (user && user.email) {
-        console.log(`AuthContext: Checking PHA status for ${user.email}`);
+      setCurrentUser(user); // Set currentUser immediately
+
+      if (user && user.uid) { // Ensure user.uid is available
         try {
-          const phaUsersRef = collection(db, 'phaUsers');
-          const q = query(phaUsersRef, where("email", "==", user.email), limit(1));
-          const querySnapshot = await getDocs(q);
-          const isPha = !querySnapshot.empty;
-          setIsPhaUser(isPha);
-          console.log(`AuthContext: ${user.email} isPhaUser status: ${isPha}`);
+          // 1. Check userProfiles first
+          const userProfileRef = doc(db, 'userProfiles', user.uid);
+          const userProfileSnap = await getDoc(userProfileRef);
+
+          if (userProfileSnap.exists()) {
+            const profileData = userProfileSnap.data() as UserProfile;
+            setUserProfile(profileData);
+            setUserType(profileData.userType);
+            setIsPhaUser(profileData.userType === 'PHA'); // Sync isPhaUser with userType
+            console.log(`AuthContext: UserProfile found for ${user.email}. Type: ${profileData.userType}`);
+          } else {
+            // 2. If not in userProfiles, check if they are a PHA user (legacy or admin-created)
+            console.log(`AuthContext: UserProfile not found for ${user.email}. Checking PHA status via phaUsers collection.`);
+            const phaUsersRef = collection(db, 'phaUsers');
+            // Using authUid for lookup as it's more reliable if available
+            const q = query(phaUsersRef, where("authUid", "==", user.uid), limit(1));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+              const phaData = querySnapshot.docs[0].data(); // Actual PhaUser data
+              setIsPhaUser(true);
+              setUserType('PHA');
+              // Construct a UserProfile-like object for context consistency
+              setUserProfile({ 
+                  uid: user.uid, 
+                  email: user.email!, 
+                  displayName: user.displayName || phaData.name, 
+                  userType: 'PHA', 
+                  // Ensure createdAt is a Firestore Timestamp, or convert if necessary
+                  createdAt: phaData.createdAt && typeof phaData.createdAt.toDate === 'function' 
+                             ? phaData.createdAt 
+                             : (phaData.createdAt && typeof phaData.createdAt === 'string' 
+                                ? Timestamp.fromDate(new Date(phaData.createdAt)) 
+                                : Timestamp.now()),
+                  updatedAt: phaData.updatedAt && typeof phaData.updatedAt.toDate === 'function'
+                             ? phaData.updatedAt
+                             : (phaData.updatedAt && typeof phaData.updatedAt === 'string'
+                                ? Timestamp.fromDate(new Date(phaData.updatedAt))
+                                : undefined)
+              });
+              console.log(`AuthContext: User ${user.email} identified as PHA user from phaUsers collection.`);
+            } else {
+              // 3. Not in userProfiles and not in phaUsers
+              console.warn(`AuthContext: User ${user.email} has no UserProfile and is not found in phaUsers by authUid. UserType unknown.`);
+              setIsPhaUser(false);
+              setUserType(null);
+              setUserProfile(null);
+            }
+          }
         } catch (error) {
-          console.error("AuthContext: Error checking PHA user status:", error);
+          console.error("AuthContext: Error fetching user profile or PHA status:", error);
+          setUserProfile(null);
+          setUserType(null);
           setIsPhaUser(false);
         }
       } else {
+        // No user / logout
+        setUserProfile(null);
+        setUserType(null);
         setIsPhaUser(false);
-        console.log("AuthContext: No user or user email, isPhaUser set to false.");
+        console.log("AuthContext: No user or user UID, states reset.");
       }
       setLoading(false);
       setShowGlobalLoader(false);
@@ -81,16 +135,49 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return unsubscribe;
   }, []);
 
-  const signUp = async (email: string, password: string, displayName?: string): Promise<User | null> => {
+  const signUp = async (email: string, password: string, displayName: string, registrationType: string, phone?: string): Promise<User | null> => {
     setLoading(true);
-    // isPhaUser will be determined by onAuthStateChanged logic based on Firestore data
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      if (displayName && userCredential.user) {
+      
+      if (userCredential.user) {
         await updateProfile(userCredential.user, { displayName });
-        // Re-trigger user object update to reflect displayName
-        setCurrentUser(auth.currentUser); 
+        setCurrentUser(auth.currentUser); // Re-trigger user object update
+
+        let mappedUserType: UserType;
+        switch (registrationType.toLowerCase()) {
+          case 'hco':
+            mappedUserType = 'HCO';
+            break;
+          case 'vendor':
+            mappedUserType = 'EHR_VENDOR';
+            break;
+          case 'healthsystem':
+            mappedUserType = 'HEALTH_SYSTEM';
+            break;
+          default:
+            console.error('Unknown registration type:', registrationType);
+            toast({ title: 'Error', description: `Invalid registration type: ${registrationType}`, variant: 'destructive' });
+            setLoading(false);
+            // Optionally, delete the created Firebase auth user if profile creation fails critically
+            // await userCredential.user.delete(); 
+            return null;
+        }
+
+        const userProfileData: UserProfile = {
+          uid: userCredential.user.uid,
+          email: userCredential.user.email!,
+          displayName: displayName || userCredential.user.displayName || '',
+          userType: mappedUserType,
+          createdAt: Timestamp.now(),
+          phone: phone || undefined,
+        };
+
+        const userProfileRef = doc(db, 'userProfiles', userCredential.user.uid);
+        await setDoc(userProfileRef, userProfileData);
+        console.log(`AuthContext: UserProfile created for ${userCredential.user.email} with type ${mappedUserType}`);
       }
+      
       toast({ title: 'Sign Up Successful', description: 'Welcome!' });
       return userCredential.user;
     } catch (error) {
@@ -156,7 +243,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setLoading(true);
     try {
       await signOut(auth);
-      setIsPhaUser(false); // Reset on logout
+      // Reset all user-specific states on logout
+      setCurrentUser(null); // Explicitly set currentUser to null
+      setIsPhaUser(false);
+      setUserProfile(null);
+      setUserType(null);
       toast({
         title: 'Logged Out',
         description: 'You have been successfully logged out.',
@@ -199,6 +290,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     currentUser,
     loading,
     isPhaUser,
+    userProfile, // Added userProfile
+    userType, // Added userType
     signUp,
     logIn,
     logOut,

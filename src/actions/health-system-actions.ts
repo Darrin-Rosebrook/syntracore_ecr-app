@@ -2,7 +2,7 @@
 'use server';
 
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, serverTimestamp, query, orderBy, Timestamp, doc, updateDoc } from 'firebase/firestore'; // Added doc, updateDoc
 import type { HealthSystemEntry } from '@/types';
 
 interface AddHealthSystemData {
@@ -30,6 +30,22 @@ export async function addHealthSystemAction(
     };
     const docRef = await addDoc(healthSystemsColRef, newHealthSystemPayload);
     console.log(`Health system "${data.name}" added successfully with ID ${docRef.id}.`);
+
+    // Mark Health System profile as complete in userProfiles
+    try {
+      const userProfileRef = doc(db, 'userProfiles', userId);
+      await updateDoc(userProfileRef, { 
+        isHealthSystemProfileComplete: true,
+        healthSystemId: docRef.id, // Store a reference to the health system document
+        // @ts-ignore
+        updatedAt: serverTimestamp() 
+      });
+      console.log(`[health-system-actions] UserProfile ${userId} marked with isHealthSystemProfileComplete: true and healthSystemId.`);
+    } catch (profileUpdateError) {
+      console.error(`[health-system-actions] ⚠️ Failed to update UserProfile for ${userId} with HealthSystemProfileComplete flag:`, profileUpdateError);
+      // Non-critical error for the primary operation, but log it.
+    }
+
     return { success: true, id: docRef.id };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred while adding the health system.';

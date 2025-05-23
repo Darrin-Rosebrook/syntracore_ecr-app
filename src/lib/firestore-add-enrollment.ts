@@ -3,7 +3,7 @@
 'use server';
 
 import { db } from "@/lib/firebase";
-import { collection, addDoc, Timestamp } from "firebase/firestore";
+import { collection, addDoc, Timestamp, doc, updateDoc } from "firebase/firestore"; // Added doc, updateDoc
 import type { EnrollmentFormData, FHIRValidationResult, ActivityLogEntry } from "@/types";
 
 export async function addEnrollmentToFirestore(
@@ -65,6 +65,21 @@ export async function addEnrollmentToFirestore(
 
     const docRef = await addDoc(collection(db, "enrollments"), dataToSave);
     console.log("[firestore-add-enrollment] ✅ Document successfully written to Firestore with ID: ", docRef.id);
+
+    // Mark HCO profile as complete
+    try {
+      const userProfileRef = doc(db, 'userProfiles', userId);
+      await updateDoc(userProfileRef, { 
+        isHcoProfileComplete: true,
+        hcoEnrollmentId: docRef.id, // Store a reference to the enrollment document
+        updatedAt: Timestamp.now() 
+      });
+      console.log(`[firestore-add-enrollment] UserProfile ${userId} marked with isHcoProfileComplete: true and hcoEnrollmentId.`);
+    } catch (profileUpdateError) {
+      console.error(`[firestore-add-enrollment] ⚠️ Failed to update UserProfile for ${userId} with HCORegComplete flag:`, profileUpdateError);
+      // Non-critical error, so we don't fail the whole operation, but log it.
+    }
+
     return { success: true, id: docRef.id };
   } catch (error: any) {
     console.error("❌ [firestore-add-enrollment] Firestore enrollment write failed:", error);
