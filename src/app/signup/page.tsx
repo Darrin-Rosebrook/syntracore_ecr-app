@@ -61,7 +61,8 @@ function SignupForm() {
     setIsSubmitting(true);
     console.log("[SignupPage] proceedWithSignup called. Registration Type from searchParams:", registrationType);
 
-    const user = await signUp(email, password, name);
+    // Pass registrationType and phone to signUp
+    const user = await signUp(email, password, name, registrationType, phone); 
     setIsSubmitting(false);
 
     if (user) {

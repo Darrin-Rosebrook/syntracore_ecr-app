@@ -1,5 +1,6 @@
 
 import type { FHIRValidationResult as ExternalFHIRValidationResult } from '@/services/fhir-validator';
+import { Timestamp } from 'firebase/firestore'; // Added Timestamp import
 
 export interface PracticeInfo {
   organizationNPI: string;
@@ -11,6 +12,7 @@ export interface PracticeInfo {
   cliaNumber?: string;
   cliaLabName?: string;
   cliaLabType?: string;
+  organizationType?: string; // New field
 }
 
 export interface ContactDetails {
@@ -119,13 +121,25 @@ export interface EnrollmentData extends EnrollmentFormData {
 }
 
 // Types for PHA User Management
+export type UserType = 'HCO' | 'EHR_VENDOR' | 'HEALTH_SYSTEM' | 'PHA';
+
+export interface UserProfile {
+  uid: string; // Firebase Auth User ID
+  email: string;
+  displayName?: string;
+  userType: UserType;
+  createdAt: Timestamp; 
+  updatedAt?: Timestamp; 
+  phone?: string; 
+}
+
 export type PhaProgram = 'Case Reporting';
 export type PhaRole = 'Admin' | 'User';
 export type PhaUserStatus = 'Active' | 'Inactive';
 
 export interface PhaUser {
   id: string;
-  authUid?: string;
+  authUid: string; // Made non-optional
   username?: string;
   name: string;
   email: string;

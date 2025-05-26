@@ -30,6 +30,22 @@ export async function createVendorProfileAction(
     };
     await setDoc(vendorRef, profilePayload);
     console.log(`Vendor profile created successfully for UID: ${userId}`);
+
+    // Mark Vendor profile as complete in userProfiles
+    try {
+      const userProfileRef = doc(db, 'userProfiles', userId);
+      await updateDoc(userProfileRef, { 
+        isVendorProfileComplete: true,
+        vendorProfileId: userId, // Vendor document ID is the userId
+        // @ts-ignore
+        updatedAt: serverTimestamp() 
+      });
+      console.log(`[vendor-actions] UserProfile ${userId} marked with isVendorProfileComplete: true.`);
+    } catch (profileUpdateError) {
+      console.error(`[vendor-actions] ⚠️ Failed to update UserProfile for ${userId} with VendorProfileComplete flag:`, profileUpdateError);
+      // Non-critical error for the primary operation, but log it.
+    }
+
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred while creating vendor profile.';

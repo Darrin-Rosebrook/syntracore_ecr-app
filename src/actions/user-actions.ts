@@ -1,10 +1,11 @@
 
 'use server';
 
-import type { PhaUser, PhaUserStatus } from '@/types';
+import type { PhaUser, PhaUserStatus, UserProfile } from '@/types'; // Added UserProfile
 import { db, auth as firebaseAuth } from '@/lib/firebase'; 
 import { createUserWithEmailAndPassword } from 'firebase/auth'; 
-import { serverTimestamp, collection, doc, setDoc, getDoc, updateDoc, getDocs, addDoc, query, orderBy, deleteDoc, where, limit, Timestamp } from 'firebase/firestore';
+// serverTimestamp, collection, doc, setDoc, getDoc, updateDoc, getDocs, addDoc, query, orderBy, deleteDoc, where, limit, Timestamp are already imported
+import { serverTimestamp, collection, doc, setDoc, getDoc, updateDoc, getDocs, addDoc, query, orderBy, deleteDoc, where, limit } from 'firebase/firestore';
 
 // Helper function to generate a random string (for username)
 function generateRandomString(length = 4): string {
@@ -69,12 +70,27 @@ export async function addPhaUserAction(
     };
     
     const usersColRef = collection(db, 'phaUsers');
-    const docRef = await addDoc(usersColRef, newUserForFirestore); 
+    const phaUserDocRef = await addDoc(usersColRef, newUserForFirestore); 
     
-    console.log(`PHA user Firestore record created for ${userData.email} with Firestore ID ${docRef.id}, Username: ${username}. Temporary Password: ${temporaryPasswordProvided}`);
+    console.log(`PHA user Firestore record created for ${userData.email} with Firestore ID ${phaUserDocRef.id}, Username: ${username}.`);
+
+    // Create UserProfile document
+    const userProfileData: UserProfile = {
+      uid: authUserUid,
+      email: userData.email,
+      displayName: userData.name,
+      userType: 'PHA',
+      // @ts-ignore 
+      createdAt: serverTimestamp(), // Consistent with phaUsers entry
+      phone: userData.phone || undefined,
+    };
+
+    const userProfileRef = doc(db, 'userProfiles', authUserUid);
+    await setDoc(userProfileRef, userProfileData);
+    console.log(`UserProfile document created for PHA user ${userData.email} with UID ${authUserUid}.`);
     
     // Return the password that was set by the admin
-    return { success: true, userId: docRef.id, username, temporaryPassword: temporaryPasswordProvided };
+    return { success: true, userId: phaUserDocRef.id, username, temporaryPassword: temporaryPasswordProvided };
 
   } catch (error) {
     const message = error instanceof Error ? error.message : "An unknown error occurred while adding the PHA user.";

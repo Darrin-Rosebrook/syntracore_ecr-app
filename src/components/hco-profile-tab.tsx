@@ -374,6 +374,21 @@ export function HcoProfileTab({
                   dynamicOptions={healthSystems} // Pass dynamic list
                   icon={Network}
                 />
+                <EditableField
+                  label="Organization Type"
+                  name="practiceInfo.organizationType"
+                  value={formData.practiceInfo?.organizationType}
+                  isEditing={isEditing}
+                  onChange={handleInputChange}
+                  type="select"
+                  options={[
+                    { label: 'Hospital', value: 'Hospital' },
+                    { label: 'Clinic', value: 'Clinic' },
+                    { label: 'Lab', value: 'Lab' },
+                    // Add other types as needed
+                  ]}
+                  // Optional: Add an icon if desired, e.g., icon={Briefcase} if imported
+                />
             </div>
 
             {/* Column 2: Contains nested grid for Primary Contact and EHR Info */}
