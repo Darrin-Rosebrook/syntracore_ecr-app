@@ -15,14 +15,14 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { EHR_VENDORS } from "@/lib/constants";
-import { FileUploader } from "@/components/file-uploader";
+// Removed: import { FileUploader } from "@/components/file-uploader";
 import { useToast } from "@/hooks/use-toast";
-import type { EnrollmentFormData, FHIRValidationResult, CustomFieldDefinition, CustomFieldOption, ProviderData, HealthSystemEntry } from "@/types";
-import { validateFHIR } from "@/services/fhir-validator";
+import type { EnrollmentFormData, CustomFieldDefinition, CustomFieldOption, ProviderData, HealthSystemEntry } from "@/types";
+// Removed: import { validateFHIR } from "@/services/fhir-validator";
 import { fetchNpiDataAction } from '@/actions/workflow-actions';
-// Removed: import { fetchCliaDataAction } from '@/actions/clia-actions';
-import { summarizeValidationResults } from "@/ai/flows/summarize-validation-results";
-import { FHIRValidationDisplay } from "./fhir-validation-display";
+import { fetchCliaDataAction } from '@/actions/clia-actions';
+// Removed: import { summarizeValidationResults } from "@/ai/flows/summarize-validation-results";
+// Removed: import { FHIRValidationDisplay } from "./fhir-validation-display";
 import { ClipboardList, User, Building, Settings2, FileText, ShieldCheck, Loader2, Info, CalendarDays, Hash, Search as SearchIcon, ArrowRight, FilePenLine, Beaker, Network } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -49,8 +49,8 @@ const practiceInfoSchema = z.object({
   organizationType: z.string().optional(),
   isLabOrPerformsLabServices: z.enum(['yes', 'no'], { required_error: "Please select if this is a lab or performs lab services." }),
   cliaNumber: z.string().optional(),
-  cliaLabName: z.string().optional(), // Retained as optional manual entry
-  cliaLabType: z.string().optional(), // Retained as optional manual entry
+  cliaLabName: z.string().optional(),
+  cliaLabType: z.string().optional(),
 }).refine(data => {
     if (data.isLabOrPerformsLabServices === 'yes' && (!data.cliaNumber || data.cliaNumber.trim() === '')) {
       return false;
@@ -69,7 +69,7 @@ const practiceInfoSchema = z.object({
     return true;
   }, {
     message: "Either Organization NPI or CLIA Number (if applicable) is required.",
-    path: ["organizationNPI"], 
+    path: ["organizationNPI"],
   });
 
 const contactDetailsSchema = z.object({
@@ -105,15 +105,15 @@ export function ProviderEnrollmentForm({
   const { currentUser, loading: authLoading } = useAuth();
   const { fetchInitialData, healthSystems } = useAppContext();
 
-  const [ccdFile, setCcdFile] = React.useState<File | null>(null);
-  const [ccdFileContent, setCcdFileContent] = React.useState<string | null>(null);
-  const [validationResult, setValidationResult] = React.useState<FHIRValidationResult | undefined>(undefined);
+  // Removed state related to CCD file and validation
   const [isSubmittingForm, setIsSubmittingForm] = React.useState(false);
-  const [isProcessingFile, setIsProcessingFile] = React.useState(false);
+  // Removed: isProcessingFile
 
   const [npiLookupLoading, setNpiLookupLoading] = React.useState(false);
   const [npiLookupError, setNpiLookupError] = React.useState<string | null>(null);
   const [fetchedNpiData, setFetchedNpiData] = React.useState<ProviderData | null>(null);
+
+  // CLIA lookup state removed
 
   const dynamicEnrollmentSchema = React.useMemo(() => {
     const additionalDataShape: Record<string, z.ZodTypeAny> = {};
@@ -159,7 +159,7 @@ export function ProviderEnrollmentForm({
         address: "",
         phone: "",
         healthSystem: "",
-        organizationType: "", // Added organizationType
+        organizationType: "",
         isLabOrPerformsLabServices: undefined,
         cliaNumber: "",
         cliaLabName: "",
@@ -210,8 +210,8 @@ export function ProviderEnrollmentForm({
   }, [customFieldDefinitions, form]);
 
    React.useEffect(() => {
-    console.log("[ProviderEnrollmentForm] useEffect for pre-filling triggered. AuthLoading:", authLoading);
-    if (authLoading) return; 
+    console.log("[ProviderEnrollmentForm] Auth Loading:", authLoading, "Current User:", currentUser?.email);
+    if (authLoading) return;
 
     if (!currentUser) {
       console.log("[ProviderEnrollmentForm] No currentUser, redirecting to signup.");
@@ -222,29 +222,22 @@ export function ProviderEnrollmentForm({
 
     console.log("[ProviderEnrollmentForm] CurrentUser available:", currentUser.email, "DisplayName:", currentUser.displayName);
     const currentFormValues = form.getValues();
-    console.log("[ProviderEnrollmentForm] Current contactDetails.name:", currentFormValues.contactDetails.name);
-    console.log("[ProviderEnrollmentForm] Current contactDetails.email:", currentFormValues.contactDetails.email);
-    console.log("[ProviderEnrollmentForm] Current practiceInfo.healthSystem:", currentFormValues.practiceInfo.healthSystem);
-
+    console.log("[ProviderEnrollmentForm] Form pre-fill check. Initial values - Contact Name:", currentFormValues.contactDetails.name, "Contact Email:", currentFormValues.contactDetails.email, "Health System:", currentFormValues.practiceInfo.healthSystem);
 
     if (!currentFormValues.contactDetails.name && currentUser.displayName) {
       console.log("[ProviderEnrollmentForm] PRE-FILLING Contact Name with currentUser.displayName:", currentUser.displayName);
       form.setValue('contactDetails.name', currentUser.displayName, { shouldValidate: true, shouldDirty: true });
-    } else if (currentFormValues.contactDetails.name) {
-      console.log("[ProviderEnrollmentForm] Contact Name already has a value:", currentFormValues.contactDetails.name);
-    } else if (!currentUser.displayName) {
-       console.log("[ProviderEnrollmentForm] currentUser.displayName is empty, not pre-filling contact name.");
+    } else {
+      console.log("[ProviderEnrollmentForm] Contact Name not pre-filled. Current value:", currentFormValues.contactDetails.name, "Display name:", currentUser.displayName);
     }
-    
+
     if (!currentFormValues.contactDetails.email && currentUser.email) {
       console.log("[ProviderEnrollmentForm] PRE-FILLING Contact Email with currentUser.email:", currentUser.email);
       form.setValue('contactDetails.email', currentUser.email, { shouldValidate: true, shouldDirty: true });
-    } else if (currentFormValues.contactDetails.email) {
-       console.log("[ProviderEnrollmentForm] Contact Email already has a value:", currentFormValues.contactDetails.email);
-    } else if (!currentUser.email) {
-        console.log("[ProviderEnrollmentForm] currentUser.email is empty, not pre-filling contact email.");
+    } else {
+      console.log("[ProviderEnrollmentForm] Contact Email not pre-filled. Current value:", currentFormValues.contactDetails.email, "User email:", currentUser.email);
     }
-    
+
     if (healthSystems && healthSystems.length > 0 && !currentFormValues.practiceInfo.healthSystem) {
       console.log("[ProviderEnrollmentForm] Checking for user's registered Health System. Current User UID:", currentUser.uid);
       const userHealthSystem = healthSystems.find(hs => hs.registeredByUserId === currentUser.uid);
@@ -254,70 +247,14 @@ export function ProviderEnrollmentForm({
       } else {
         console.log("[ProviderEnrollmentForm] No specific Health System found registered by this user UID:", currentUser.uid);
       }
-    } else if (currentFormValues.practiceInfo.healthSystem) {
-        console.log("[ProviderEnrollmentForm] Health System already has a value:", currentFormValues.practiceInfo.healthSystem);
+    } else {
+        console.log("[ProviderEnrollmentForm] Health System not pre-filled. Current value:", currentFormValues.practiceInfo.healthSystem, "Available Health Systems:", healthSystems?.length);
     }
 
   }, [currentUser, authLoading, router, toast, form, healthSystems]);
 
 
-  const handleFileSelect = async (file: File | null, fileContent: string | null) => {
-    setCcdFile(file);
-    setCcdFileContent(fileContent);
-    setValidationResult(undefined);
-    console.log("[ProviderEnrollmentForm] File selected:", file ? file.name : "No file");
-
-    if (file && fileContent) {
-      setIsProcessingFile(true);
-      let parsedContent: any;
-
-      try {
-         try {
-          parsedContent = JSON.parse(fileContent);
-        } catch (error) {
-          console.warn("[ProviderEnrollmentForm] File content is not valid JSON, treating as text/XML for validation:", error);
-          parsedContent = fileContent; 
-        }
-
-        const rawValidationResult = await validateFHIR(parsedContent);
-        console.log("[ProviderEnrollmentForm] Raw FHIR validation result:", rawValidationResult);
-
-        if (Object.keys(rawValidationResult).length > 0 && rawValidationResult.messages && rawValidationResult.messages.length > 0) {
-          const aiSummaryResult = await summarizeValidationResults({ validationResults: rawValidationResult });
-          console.log("[ProviderEnrollmentForm] AI summary result:", aiSummaryResult);
-          setValidationResult({
-            ...rawValidationResult,
-            summary: aiSummaryResult.summary,
-          });
-        } else {
-            console.warn("[ProviderEnrollmentForm] FHIR validation returned an empty or minimal result. Assuming validation passed but providing a generic message.");
-            setValidationResult({
-                isValid: true, // Assume valid if no errors, or adjust as needed
-                messages: ["File processed. No critical validation issues reported by the basic checker."],
-                summary: "File structure appears acceptable by basic checks. Detailed review may be needed."
-            });
-        }
-
-      } catch (validationError) {
-        console.error("[ProviderEnrollmentForm] Error during FHIR validation or AI summarization:", validationError);
-        toast({
-          title: "Processing Error",
-          description: `An error occurred while validating the file: ${(validationError as Error).message}`,
-          variant: "destructive",
-        });
-        setValidationResult({
-            isValid: false,
-            messages: ["Error during validation or AI summarization.", (validationError as Error).message],
-            summary: "File processing failed."
-        });
-      } finally {
-        setIsProcessingFile(false);
-      }
-    } else {
-      setValidationResult(undefined);
-      setIsProcessingFile(false);
-    }
-  };
+  // Removed handleFileSelect function
 
   const handleNpiLookup = async () => {
     const npiToLookup = form.getValues('practiceInfo.organizationNPI');
@@ -366,28 +303,18 @@ export function ProviderEnrollmentForm({
     form.setValue('practiceInfo.organizationNPI', '');
     toast({ title: 'NPI Data Cleared', description: 'NPI lookup information has been cleared.' });
   };
-  
+
+  // Removed CLIA lookup functions
+
   const onSubmitRegistration = async (data: FormSchemaType) => {
     setIsSubmittingForm(true);
     console.log("[ProviderEnrollmentForm] Form is submitting...");
     console.log("[ProviderEnrollmentForm] Raw Form Data from react-hook-form state:", JSON.stringify(data, null, 2));
-    console.log("[ProviderEnrollmentForm] Current CCD File:", ccdFile ? ccdFile.name : "No file selected/processed");
-    console.log("[ProviderEnrollmentForm] Current Validation Result:", JSON.stringify(validationResult, null, 2));
 
     if (!currentUser || !currentUser.uid || !currentUser.email) {
         toast({ title: "Authentication Error", description: "You must be logged in to submit.", variant: "destructive" });
         setIsSubmittingForm(false);
         return;
-    }
-    if (!ccdFile) {
-      toast({ title: "Missing Document", description: "Please upload a CCD/FHIR document.", variant: "destructive" });
-      setIsSubmittingForm(false);
-      return;
-    }
-    if (!validationResult) {
-      toast({ title: "File Not Processed or Invalid", description: "Please ensure the file is correctly processed and valid or re-upload if an error occurred.", variant: "destructive" });
-      setIsSubmittingForm(false);
-      return;
     }
 
     try {
@@ -399,7 +326,7 @@ export function ProviderEnrollmentForm({
             cliaLabName: data.practiceInfo.isLabOrPerformsLabServices === 'yes' ? data.practiceInfo.cliaLabName : undefined,
             cliaLabType: data.practiceInfo.isLabOrPerformsLabServices === 'yes' ? data.practiceInfo.cliaLabType : undefined,
         },
-        ccdDocumentName: ccdFile.name,
+        // ccdDocumentName removed
         additionalData: data.additionalData || {},
         userId: currentUser.uid,
         userEmail: currentUser.email,
@@ -409,8 +336,6 @@ export function ProviderEnrollmentForm({
 
       const submissionResult = await addEnrollmentToFirestore(
         enrollmentDataToSubmit,
-        ccdFileContent, // Pass the string content of the CCD file
-        validationResult,
         currentUser.uid,
         currentUser.email
       );
@@ -441,10 +366,7 @@ export function ProviderEnrollmentForm({
   };
 
   const sortedCustomFieldDefinitions = [...customFieldDefinitions].sort((a,b) => a.order - b.order);
-  console.log("[ProviderEnrollmentForm] Rendering. Fetched NPI Data state:", fetchedNpiData);
-
   const healthSystemOptions = healthSystems.map(hs => ({ label: hs.name, value: hs.id }));
-
 
   if (authLoading) {
      return <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-2">Loading form...</p></div>;
@@ -452,7 +374,6 @@ export function ProviderEnrollmentForm({
   if (!currentUser && !authLoading) {
      return <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center"><p>Redirecting to login/signup...</p></div>;
   }
-
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
@@ -519,7 +440,7 @@ export function ProviderEnrollmentForm({
                     )}
                 />
                 {form.formState.errors.practiceInfo?.cliaNumber && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.cliaNumber.message}</p>}
-                
+
                 <div>
                     <Label htmlFor="cliaLabName" className="text-xs">CLIA Lab Name (Optional, if different from main HCO Name)</Label>
                     <Input id="cliaLabName" {...form.register("practiceInfo.cliaLabName")} placeholder="Enter Lab Name" disabled={isSubmittingForm} />
@@ -632,8 +553,6 @@ export function ProviderEnrollmentForm({
                   </Select>
                 )}
               />
-              {/* Optional: Display error message if needed in the future */}
-              {/* {form.formState.errors.practiceInfo?.organizationType && <p className="text-sm text-destructive mt-1">{form.formState.errors.practiceInfo.organizationType.message}</p>} */}
             </div>
           </fieldset>
 
@@ -672,12 +591,7 @@ export function ProviderEnrollmentForm({
             </fieldset>
           )}
 
-          <fieldset className="space-y-4 p-4 border rounded-md">
-            <legend className="text-lg font-medium px-1 flex items-center"> <FileText className="mr-2 h-5 w-5 text-primary" /> CCD/FHIR Document </legend>
-            <FileUploader onFileSelect={handleFileSelect} acceptedFileTypes=".xml,.json" label="Upload Document (JSON or XML)" />
-            {isProcessingFile && ( <div className="text-muted-foreground text-sm flex items-center mt-2"> <Loader2 className="h-4 w-4 animate-spin mr-2" /> Processing file... </div> )}
-            <FHIRValidationDisplay result={validationResult} />
-          </fieldset>
+          {/* Removed FileUploader and FHIRValidationDisplay sections */}
 
           <fieldset className="p-4 border rounded-md">
             <legend className="text-lg font-medium px-1 flex items-center"> <ShieldCheck className="mr-2 h-5 w-5 text-primary" /> Consent Agreement <span className="text-destructive ml-1">*</span> </legend>
@@ -687,7 +601,7 @@ export function ProviderEnrollmentForm({
           </fieldset>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isSubmittingForm || isProcessingFile || npiLookupLoading } >
+          <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isSubmittingForm || npiLookupLoading } >
             {isSubmittingForm ? ( <> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting Registration... </> ) : ( <> Submit Registration <ArrowRight className="ml-2 h-4 w-4" /> </> )}
           </Button>
         </CardFooter>
@@ -695,6 +609,3 @@ export function ProviderEnrollmentForm({
     </Card>
   );
 }
-    
-
-    

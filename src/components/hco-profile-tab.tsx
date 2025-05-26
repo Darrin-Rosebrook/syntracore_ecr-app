@@ -19,7 +19,7 @@ import { EHR_VENDORS } from '@/lib/constants';
 import { FHIRValidationDisplay } from '@/components/fhir-validation-display';
 import { HcoOnboardingWorkflowSteps } from '@/components/hco-onboarding-workflow-steps';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useAppContext } from '@/context/AppContext'; // For dynamic health systems
+import { useAppContext } from '@/context/AppContext';
 
 type EditableFieldOnChangeEvent =
   | ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -32,8 +32,8 @@ interface EditableFieldProps {
   isEditing: boolean;
   onChange: (event: EditableFieldOnChangeEvent) => void;
   type?: string;
-  options?: { label: string; value: string }[]; // For EHR Vendors, etc.
-  dynamicOptions?: HealthSystemEntry[]; // For dynamic health systems
+  options?: { label: string; value: string }[];
+  dynamicOptions?: HealthSystemEntry[];
   customField?: CustomFieldDefinition;
   allCustomFields?: CustomFieldDefinition[];
   formData?: Record<string, any>;
@@ -44,7 +44,7 @@ const EditableField: React.FC<EditableFieldProps> = ({
   label, value, name, isEditing, onChange, type = 'text',
   options, dynamicOptions, customField, allCustomFields, formData, icon: Icon
 }) => {
-  const { healthSystems: contextHealthSystems } = useAppContext(); // Get dynamic health systems
+  const { healthSystems: contextHealthSystems } = useAppContext();
 
   const displayValue = (val: any, cf?: CustomFieldDefinition) => {
     if (val === undefined || val === null || val === '') return <span className="italic text-muted-foreground">Not provided</span>;
@@ -68,7 +68,7 @@ const EditableField: React.FC<EditableFieldProps> = ({
         const vendor = EHR_VENDORS.find(v => v.value === val);
         return vendor ? vendor.label : String(val);
     }
-    if (name === 'practiceInfo.healthSystem' && contextHealthSystems) { // Use contextHealthSystems
+    if (name === 'practiceInfo.healthSystem' && contextHealthSystems) {
         const system = contextHealthSystems.find(hs => hs.id === val);
         return system ? system.name : String(val);
     }
@@ -92,7 +92,6 @@ const EditableField: React.FC<EditableFieldProps> = ({
   const isRequired = customField?.required || false;
 
   if (customField) {
-    // Custom field rendering logic remains the same
     switch (customField.type) {
       case 'text':
         return (
@@ -116,39 +115,7 @@ const EditableField: React.FC<EditableFieldProps> = ({
         );
       case 'select':
         let currentOptions = customField.options || [];
-        if (customField.parentFieldId && customField.dependentOptionsJson && formData && allCustomFields) {
-            const parentValue = formData[`additionalData.${customField.parentFieldId}`];
-            if (parentValue) {
-              try {
-                const dependentOptionsMap = JSON.parse(customField.dependentOptionsJson);
-                currentOptions = dependentOptionsMap[parentValue] || [];
-              } catch (e) { console.error("Error parsing dependentOptionsJson", e); }
-            } else {
-              currentOptions = [];
-            }
-        }
-        return (
-          <div className="mb-3">
-            <Label htmlFor={fieldId} className="flex items-center">
-                {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
-                {fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}
-            </Label>
-            <Select name={fieldId} onValueChange={(val) => onChange({ target: { name: fieldId, value: val } })} value={value || ''}
-              disabled={customField.parentFieldId && formData && !formData[`additionalData.${customField.parentFieldId}`] && currentOptions.length === 0}
-            >
-              <SelectTrigger id={fieldId} className="ml-6 w-[calc(100%-1.5rem)]"><SelectValue placeholder={customField.placeholder || "Select an option"} /></SelectTrigger>
-              <SelectContent>
-                {currentOptions.filter(opt => opt.value && opt.value.trim() !== '').map((option: CustomFieldOption) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-                 {currentOptions.length === 0 && customField.parentFieldId && formData && formData[`additionalData.${customField.parentFieldId}`] && (
-                    <SelectItem value="NO_OPTIONS_TEMP_VALUE_PLACEHOLDER" disabled>No options for selected parent</SelectItem>
-                )}
-                 {currentOptions.length === 0 && customField.parentFieldId && (!formData || !formData[`additionalData.${customField.parentFieldId}`]) && (
-                    <SelectItem value="SELECT_PARENT_TEMP_VALUE_PLACEHOLDER" disabled>Select parent field first</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-        );
+        if (fieldDef.parentFieldId && fieldDef.dependentOptionsJson && watchedAdditionalData) { const parentValue = watchedAdditionalData[fieldDef.parentFieldId]; if (parentValue) { try { const dependentOptionsMap = JSON.parse(fieldDef.dependentOptionsJson); currentOptions = dependentOptionsMap[parentValue] || []; } catch (e) { console.error("Error parsing dependentOptionsJson", e); } } else { currentOptions = []; } } return ( <Select onValueChange={field.onChange} value={field.value} disabled={isSubmittingForm || (fieldDef.parentFieldId && watchedAdditionalData && !watchedAdditionalData[fieldDef.parentFieldId] && currentOptions.length === 0)}> <SelectTrigger id={fieldName} className={error ? "border-destructive" : ""}> <SelectValue placeholder={fieldDef.placeholder || "Select an option"} /> </SelectTrigger> <SelectContent> {currentOptions.filter(opt => opt.value && opt.value.trim() !== '').map((option: CustomFieldOption) => (<SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>))} {currentOptions.length === 0 && fieldDef.parentFieldId && watchedAdditionalData && watchedAdditionalData[fieldDef.parentFieldId] && ( <SelectItem value="NO_OPTIONS_TEMP_VALUE_PLACEHOLDER" disabled>No options for selected parent</SelectItem> )} {currentOptions.length === 0 && fieldDef.parentFieldId && (!watchedAdditionalData || !watchedAdditionalData[fieldDef.parentFieldId]) && ( <SelectItem value="SELECT_PARENT_TEMP_VALUE_PLACEHOLDER" disabled>Select parent field first</SelectItem> )} </SelectContent> </Select> ); }} /> )}
       case 'checkbox':
         return (
           <div className="flex items-center space-x-2 mb-3 py-2 ml-6">
@@ -228,7 +195,6 @@ const EditableField: React.FC<EditableFieldProps> = ({
     }
   }
 
-  // Standard fields (not custom fields)
   if (type === 'textarea') {
     return (
       <div className="mb-3">
@@ -254,7 +220,6 @@ const EditableField: React.FC<EditableFieldProps> = ({
         <Select name={fieldId} onValueChange={(val) => onChange({target: {name: fieldId, value: val}})} value={value || ''}>
           <SelectTrigger id={fieldId} className="ml-6 w-[calc(100%-1.5rem)]"><SelectValue placeholder={`Select ${fieldLabel.toLowerCase()}`} /></SelectTrigger>
           <SelectContent>
-             <SelectItem value="">None</SelectItem>
             {selectOptions?.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -297,7 +262,7 @@ export function HcoProfileTab({
   isSaving,
   currentEnrollment,
 }: HcoProfileTabProps) {
-  const { healthSystems } = useAppContext(); // Get dynamic health systems
+  const { healthSystems } = useAppContext(); 
 
   const handleInputChange = (e: EditableFieldOnChangeEvent) => {
     const { name, value } = e.target;
@@ -323,8 +288,7 @@ export function HcoProfileTab({
   const sortedCustomFieldDefinitions = [...customFieldDefinitions].sort((a, b) => a.order - b.order);
 
   return (
-    <div className="space-y-6">
-      <Card className="shadow-lg mt-2">
+    <Card className="shadow-lg mt-2">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-xl font-semibold flex items-center">
             <UserCircle className="mr-2 h-5 w-5 text-primary" />
@@ -357,7 +321,6 @@ export function HcoProfileTab({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
-            {/* Column 1: Practice Information */}
             <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
               <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><Building className="mr-2 h-4 w-4 text-muted-foreground"/>Practice Information</h4>
                 <EditableField label="Organization NPI" name="practiceInfo.organizationNPI" value={formData.practiceInfo?.organizationNPI} isEditing={isEditing} onChange={handleInputChange} icon={Hash} />
@@ -371,7 +334,7 @@ export function HcoProfileTab({
                   isEditing={isEditing}
                   onChange={handleInputChange}
                   type="select"
-                  dynamicOptions={healthSystems} // Pass dynamic list
+                  dynamicOptions={healthSystems} 
                   icon={Network}
                 />
                 <EditableField
@@ -385,23 +348,19 @@ export function HcoProfileTab({
                     { label: 'Hospital', value: 'Hospital' },
                     { label: 'Clinic', value: 'Clinic' },
                     { label: 'Lab', value: 'Lab' },
-                    // Add other types as needed
                   ]}
-                  // Optional: Add an icon if desired, e.g., icon={Briefcase} if imported
                 />
             </div>
 
-            {/* Column 2: Contains nested grid for Primary Contact and EHR Info */}
-            <div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-                <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
-                  <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><User className="mr-2 h-4 w-4 text-muted-foreground"/>Primary Contact Details</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                 <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
+                    <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><User className="mr-2 h-4 w-4 text-muted-foreground"/>Primary Contact Details</h4>
                     <EditableField label="Contact Name" name="contactDetails.name" value={formData.contactDetails?.name} isEditing={isEditing} onChange={handleInputChange} />
                     <EditableField label="Email" name="contactDetails.email" value={formData.contactDetails?.email} type="email" isEditing={isEditing} onChange={handleInputChange} />
                     <EditableField label="Phone" name="contactDetails.phone" value={formData.contactDetails?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
                 </div>
-                <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
-                  <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><Settings2 className="mr-2 h-4 w-4 text-muted-foreground"/>EHR &amp; System Info</h4>
+                 <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
+                    <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><Settings2 className="mr-2 h-4 w-4 text-muted-foreground"/>EHR &amp; System Info</h4>
                     <EditableField
                       label="EHR Vendor"
                       name="ehrVendor"
@@ -413,7 +372,6 @@ export function HcoProfileTab({
                       icon={Settings2}
                     />
                 </div>
-              </div>
             </div>
           </div>
 
@@ -445,6 +403,7 @@ export function HcoProfileTab({
         <HcoOnboardingWorkflowSteps enrollment={enrollment} />
       </div>
 
+      {/* Conditionally render FHIR/CCD section if data exists */}
       {enrollment.ccdDocumentName && (
          <Card className="mt-6 shadow-lg">
             <CardHeader>
@@ -455,9 +414,11 @@ export function HcoProfileTab({
                     <strong>Document Name:</strong> {enrollment.ccdDocumentName}
                 </CardDescription>
             </CardHeader>
-            <CardContent>
-                {enrollment.validationResult && <FHIRValidationDisplay result={enrollment.validationResult} />}
-            </CardContent>
+            {enrollment.validationResult && (
+              <CardContent>
+                <FHIRValidationDisplay result={enrollment.validationResult} />
+              </CardContent>
+            )}
          </Card>
       )}
     </div>
