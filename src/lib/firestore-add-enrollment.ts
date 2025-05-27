@@ -4,7 +4,7 @@
 
 import { db } from "@/lib/firebase";
 import { collection, addDoc, Timestamp, doc, updateDoc } from "firebase/firestore";
-import type { EnrollmentFormData, ActivityLogEntry } from "@/types"; // Removed FHIRValidationResult
+import type { EnrollmentFormData, ActivityLogEntry, PracticeInfo } from "@/types";
 
 export async function addEnrollmentToFirestore(
   formData: EnrollmentFormData,
@@ -23,31 +23,42 @@ export async function addEnrollmentToFirestore(
       user: userId,
     };
 
+    // Build the practiceInfo object carefully, omitting undefined/empty optional fields
+    const practiceInfoPayload: Partial<PracticeInfo> = {
+      organizationNPI: formData.practiceInfo.organizationNPI || '', // Ensure NPI is at least an empty string if not provided
+      name: formData.practiceInfo.name,
+      address: formData.practiceInfo.address,
+      phone: formData.practiceInfo.phone,
+      isLabOrPerformsLabServices: formData.practiceInfo.isLabOrPerformsLabServices || 'no',
+    };
+
+    if (formData.practiceInfo.healthSystem && formData.practiceInfo.healthSystem.trim() !== "") {
+      practiceInfoPayload.healthSystem = formData.practiceInfo.healthSystem;
+    }
+    if (formData.practiceInfo.cliaNumber && formData.practiceInfo.cliaNumber.trim() !== "") {
+      practiceInfoPayload.cliaNumber = formData.practiceInfo.cliaNumber;
+    }
+    if (formData.practiceInfo.cliaLabName && formData.practiceInfo.cliaLabName.trim() !== "") {
+      practiceInfoPayload.cliaLabName = formData.practiceInfo.cliaLabName;
+    }
+    if (formData.practiceInfo.cliaLabType && formData.practiceInfo.cliaLabType.trim() !== "") {
+      practiceInfoPayload.cliaLabType = formData.practiceInfo.cliaLabType;
+    }
+    if (formData.practiceInfo.organizationType && formData.practiceInfo.organizationType.trim() !== "") {
+      practiceInfoPayload.organizationType = formData.practiceInfo.organizationType;
+    }
+
     const dataToSave = {
       userId: userId,
       userEmail: userEmail,
-      practiceInfo: {
-        organizationNPI: formData.practiceInfo.organizationNPI || '',
-        name: formData.practiceInfo.name,
-        address: formData.practiceInfo.address,
-        phone: formData.practiceInfo.phone,
-        healthSystem: formData.practiceInfo.healthSystem || undefined,
-        isLabOrPerformsLabServices: formData.practiceInfo.isLabOrPerformsLabServices || 'no',
-        cliaNumber: formData.practiceInfo.cliaNumber || undefined,
-        cliaLabName: formData.practiceInfo.cliaLabName || undefined,
-        cliaLabType: formData.practiceInfo.cliaLabType || undefined,
-        organizationType: formData.practiceInfo.organizationType || undefined,
-      },
+      practiceInfo: practiceInfoPayload,
       contactDetails: formData.contactDetails,
       ehrVendor: formData.ehrVendor,
       consent: formData.consent,
       submissionDate: Timestamp.fromDate(submissionDate),
-      // validationResult removed
       status: "Pending" as const,
       activityLog: [{ ...logEntry, timestamp: Timestamp.fromDate(new Date(logEntry.timestamp)) }],
       additionalData: formData.additionalData || {},
-      // ccdDocumentName removed
-      // ccdDocumentContent removed
       additionalContacts: formData.additionalContacts || [],
       messages: [],
     };
