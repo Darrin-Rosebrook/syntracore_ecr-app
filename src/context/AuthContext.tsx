@@ -10,7 +10,7 @@ import React, {
 } from 'react';
 import { auth, db } from '@/lib/firebase';
 import type { User, AuthError } from 'firebase/auth';
-import { UserProfile, UserType, PhaUser, VendorProfileData, HealthSystemEntry } from '@/types'; // Ensure all relevant types are imported
+import { UserProfile, UserType, PhaUser, VendorProfileData, HealthSystemEntry } from '@/types';
 import { doc, setDoc, Timestamp, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import {
   createUserWithEmailAndPassword,
@@ -27,7 +27,7 @@ import { getPhaUserByUsernameAction } from '@/actions/user-actions';
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
-  isPhaUser: boolean; // Kept for direct PHA check if needed, though userType is primary
+  isPhaUser: boolean;
   userProfile: UserProfile | null;
   userType: UserType | null;
   signUp: (email: string, password: string, displayName: string, registrationTypeParam: string, phone?: string) => Promise<User | null>;
@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log("[AuthContext] Auth state changed. User:", user ? user.email : "null");
       setCurrentUser(user);
-      setShowGlobalLoader(true);
+      setShowGlobalLoader(true); // Show loader immediately
       setLoading(true);
 
       try {
@@ -72,101 +72,74 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           let determinedUserProfile: UserProfile | null = null;
           let determinedIsPhaUser = false;
 
-          // 1. Check userProfiles collection first
-          const userProfileRef = doc(db, 'userProfiles', user.uid);
-          const userProfileSnap = await getDoc(userProfileRef);
+          // 1. Check phaUsers collection first (by email)
+          console.log(`[AuthContext] Checking PHA status for ${user.email}`);
+          const phaUsersColRef = collection(db, 'phaUsers');
+          const qPhaEmail = query(phaUsersColRef, where("email", "==", user.email), limit(1));
+          const phaEmailSnap = await getDocs(qPhaEmail);
 
-          if (userProfileSnap.exists()) {
-            const profileData = userProfileSnap.data() as UserProfile;
-            determinedUserProfile = profileData;
-            determinedUserType = profileData.userType;
-            determinedIsPhaUser = profileData.userType === 'PHA';
-            console.log(`[AuthContext] UserProfile found for ${user.email}. Type: ${profileData.userType}`);
+          if (!phaEmailSnap.empty) {
+            const phaData = phaEmailSnap.docs[0].data() as PhaUser;
+            determinedUserType = 'PHA';
+            determinedIsPhaUser = true;
+            determinedUserProfile = {
+              uid: user.uid,
+              email: user.email,
+              displayName: phaData.name || user.displayName || 'PHA User',
+              userType: 'PHA',
+              createdAt: phaData.createdAt ? (typeof (phaData.createdAt as any)?.toDate === 'function' ? phaData.createdAt as Timestamp : Timestamp.fromDate(new Date(phaData.createdAt as string))) : Timestamp.now(),
+              phone: phaData.phone || undefined,
+            };
+            console.log(`[AuthContext] User ${user.email} identified as PHA by email match in phaUsers.`);
           } else {
-            console.log(`[AuthContext] UserProfile not found for ${user.email}. Proceeding to check other collections.`);
-            // 2. Check phaUsers by email
-            const phaUsersColRef = collection(db, 'phaUsers');
-            const qPhaEmail = query(phaUsersColRef, where("email", "==", user.email), limit(1));
-            const phaEmailSnap = await getDocs(qPhaEmail);
+            // 2. If not PHA, check vendors collection (by UID)
+            console.log(`[AuthContext] User ${user.email} not PHA. Checking vendor status for UID: ${user.uid}`);
+            const vendorDocRef = doc(db, 'vendors', user.uid); // Assumes vendor doc ID is user.uid
+            const vendorSnap = await getDoc(vendorDocRef);
 
-            if (!phaEmailSnap.empty) {
-              const phaData = phaEmailSnap.docs[0].data() as PhaUser;
-              determinedUserType = 'PHA';
-              determinedIsPhaUser = true;
+            if (vendorSnap.exists()) {
+              const vendorData = vendorSnap.data() as VendorProfileData;
+              determinedUserType = 'EHR_VENDOR';
               determinedUserProfile = {
                 uid: user.uid,
                 email: user.email,
-                displayName: phaData.name || user.displayName || 'PHA User',
-                userType: 'PHA',
-                createdAt: phaData.createdAt ? (typeof (phaData.createdAt as any)?.toDate === 'function' ? phaData.createdAt as Timestamp : Timestamp.fromDate(new Date(phaData.createdAt as string))) : Timestamp.now(),
-                phone: phaData.phone || undefined,
+                displayName: vendorData.contactName || user.displayName || 'Vendor User',
+                userType: 'EHR_VENDOR',
+                createdAt: vendorData.createdAt ? (typeof (vendorData.createdAt as any)?.toDate === 'function' ? vendorData.createdAt as Timestamp : Timestamp.fromDate(new Date(vendorData.createdAt as string))) : Timestamp.now(),
+                phone: (vendorData as any).phone || undefined,
               };
-              console.log(`[AuthContext] User ${user.email} identified as PHA by email match in phaUsers.`);
+              console.log(`[AuthContext] User ${user.email} identified as EHR_VENDOR by UID match in vendors.`);
             } else {
-              // 3. Check phaUsers by authUid
-              const qPhaUid = query(phaUsersColRef, where("authUid", "==", user.uid), limit(1));
-              const phaUidSnap = await getDocs(qPhaUid);
-              if (!phaUidSnap.empty) {
-                const phaData = phaUidSnap.docs[0].data() as PhaUser;
-                determinedUserType = 'PHA';
-                determinedIsPhaUser = true;
+              // 3. If not Vendor, check healthSystems collection (by registeredByUserId)
+              console.log(`[AuthContext] User ${user.email} not Vendor. Checking health system status for UID: ${user.uid}`);
+              const healthSystemsColRef = collection(db, 'healthSystems');
+              const qHealthSystem = query(healthSystemsColRef, where("registeredByUserId", "==", user.uid), limit(1));
+              const healthSystemSnap = await getDocs(qHealthSystem);
+
+              if (!healthSystemSnap.empty) {
+                const hsData = healthSystemSnap.docs[0].data() as HealthSystemEntry;
+                determinedUserType = 'HEALTH_SYSTEM';
                 determinedUserProfile = {
                   uid: user.uid,
                   email: user.email,
-                  displayName: phaData.name || user.displayName || 'PHA User',
-                  userType: 'PHA',
-                  createdAt: phaData.createdAt ? (typeof (phaData.createdAt as any)?.toDate === 'function' ? phaData.createdAt as Timestamp : Timestamp.fromDate(new Date(phaData.createdAt as string))) : Timestamp.now(),
-                  phone: phaData.phone || undefined,
+                  displayName: hsData.name || user.displayName || 'Health System User',
+                  userType: 'HEALTH_SYSTEM',
+                  createdAt: hsData.createdAt ? (typeof (hsData.createdAt as any)?.toDate === 'function' ? hsData.createdAt as Timestamp : Timestamp.fromDate(new Date(hsData.createdAt as string))) : Timestamp.now(),
+                  phone: hsData.contactPhone || undefined,
                 };
-                console.log(`[AuthContext] User ${user.email} identified as PHA by authUid match in phaUsers.`);
+                console.log(`[AuthContext] User ${user.email} identified as HEALTH_SYSTEM by registeredByUserId match in healthSystems.`);
               } else {
-                // 4. Check vendors collection
-                const vendorsColRef = collection(db, 'vendors');
-                const qVendor = query(vendorsColRef, where("userId", "==", user.uid), limit(1));
-                const vendorSnap = await getDocs(qVendor);
-                if (!vendorSnap.empty) {
-                  const vendorData = vendorSnap.docs[0].data() as VendorProfileData;
-                  determinedUserType = 'EHR_VENDOR';
-                  determinedUserProfile = {
-                    uid: user.uid,
-                    email: user.email,
-                    displayName: vendorData.contactName || user.displayName || 'Vendor User',
-                    userType: 'EHR_VENDOR',
-                    createdAt: vendorData.createdAt ? (typeof (vendorData.createdAt as any)?.toDate === 'function' ? vendorData.createdAt as Timestamp : Timestamp.fromDate(new Date(vendorData.createdAt as string))) : Timestamp.now(),
-                    phone: (vendorData as any).phone || undefined, // Assuming phone might exist on vendor data
-                  };
-                  console.log(`[AuthContext] User ${user.email} identified as EHR_VENDOR.`);
-                } else {
-                  // 5. Check healthSystems collection
-                  const healthSystemsColRef = collection(db, 'healthSystems');
-                  const qHealthSystem = query(healthSystemsColRef, where("registeredByUserId", "==", user.uid), limit(1));
-                  const healthSystemSnap = await getDocs(qHealthSystem);
-                  if (!healthSystemSnap.empty) {
-                    const hsData = healthSystemSnap.docs[0].data() as HealthSystemEntry;
-                    determinedUserType = 'HEALTH_SYSTEM';
-                    determinedUserProfile = {
-                      uid: user.uid,
-                      email: user.email,
-                      displayName: hsData.name || user.displayName || 'Health System User',
-                      userType: 'HEALTH_SYSTEM',
-                      createdAt: hsData.createdAt ? (typeof (hsData.createdAt as any)?.toDate === 'function' ? hsData.createdAt as Timestamp : Timestamp.fromDate(new Date(hsData.createdAt as string))) : Timestamp.now(),
-                      phone: hsData.contactPhone || undefined,
-                    };
-                    console.log(`[AuthContext] User ${user.email} identified as HEALTH_SYSTEM.`);
-                  } else {
-                    // 6. Default to HCO if logged in and no other type identified
-                    determinedUserType = 'HCO';
-                    determinedUserProfile = {
-                      uid: user.uid,
-                      email: user.email,
-                      displayName: user.displayName || 'HCO User',
-                      userType: 'HCO',
-                      createdAt: Timestamp.now(), // Or fetch from enrollment if that's primary
-                      // phone: undefined, // Or fetch from enrollment
-                    };
-                    console.log(`[AuthContext] User ${user.email} not explicitly PHA, Vendor, or Health System. Defaulting to HCO.`);
-                  }
-                }
+                // 4. If not PHA, Vendor, or Health System, and logged in, default to HCO
+                determinedUserType = 'HCO';
+                determinedUserProfile = {
+                  uid: user.uid,
+                  email: user.email,
+                  displayName: user.displayName || 'HCO User',
+                  userType: 'HCO',
+                  createdAt: Timestamp.now(),
+                  phone: undefined, // Or fetch from enrollment if available
+                };
+                console.log(`[AuthContext] User ${user.email} not PHA, Vendor, or Health System. Defaulting to HCO.`);
               }
             }
           }
@@ -181,13 +154,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           console.log("[AuthContext] No user authenticated or user data incomplete. States reset.");
         }
       } catch (error) {
-        console.error("[AuthContext] Critical error in onAuthStateChanged processing:", error);
+        console.error("[AuthContext] Error processing user auth state:", error);
         setUserProfile(null);
         setUserType(null);
         setIsPhaUser(false);
         toast({
           title: "Authentication Error",
-          description: "Could not determine user role. Please try logging in again.",
+          description: "Could not determine user role due to an internal error. Please try logging in again.",
           variant: "destructive",
         });
       } finally {
@@ -197,11 +170,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     });
     return unsubscribe;
-  }, [toast]); // toast is stable
+  }, [toast]);
 
   const signUp = async (email: string, password: string, displayName: string, registrationTypeParam: string, phone?: string): Promise<User | null> => {
     setLoading(true);
-    setIsPhaUser(false);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -219,7 +191,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           console.error('[AuthContext] Unknown registration type during signup:', registrationTypeParam);
           toast({ title: 'Error', description: `Invalid registration type: ${registrationTypeParam}`, variant: 'destructive' });
           setLoading(false);
-          // Optionally delete user: await user.delete();
           return null;
       }
 
@@ -235,22 +206,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       await setDoc(userProfileRef, userProfileData);
       console.log(`[AuthContext] UserProfile created for ${user.email} with type ${mappedUserType}`);
 
-      setUserProfile(userProfileData); // Eagerly update context state
+      setCurrentUser(user);
+      setUserProfile(userProfileData);
       setUserType(mappedUserType);
-      setIsPhaUser(mappedUserType === 'PHA');
+      setIsPhaUser(mappedUserType === 'PHA'); // This would only be true if 'PHA' was a registrationTypeParam option
 
       toast({ title: 'Sign Up Successful', description: 'Welcome!' });
       return user;
     } catch (error) {
       const authError = error as AuthError;
       console.error('[AuthContext] Sign up error:', authError.code, authError.message);
-      let description = authError.message;
+      let descriptionText = authError.message;
       if (authError.code === 'auth/email-already-in-use') {
-        description = 'This email address is already registered. Please try logging in or use a different email.';
+        descriptionText = 'This email address is already registered. Please try logging in or use a different email.';
       } else if (authError.code === 'auth/weak-password') {
-        description = 'The password is too weak. Please choose a stronger password.';
+        descriptionText = 'The password is too weak. Please choose a stronger password.';
       }
-      toast({ title: 'Sign Up Failed', description, variant: 'destructive' });
+      toast({ title: 'Sign Up Failed', description: descriptionText, variant: 'destructive' });
       return null;
     } finally {
       setLoading(false);
@@ -291,21 +263,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const logOut = async () => {
-    setShowGlobalLoader(true); // Show loader immediately on logout action
+    setShowGlobalLoader(true);
     setLoading(true);
     try {
       await signOut(auth);
-      // onAuthStateChanged will reset other states (currentUser, userProfile, userType, isPhaUser)
       toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
     } catch (error) {
       const authError = error as AuthError;
       console.error('[AuthContext] Logout error:', authError.message);
       toast({ title: 'Logout Failed', description: authError.message, variant: 'destructive' });
-      // Ensure loaders are hidden even if signOut fails, though onAuthStateChanged should still fire
+      // Explicitly set loading to false here in case signOut errors early
       setLoading(false);
       setShowGlobalLoader(false);
     }
-    // setLoading and setShowGlobalLoader will be handled by onAuthStateChanged triggering with null user
+    // onAuthStateChanged will reset other states (currentUser, userProfile, userType, isPhaUser)
   };
 
   const resetPassword = async (email: string) => {
@@ -345,3 +316,4 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
