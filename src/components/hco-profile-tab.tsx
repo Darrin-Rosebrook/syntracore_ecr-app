@@ -42,7 +42,7 @@ interface EditableFieldProps {
 
 const EditableField: React.FC<EditableFieldProps> = ({
   label, value, name, isEditing, onChange, type = 'text',
-  options, dynamicOptions, customField, allCustomFields, formData, icon: Icon
+  options, dynamicOptions, customField, formData, icon: Icon
 }) => {
   const { healthSystems: contextHealthSystems } = useAppContext();
 
@@ -75,21 +75,21 @@ const EditableField: React.FC<EditableFieldProps> = ({
     return String(val);
   };
 
+  const fieldId = customField ? `additionalData.${customField.id}` : name;
+  const fieldLabel = customField?.label || label;
+  const isRequired = customField?.required || false;
+
   if (!isEditing) {
     return (
       <div className="mb-3">
         <Label className="font-semibold text-foreground/80 flex items-center">
           {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
-          {customField?.label || label}:
+          {fieldLabel}:
         </Label>
         <p className="text-sm mt-0.5 ml-6">{displayValue(value, customField)}</p>
       </div>
     );
   }
-
-  const fieldId = customField ? `additionalData.${customField.id}` : name;
-  const fieldLabel = customField?.label || label;
-  const isRequired = customField?.required || false;
 
   if (customField) {
     switch (customField.type) {
@@ -113,9 +113,62 @@ const EditableField: React.FC<EditableFieldProps> = ({
             <Textarea id={fieldId} name={fieldId} value={value || ''} onChange={onChange} placeholder={customField.placeholder} className="ml-6 w-[calc(100%-1.5rem)]" />
           </div>
         );
-      case 'select':
-        let currentOptions = customField.options || [];
-        if (fieldDef.parentFieldId && fieldDef.dependentOptionsJson && watchedAdditionalData) { const parentValue = watchedAdditionalData[fieldDef.parentFieldId]; if (parentValue) { try { const dependentOptionsMap = JSON.parse(fieldDef.dependentOptionsJson); currentOptions = dependentOptionsMap[parentValue] || []; } catch (e) { console.error("Error parsing dependentOptionsJson", e); } } else { currentOptions = []; } } return ( <Select onValueChange={field.onChange} value={field.value} disabled={isSubmittingForm || (fieldDef.parentFieldId && watchedAdditionalData && !watchedAdditionalData[fieldDef.parentFieldId] && currentOptions.length === 0)}> <SelectTrigger id={fieldName} className={error ? "border-destructive" : ""}> <SelectValue placeholder={fieldDef.placeholder || "Select an option"} /> </SelectTrigger> <SelectContent> {currentOptions.filter(opt => opt.value && opt.value.trim() !== '').map((option: CustomFieldOption) => (<SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>))} {currentOptions.length === 0 && fieldDef.parentFieldId && watchedAdditionalData && watchedAdditionalData[fieldDef.parentFieldId] && ( <SelectItem value="NO_OPTIONS_TEMP_VALUE_PLACEHOLDER" disabled>No options for selected parent</SelectItem> )} {currentOptions.length === 0 && fieldDef.parentFieldId && (!watchedAdditionalData || !watchedAdditionalData[fieldDef.parentFieldId]) && ( <SelectItem value="SELECT_PARENT_TEMP_VALUE_PLACEHOLDER" disabled>Select parent field first</SelectItem> )} </SelectContent> </Select> ); }} /> )}
+      case 'select': {
+        let currentOptions: CustomFieldOption[] = customField.options || [];
+        let selectDisabled = !isEditing;
+        let placeholder = customField.placeholder || "Select an option";
+
+        if (customField.parentFieldId && customField.dependentOptionsJson && formData?.additionalData) {
+          const parentValue = formData.additionalData[customField.parentFieldId];
+          if (parentValue) {
+            try {
+              const dependentOptionsMap = JSON.parse(customField.dependentOptionsJson);
+              currentOptions = dependentOptionsMap[parentValue] || [];
+              if (currentOptions.length === 0) {
+                placeholder = "No options for selected parent";
+              }
+            } catch (e) {
+              console.error("Error parsing dependentOptionsJson for field:", customField.id, e);
+              currentOptions = [];
+              placeholder = "Error loading dependent options";
+            }
+          } else {
+            currentOptions = []; // No parent value selected, so child options are empty
+            selectDisabled = true; // Disable if parent not selected
+            placeholder = "Select parent field first";
+          }
+        }
+
+        return (
+          <div className="mb-3">
+            <Label htmlFor={fieldId} className="flex items-center">
+              {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
+              {fieldLabel}{isRequired && <span className="text-destructive ml-1">*</span>}
+            </Label>
+            <Select
+              value={value || ''}
+              onValueChange={(val) => onChange({ target: { name: fieldId, value: val } })}
+              disabled={selectDisabled}
+            >
+              <SelectTrigger id={fieldId} className="ml-6 w-[calc(100%-1.5rem)]">
+                <SelectValue placeholder={placeholder} />
+              </SelectTrigger>
+              <SelectContent>
+                {currentOptions
+                  .filter(opt => opt.value && opt.value.trim() !== '') 
+                  .map((option: CustomFieldOption) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                {currentOptions.length === 0 && customField.parentFieldId && (
+                  <SelectItem value="TEMP_PLACEHOLDER_NO_OPTIONS" disabled>
+                    {placeholder}
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      }
       case 'checkbox':
         return (
           <div className="flex items-center space-x-2 mb-3 py-2 ml-6">
@@ -195,14 +248,15 @@ const EditableField: React.FC<EditableFieldProps> = ({
     }
   }
 
+  // Standard fields (not custom)
   if (type === 'textarea') {
     return (
       <div className="mb-3">
-        <Label htmlFor={fieldId} className="flex items-center">
+        <Label htmlFor={name} className="flex items-center">
             {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
-            {fieldLabel}
+            {label}
         </Label>
-        <Textarea id={fieldId} name={fieldId} value={value || ''} onChange={onChange} className="ml-6 w-[calc(100%-1.5rem)]" />
+        <Textarea id={name} name={name} value={value || ''} onChange={onChange} className="ml-6 w-[calc(100%-1.5rem)]" />
       </div>
     );
   }
@@ -213,12 +267,12 @@ const EditableField: React.FC<EditableFieldProps> = ({
 
      return (
       <div className="mb-3">
-        <Label htmlFor={fieldId} className="flex items-center">
+        <Label htmlFor={name} className="flex items-center">
             {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
-            {fieldLabel}
+            {label}
         </Label>
-        <Select name={fieldId} onValueChange={(val) => onChange({target: {name: fieldId, value: val}})} value={value || ''}>
-          <SelectTrigger id={fieldId} className="ml-6 w-[calc(100%-1.5rem)]"><SelectValue placeholder={`Select ${fieldLabel.toLowerCase()}`} /></SelectTrigger>
+        <Select name={name} onValueChange={(val) => onChange({target: {name: name, value: val}})} value={value || ''}>
+          <SelectTrigger id={name} className="ml-6 w-[calc(100%-1.5rem)]"><SelectValue placeholder={`Select ${label.toLowerCase()}`} /></SelectTrigger>
           <SelectContent>
             {selectOptions?.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
           </SelectContent>
@@ -229,11 +283,11 @@ const EditableField: React.FC<EditableFieldProps> = ({
 
   return (
     <div className="mb-3">
-      <Label htmlFor={fieldId} className="flex items-center">
+      <Label htmlFor={name} className="flex items-center">
         {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
-        {fieldLabel}
+        {label}
       </Label>
-      <Input id={fieldId} name={fieldId} type={type} value={value || ''} onChange={onChange} className="ml-6 w-[calc(100%-1.5rem)]" />
+      <Input id={name} name={name} type={type} value={value || ''} onChange={onChange} className="ml-6 w-[calc(100%-1.5rem)]" />
     </div>
   );
 };
@@ -288,122 +342,123 @@ export function HcoProfileTab({
   const sortedCustomFieldDefinitions = [...customFieldDefinitions].sort((a, b) => a.order - b.order);
 
   return (
-    <Card className="shadow-lg mt-2">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-xl font-semibold flex items-center">
-            <UserCircle className="mr-2 h-5 w-5 text-primary" />
-            HCO Profile Details
-          </CardTitle>
-          <div className="flex space-x-2">
-            {isEditing && (
+    <>
+      <Card className="shadow-lg mt-2">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-xl font-semibold flex items-center">
+              <UserCircle className="mr-2 h-5 w-5 text-primary" />
+              HCO Profile Details
+            </CardTitle>
+            <div className="flex space-x-2">
+              {isEditing && (
+                <Button onClick={() => {
+                    setIsEditing(false);
+                    if(currentEnrollment) {
+                        setFormData({
+                            practiceInfo: { ...currentEnrollment.practiceInfo },
+                            contactDetails: { ...currentEnrollment.contactDetails },
+                            ehrVendor: currentEnrollment.ehrVendor,
+                            additionalData: { ...(currentEnrollment.additionalData || {}) }
+                        });
+                    }
+                }} variant="outline" size="sm" disabled={isSaving}>
+                     Cancel
+                </Button>
+              )}
               <Button onClick={() => {
-                  setIsEditing(false);
-                  if(currentEnrollment) {
-                      setFormData({
-                          practiceInfo: { ...currentEnrollment.practiceInfo },
-                          contactDetails: { ...currentEnrollment.contactDetails },
-                          ehrVendor: currentEnrollment.ehrVendor,
-                          additionalData: { ...(currentEnrollment.additionalData || {}) }
-                      });
-                  }
-              }} variant="outline" size="sm" disabled={isSaving}>
-                   Cancel
+                if (isEditing) handleSave();
+                else setIsEditing(true);
+              }} variant={isEditing ? 'default' : 'outline'} size="sm" className={isEditing ? 'bg-green-600 hover:bg-green-700 text-white' : ''} disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : (isEditing ? <Save className="mr-1 h-4 w-4" /> : <Edit className="mr-1 h-4 w-4" />)}
+                {isSaving ? 'Saving...' : (isEditing ? 'Save Profile' : 'Edit Profile')}
               </Button>
-            )}
-            <Button onClick={() => {
-              if (isEditing) handleSave();
-              else setIsEditing(true);
-            }} variant={isEditing ? 'default' : 'outline'} size="sm" className={isEditing ? 'bg-green-600 hover:bg-green-700 text-white' : ''} disabled={isSaving}>
-              {isSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : (isEditing ? <Save className="mr-1 h-4 w-4" /> : <Edit className="mr-1 h-4 w-4" />)}
-              {isSaving ? 'Saving...' : (isEditing ? 'Save Profile' : 'Edit Profile')}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
-            <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
-              <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><Building className="mr-2 h-4 w-4 text-muted-foreground"/>Practice Information</h4>
-                <EditableField label="Organization NPI" name="practiceInfo.organizationNPI" value={formData.practiceInfo?.organizationNPI} isEditing={isEditing} onChange={handleInputChange} icon={Hash} />
-                <EditableField label="Practice Name" name="practiceInfo.name" value={formData.practiceInfo?.name} isEditing={isEditing} onChange={handleInputChange} />
-                <EditableField label="Address" name="practiceInfo.address" value={formData.practiceInfo?.address} type="textarea" isEditing={isEditing} onChange={handleInputChange} />
-                <EditableField label="Phone" name="practiceInfo.phone" value={formData.practiceInfo?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
-                <EditableField
-                  label="Health System"
-                  name="practiceInfo.healthSystem"
-                  value={formData.practiceInfo?.healthSystem}
-                  isEditing={isEditing}
-                  onChange={handleInputChange}
-                  type="select"
-                  dynamicOptions={healthSystems} 
-                  icon={Network}
-                />
-                <EditableField
-                  label="Organization Type"
-                  name="practiceInfo.organizationType"
-                  value={formData.practiceInfo?.organizationType}
-                  isEditing={isEditing}
-                  onChange={handleInputChange}
-                  type="select"
-                  options={[
-                    { label: 'Hospital', value: 'Hospital' },
-                    { label: 'Clinic', value: 'Clinic' },
-                    { label: 'Lab', value: 'Lab' },
-                  ]}
-                />
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-                 <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
-                    <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><User className="mr-2 h-4 w-4 text-muted-foreground"/>Primary Contact Details</h4>
-                    <EditableField label="Contact Name" name="contactDetails.name" value={formData.contactDetails?.name} isEditing={isEditing} onChange={handleInputChange} />
-                    <EditableField label="Email" name="contactDetails.email" value={formData.contactDetails?.email} type="email" isEditing={isEditing} onChange={handleInputChange} />
-                    <EditableField label="Phone" name="contactDetails.phone" value={formData.contactDetails?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
-                </div>
-                 <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
-                    <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><Settings2 className="mr-2 h-4 w-4 text-muted-foreground"/>EHR &amp; System Info</h4>
-                    <EditableField
-                      label="EHR Vendor"
-                      name="ehrVendor"
-                      value={formData.ehrVendor}
-                      isEditing={isEditing}
-                      onChange={handleInputChange}
-                      type="select"
-                      options={EHR_VENDORS}
-                      icon={Settings2}
-                    />
-                </div>
-            </div>
-          </div>
-
-          {sortedCustomFieldDefinitions.length > 0 && (
-            <div className="md:col-span-2 mt-4 pt-4 border-t">
-                <h4 className="text-md font-medium mb-3 flex items-center"><Info className="mr-2 h-4 w-4 text-muted-foreground"/>Additional Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0 p-4 border rounded-md bg-muted/30 shadow-sm">
-                {sortedCustomFieldDefinitions.map(fieldDef => (
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
+              {/* Left Column: Practice Information */}
+              <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
+                <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><Building className="mr-2 h-4 w-4 text-muted-foreground"/>Practice Information</h4>
+                  <EditableField label="Organization NPI" name="practiceInfo.organizationNPI" value={formData.practiceInfo?.organizationNPI} isEditing={isEditing} onChange={handleInputChange} icon={Hash} />
+                  <EditableField label="Practice Name" name="practiceInfo.name" value={formData.practiceInfo?.name} isEditing={isEditing} onChange={handleInputChange} />
+                  <EditableField label="Address" name="practiceInfo.address" value={formData.practiceInfo?.address} type="textarea" isEditing={isEditing} onChange={handleInputChange} />
+                  <EditableField label="Phone" name="practiceInfo.phone" value={formData.practiceInfo?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
                   <EditableField
-                    key={fieldDef.id}
-                    label={fieldDef.label}
-                    name={`additionalData.${fieldDef.id}`}
-                    value={formData.additionalData?.[fieldDef.id]}
+                    label="Health System"
+                    name="practiceInfo.healthSystem"
+                    value={formData.practiceInfo?.healthSystem}
                     isEditing={isEditing}
                     onChange={handleInputChange}
-                    customField={fieldDef}
-                    allCustomFields={customFieldDefinitions}
-                    formData={formData}
-                    icon={Info}
+                    type="select"
+                    dynamicOptions={healthSystems} 
+                    icon={Network}
                   />
-                ))}
-                </div>
+                  <EditableField
+                    label="Organization Type"
+                    name="practiceInfo.organizationType"
+                    value={formData.practiceInfo?.organizationType}
+                    isEditing={isEditing}
+                    onChange={handleInputChange}
+                    type="select"
+                    options={[
+                      { label: 'Hospital', value: 'Hospital' },
+                      { label: 'Clinic', value: 'Clinic' },
+                      { label: 'Lab', value: 'Lab' },
+                    ]}
+                  />
+              </div>
+
+              {/* Right Column: Contact and EHR Info */}
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                   <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
+                      <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><User className="mr-2 h-4 w-4 text-muted-foreground"/>Primary Contact Details</h4>
+                      <EditableField label="Contact Name" name="contactDetails.name" value={formData.contactDetails?.name} isEditing={isEditing} onChange={handleInputChange} />
+                      <EditableField label="Email" name="contactDetails.email" value={formData.contactDetails?.email} type="email" isEditing={isEditing} onChange={handleInputChange} />
+                      <EditableField label="Phone" name="contactDetails.phone" value={formData.contactDetails?.phone} type="tel" isEditing={isEditing} onChange={handleInputChange} />
+                  </div>
+                   <div className="p-4 border rounded-md bg-muted/30 shadow-sm space-y-3 mb-4">
+                      <h4 className="text-md font-medium mb-2 mt-0 flex items-center"><Settings2 className="mr-2 h-4 w-4 text-muted-foreground"/>EHR &amp; System Info</h4>
+                      <EditableField
+                        label="EHR Vendor"
+                        name="ehrVendor"
+                        value={formData.ehrVendor}
+                        isEditing={isEditing}
+                        onChange={handleInputChange}
+                        type="select"
+                        options={EHR_VENDORS}
+                        icon={Settings2}
+                      />
+                  </div>
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {sortedCustomFieldDefinitions.length > 0 && (
+              <div className="md:col-span-2 mt-4 pt-4 border-t">
+                  <h4 className="text-md font-medium mb-3 flex items-center"><Info className="mr-2 h-4 w-4 text-muted-foreground"/>Additional Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0 p-4 border rounded-md bg-muted/30 shadow-sm">
+                  {sortedCustomFieldDefinitions.map(fieldDef => (
+                    <EditableField
+                      key={fieldDef.id}
+                      label={fieldDef.label}
+                      name={`additionalData.${fieldDef.id}`}
+                      value={formData.additionalData?.[fieldDef.id]}
+                      isEditing={isEditing}
+                      onChange={handleInputChange}
+                      customField={fieldDef}
+                      formData={formData} 
+                      icon={Info}
+                    />
+                  ))}
+                  </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
       <div className="mt-6 pt-0">
         <HcoOnboardingWorkflowSteps enrollment={enrollment} />
       </div>
 
-      {/* Conditionally render FHIR/CCD section if data exists */}
       {enrollment.ccdDocumentName && (
          <Card className="mt-6 shadow-lg">
             <CardHeader>
@@ -421,6 +476,7 @@ export function HcoProfileTab({
             )}
          </Card>
       )}
-    </div>
+    </>
   );
 }
+    
