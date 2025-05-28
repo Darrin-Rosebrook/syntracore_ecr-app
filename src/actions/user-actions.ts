@@ -59,7 +59,7 @@ export async function addPhaUserAction(
     const newUserForFirestore: Omit<PhaUser, 'id'> = {
       username: username,
       name: userData.name,
-      email: userData.email,
+      email: userData.email.toLowerCase(),
       phone: userData.phone || undefined, 
       program: userData.program,
       role: userData.role,
@@ -77,7 +77,7 @@ export async function addPhaUserAction(
     // Create UserProfile document
     const userProfileData: UserProfile = {
       uid: authUserUid,
-      email: userData.email,
+      email: userData.email.toLowerCase(),
       displayName: userData.name,
       userType: 'PHA',
       // @ts-ignore 
