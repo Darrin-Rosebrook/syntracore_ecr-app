@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LogIn, LogOut, UserCircle, Settings, Building, LayoutDashboard, Loader2, Search as SearchIcon, BookOpen, UserPlus, ChevronDown, FilePenLine, Share2 } from "lucide-react";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-// Removed: import { getVendorProfileAction } from '@/actions/vendor-actions'; // Not needed directly with userType
 import { ResourcesDrawer } from '@/components/resources-drawer';
 import {
   DropdownMenu,
@@ -26,7 +25,6 @@ interface NavLinkItem {
 }
 
 export function MainHeader() {
-  // Use userType from useAuth directly
   const { currentUser, userType, logOut, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -35,13 +33,12 @@ export function MainHeader() {
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [isResourcesDrawerOpen, setIsResourcesDrawerOpen] = useState(false);
 
-  // Hide search on specific pages
   const showSearch = ![
     '/hco-registration',
     '/vendor-registration',
     '/health-system-detailed-registration',
     '/login',
-    '/provider-portal', // Can decide to show/hide search within portals later
+    '/provider-portal',
     '/vendor-portal',
     '/health-system-portal',
     '/admin'
@@ -58,7 +55,7 @@ export function MainHeader() {
     if (searchTerm.trim()) {
       router.push(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
     } else {
-      router.push('/search'); // Or clear search results if on /search page
+      router.push('/search');
     }
   };
   
@@ -66,70 +63,47 @@ export function MainHeader() {
     setSearchTerm(searchParams.get('q') || '');
   }, [searchParams]);
 
-  // Define navigation links based on userType
-  let navLinks: NavLinkItem[] = [];
-  const commonLoggedInLinks: NavLinkItem[] = [
-    // Example: { href: '/profile', label: 'My Profile', icon: UserCircle },
-  ];
-
-  if (authLoading) {
-    // Handled by the main return block
-  } else if (currentUser && userType) {
+  let portalLink: NavLinkItem | null = null;
+  if (currentUser && userType) {
     switch (userType) {
       case 'PHA':
-        navLinks = [
-          { href: '/admin', label: 'Admin Dashboard', icon: Settings },
-          // Add other PHA specific links
-        ];
+        // PHA admins will see their email and Admin/Logout in the main section
         break;
       case 'HCO':
-        navLinks = [
-          { href: '/provider-portal', label: 'Provider Portal', icon: LayoutDashboard },
-          // Add other HCO specific links
-        ];
+        portalLink = { href: '/provider-portal', label: 'Provider Portal', icon: LayoutDashboard };
         break;
       case 'EHR_VENDOR':
-        navLinks = [
-          { href: '/vendor-portal', label: 'Vendor Portal', icon: Building },
-          // Add other Vendor specific links
-        ];
+        portalLink = { href: '/vendor-portal', label: 'Vendor Portal', icon: Building };
         break;
       case 'HEALTH_SYSTEM':
-        navLinks = [
-          { href: '/health-system-portal', label: 'Health System Portal', icon: Share2 },
-          // Add other Health System specific links
-        ];
+        portalLink = { href: '/health-system-portal', label: 'Health System Portal', icon: Share2 };
         break;
       default:
-        // Generic logged-in user, or if userType is unexpected
-        navLinks = [{ href: '/', label: 'Dashboard', icon: LayoutDashboard }]; 
+        portalLink = { href: '/', label: 'Dashboard', icon: LayoutDashboard };
     }
-    navLinks = [...navLinks, ...commonLoggedInLinks];
-  } else {
-    // Logged-out users
-    // "Login" and "Sign Up" are handled separately
   }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background shadow-sm">
       <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 mr-4">
+        <Link href="/" className="flex items-center gap-2 mr-4 shrink-0">
           <Image
             src="/images/SyntraCore_Logo.png"
             alt="SyntraCore Logo"
             width={150}
             height={50}
             priority
+            data-ai-hint="company logo"
           />
         </Link>
 
         {showSearch && (
-          <form onSubmit={handleSearchSubmit} className="flex-grow max-w-md mx-4">
-            <div className="relative">
+          <form onSubmit={handleSearchSubmit} className="flex-grow max-w-md mx-4 hidden md:flex">
+            <div className="relative w-full">
               <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search..." // Simplified placeholder
+                placeholder="Search..."
                 className="w-full rounded-lg bg-muted pl-10 h-9"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -146,18 +120,26 @@ export function MainHeader() {
             </Button>
           ) : currentUser ? (
             <>
-              {navLinks.map(link => (
-                <Button variant="ghost" size="sm" asChild key={link.href}>
-                  <Link href={link.href}>
-                    {link.icon && <link.icon className="mr-1 md:mr-2 h-4 w-4" />}
-                    <span className="hidden md:inline">{link.label}</span>
-                  </Link>
-                </Button>
-              ))}
               <span className="text-sm text-muted-foreground hidden lg:inline-block mr-2 ml-2 border-l pl-2">
                 <UserCircle className="inline mr-1 h-4 w-4" />
                 {currentUser.email}
               </span>
+              {userType === 'PHA' && (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/admin">
+                    <Settings className="mr-1 md:mr-2 h-4 w-4" />
+                    <span className="hidden md:inline">Admin Console</span>
+                  </Link>
+                </Button>
+              )}
+              {portalLink && userType !== 'PHA' && (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href={portalLink.href}>
+                    {portalLink.icon && <portalLink.icon className="mr-1 md:mr-2 h-4 w-4" />}
+                    <span className="hidden md:inline">{portalLink.label}</span>
+                  </Link>
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="mr-0 sm:mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Logout</span>
@@ -166,7 +148,7 @@ export function MainHeader() {
           ) : (
             <>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/login"> {/* Direct to login page as / should handle public view or redirect */}
+                <Link href="/"> 
                   <LogIn className="mr-2 h-4 w-4" />
                   Login
                 </Link>
@@ -197,6 +179,12 @@ export function MainHeader() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+               {/* Temporary Admin Console Access Button for Guests */}
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/admin">
+                  <Settings className="mr-1 h-4 w-4 text-destructive" /> Admin Console (Temp)
+                </Link>
+              </Button>
             </>
           )}
           <Button
