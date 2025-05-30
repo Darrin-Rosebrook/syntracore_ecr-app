@@ -28,6 +28,11 @@ export function HealthSystemsTab() {
     }).sort((a,b) => a.name.localeCompare(b.name));
   }, [enrollments, healthSystems, isContextLoading]);
 
+    // ✅ Add the useEffect here
+    React.useEffect(() => {
+      console.log('[HealthSystemsTab] Component mounted');
+    }, []);
+    
   if (isContextLoading && healthSystems.length === 0) {
     return (
       <div className="flex justify-center items-center p-10">
@@ -94,3 +99,4 @@ export function HealthSystemsTab() {
     </div>
   );
 }
+
