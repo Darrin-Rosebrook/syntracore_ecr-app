@@ -19,7 +19,7 @@ export function HealthSystemsTab() {
   const { enrollments, healthSystems, isLoading: isContextLoading } = useAppContext();
 
   const healthSystemsWithCounts = useMemo((): HealthSystemDisplayInfo[] => {
-    if (isContextLoading || !healthSystems) return []; 
+    if (isContextLoading || !healthSystems) return [];
     return healthSystems.map(system => {
       const count = enrollments.filter(
         (enrollment: EnrollmentData) => enrollment.practiceInfo.healthSystem === system.id
@@ -28,7 +28,7 @@ export function HealthSystemsTab() {
     }).sort((a,b) => a.name.localeCompare(b.name));
   }, [enrollments, healthSystems, isContextLoading]);
 
-  if (isContextLoading && healthSystems.length === 0) { 
+  if (isContextLoading && healthSystems.length === 0) {
     return (
       <div className="flex justify-center items-center p-10">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -62,22 +62,25 @@ export function HealthSystemsTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {healthSystemsWithCounts.map((system: HealthSystemDisplayInfo) => (
-                    <TableRow key={system.id} className="hover:bg-muted/50">
-                      <TableCell className="font-medium">
-                        <Link href={`/admin/health-systems/${system.id}`} className="text-primary hover:underline">
-                          {system.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{system.contactEmail || 'N/A'}</TableCell>
-                      <TableCell className="text-right">{system.hcoCount}</TableCell>
-                      <TableCell className="text-right">
-                        <Link href={`/admin/health-systems/${system.id}`} title="View Health System Details">
-                          <ChevronRight className="h-5 w-5 text-muted-foreground hover:text-primary inline-block" />
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {healthSystemsWithCounts.map((system: HealthSystemDisplayInfo) => {
+                    console.log(`[HealthSystemsTab] Creating link for system: ${system.name}, ID: ${system.id}`); // Added console.log
+                    return (
+                      <TableRow key={system.id} className="hover:bg-muted/50">
+                        <TableCell className="font-medium">
+                          <Link href={`/admin/health-systems/${system.id}`} className="text-primary hover:underline">
+                            {system.name}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{system.contactEmail || 'N/A'}</TableCell>
+                        <TableCell className="text-right">{system.hcoCount}</TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/admin/health-systems/${system.id}`} title="View Health System Details">
+                            <ChevronRight className="h-5 w-5 text-muted-foreground hover:text-primary inline-block" />
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </ScrollArea>
