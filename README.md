@@ -159,5 +159,3 @@ Darrin Rosebrook
 SyntraCore
 
 © 2025 SyntraCore
-
-✅ What this versio
